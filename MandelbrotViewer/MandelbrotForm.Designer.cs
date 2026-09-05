@@ -17,6 +17,8 @@
     private Label lblAA = null!;
     private ComboBox cmbAA = null!;
     private Label lblEngine = null!;
+    private Label lblGpu = null!;
+    private ComboBox cmbGpu = null!;
     private RadioButton radioCpu = null!;
     private RadioButton radioCuda = null!;
     private RadioButton radioDx = null!;
@@ -63,6 +65,8 @@
         this.lblAA = new Label();
         this.cmbAA = new ComboBox();
         this.lblEngine = new Label();
+        this.lblGpu = new Label();
+        this.cmbGpu = new ComboBox();
         this.radioCpu = new RadioButton();
         this.radioCuda = new RadioButton();
         this.radioDx = new RadioButton();
@@ -104,8 +108,10 @@
         this.layoutTop.AutoSize = true;
         this.layoutTop.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         this.layoutTop.Margin = new Padding(0);
-        this.layoutTop.ColumnCount = 11;
+        this.layoutTop.ColumnCount = 13;
         this.layoutTop.RowCount = 1;
+        this.layoutTop.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        this.layoutTop.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         this.layoutTop.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         this.layoutTop.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         this.layoutTop.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -129,6 +135,8 @@
         this.layoutTop.Controls.Add(this.cmbAA, 8, 0);
         this.layoutTop.Controls.Add(this.lblEngine, 9, 0);
         this.layoutTop.Controls.Add(this.enginePanel, 10, 0);
+        this.layoutTop.Controls.Add(this.lblGpu, 11, 0);
+        this.layoutTop.Controls.Add(this.cmbGpu, 12, 0);
 
         // btnReset
         this.btnReset.Anchor = AnchorStyles.None;
@@ -202,6 +210,19 @@
         this.lblEngine.Anchor = AnchorStyles.None;
         this.lblEngine.AutoSize = true;
         this.lblEngine.Text = "Motore:";
+
+        // lblGpu
+        this.lblGpu.Anchor = AnchorStyles.None;
+        this.lblGpu.AutoSize = true;
+        this.lblGpu.Text = "GPU:";
+
+        // cmbGpu (scheda video: "Auto" + schede enumerate di CUDA e DirectX)
+        this.cmbGpu.Anchor = AnchorStyles.None;
+        this.cmbGpu.Width = 200;
+        this.cmbGpu.DropDownStyle = ComboBoxStyle.DropDownList;
+        this.cmbGpu.Items.AddRange(new object[] { "Auto" });
+        this.cmbGpu.SelectedIndex = 0;
+        this.cmbGpu.SelectedIndexChanged += new EventHandler(this.CmbGpu_SelectedIndexChanged);
 
         // radioCpu
         this.radioCpu.Anchor = AnchorStyles.None;

@@ -14,7 +14,10 @@ mostra comunque il valore usato pur restando disabilitato. Dropdown AA
 di ogni blocco kxk (su CPU e GPU, costo ~k²). Radio motore di rendering: CPU sempre
 disponibile, CUDA se c'è una GPU NVIDIA (float sopra scala 1e-3, double sotto,
 altrimenti fallback CPU); DirectX realtime (v2.0, shader HLSL, float, loop
-~60 fps, pan/zoom immediati, fallback CPU in caso di errore). Menu File: carica zona
+~60 fps, pan/zoom immediati, fallback CPU in caso di errore). Dropdown GPU
+(v2.1): con più schede video si sceglie quale usare — "Auto" = la più potente,
+altrimenti la scheda nominata; unisce le schede DirectX (DXGI) e i device
+CUDA (ILGPU); la scelta è persistita e applicata al cambio di motore. Menu File: carica zona
 (Ctrl+O) e salva zona (Ctrl+S) in formato JSON (centro, scala, iterazioni),
 salva immagine con nome (Ctrl+Shift+S), benchmark standard 8s (Ctrl+B) con
 pixel/s in grande, Esci (Alt+F4).
@@ -30,7 +33,8 @@ throttle del pan (80 ms) e anti-rimbalzo sul resize.
   Termico) con gradienti e smooth coloring.
 - `MandelbrotViewer/MandelbrotForm.cs` / `MandelbrotForm.Designer.cs` — UI: zoom/pan,
   menu File (zone, PNG, benchmark, Esci) e Aiuto, dropdown palette e AA,
-  checkbox iterazioni auto, radio motore, `TableLayoutPanel`, `StatusStrip`.
+  checkbox iterazioni auto, radio motore, dropdown GPU (scelta scheda video),
+  `TableLayoutPanel`, `StatusStrip`.
 - `MandelbrotViewer/BenchmarkForm.cs` / `.Designer.cs` — benchmark standard
   (zona fissa 800x600 AA 8x, 5000 iterazioni, durata minima 8 s) con risultato
   pixel/s in grande, UI aggiornata ogni 3 s, progresso e annullamento.
@@ -39,16 +43,20 @@ throttle del pan (80 ms) e anti-rimbalzo sul resize.
 - `MandelbrotViewer/RenderEngine.cs` — enum `RenderEngine` (Cpu/Cuda/DirectX) +
   disponibilità (CUDA solo se `GpuMandelbrot.IsReady`).
 - `MandelbrotViewer/Settings.cs` — `AppSettings` in
-  `%APPDATA%\MandelbrotViewer\settings.json`: iterazioni, palette, AA, motore
-  e finestra; la vista NON viene memorizzata (all'avvio si parte sempre
-  dall'insieme completo); load tollerante, save validato.
+  `%APPDATA%\MandelbrotViewer\settings.json`: iterazioni, palette, AA, motore,
+  GPU scelta e finestra; la vista NON viene memorizzata (all'avvio si parte
+  sempre dall'insieme completo); load tollerante, save validato.
 - `MandelbrotViewer/DxMandelbrot.cs` — backend DirectX 11 realtime via
   Vortice 3.8.3: pixel shader HLSL (float) che calcola il frattale a ogni
   frame, swapchain legata al pannello, AA come supersampling in-shader,
-  cattura backbuffer per Salva PNG, `LastError` diagnostico.
+  cattura backbuffer per Salva PNG, `LastError` diagnostico. `AdapterNames()`
+  elenca le schede hardware (escluso WARP); `TryInitialize(..., adapterName)`
+  crea il device sull'adapter scelto (auto = più memoria dedicata).
 - `MandelbrotViewer/GpuMandelbrot.cs` — backend CUDA via ILGPU 1.5.3: kernel
   float/double (un thread per pixel, solo fuga), soglia double a scala < 1e-3,
-  device più capiente in automatico, fallback CPU, `LastError` diagnostico.
+  fallback CPU, `LastError` diagnostico. `DeviceNames()` elenca i device CUDA;
+  `TryInitialize(deviceName)` usa la scheda scelta (auto = la più capiente);
+  `ResetAccelerator` riusa il contesto CUDA al cambio di scheda.
 - `avvia.bat` / `avvia.ps1` — lancio: usa `pubblicato\` se presente, altrimenti
   `bin\Debug`, altrimenti `dotnet run`.
 - `pubblicato/` — build self-contained single-file (~150 MB), rigenerabile,

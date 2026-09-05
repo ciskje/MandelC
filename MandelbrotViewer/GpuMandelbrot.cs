@@ -61,29 +61,57 @@ internal static class GpuMandelbrot
     /// <summary>True se la scala richiede il double (il float non ha cifre a sufficienza).</summary>
     public static bool WantsDouble(double scale) => scale < 1e-3;
 
-    /// <summary>
-    /// Inizializza contesto, device CUDA e kernel. Prova i device CUDA dal più
-    /// capiente; ritorna false se nessuno funziona (si usa la CPU).
-    /// </summary>
-    public static bool TryInitialize()
+    /// <summary>Device CUDA disponibili (nomi ILGPU); vuoto se nessun CUDA.</summary>
+    public static IReadOnlyList<string> DeviceNames()
     {
-        if (IsReady) return true;
-        LastError = "";
         try
         {
-            _context = Context.CreateDefault();
+            _context ??= Context.CreateDefault();
+            return _context.Devices
+                .Where(d => d.AcceleratorType == AcceleratorType.Cuda)
+                .Select(d => d.Name)
+                .Distinct()
+                .OrderBy(n => n)
+                .ToList();
+        }
+        catch
+        {
+            return new List<string>();
+        }
+    }
+
+    /// <summary>
+    /// Inizializza contesto, device CUDA e kernel. Con <paramref name="deviceName"/>
+    /// usa quella scheda; senza, prova i device CUDA dal più capiente.
+    /// Ritorna false se nessuno funziona (si usa la CPU).
+    /// </summary>
+    public static bool TryInitialize(string? deviceName = null)
+    {
+        if (IsReady && (deviceName == null || DeviceName == deviceName)) return true;
+        LastError = "";
+        ResetAccelerator();
+        try
+        {
+            _context ??= Context.CreateDefault();
             var cudaDevices = _context.Devices
                 .Where(d => d.AcceleratorType == AcceleratorType.Cuda)
-                .OrderByDescending(d => d.MemorySize)
                 .ToList();
             if (cudaDevices.Count == 0)
             {
                 LastError = "Nessun device CUDA enumerato.";
-                Dispose();
                 return false;
             }
 
-            foreach (var device in cudaDevices)
+            var candidates = deviceName == null
+                ? cudaDevices.OrderByDescending(d => d.MemorySize).ToList()
+                : cudaDevices.Where(d => d.Name == deviceName).ToList();
+            if (candidates.Count == 0)
+            {
+                LastError = $"Device CUDA non trovato: {deviceName}";
+                return false;
+            }
+
+            foreach (var device in candidates)
             {
                 try
                 {
@@ -98,24 +126,29 @@ internal static class GpuMandelbrot
                 catch (Exception ex)
                 {
                     LastError = $"{device.Name}: {ex.GetType().Name}: {ex.Message}";
-                    _floatKernel = null;
-                    _doubleKernel = null;
-                    _floatBenchKernel = null;
-                    _doubleBenchKernel = null;
-                    _accelerator?.Dispose();
-                    _accelerator = null;
-                    DeviceName = "";
+                    ResetAccelerator();
                 }
             }
-            Dispose();
             return false;
         }
         catch (Exception ex)
         {
             LastError = ex.GetType().Name + ": " + ex.Message;
-            Dispose();
+            ResetAccelerator();
             return false;
         }
+    }
+
+    /// <summary>Scarica accelerator+kernel (il contesto CUDA resta riusabile).</summary>
+    private static void ResetAccelerator()
+    {
+        _floatKernel = null;
+        _doubleKernel = null;
+        _floatBenchKernel = null;
+        _doubleBenchKernel = null;
+        _accelerator?.Dispose();
+        _accelerator = null;
+        DeviceName = "";
     }
 
     /// <summary>Calcola il frame su GPU (lancio kernel + ricopia in RAM).</summary>
@@ -240,15 +273,9 @@ internal static class GpuMandelbrot
 
     public static void Dispose()
     {
-        _floatKernel = null;
-        _doubleKernel = null;
-        _floatBenchKernel = null;
-        _doubleBenchKernel = null;
-        _accelerator?.Dispose();
-        _accelerator = null;
+        ResetAccelerator();
         _context?.Dispose();
         _context = null;
-        DeviceName = "";
     }
 
     // ---------- Kernel benchmark: solo iterazioni (niente |z|², un terzo del traffico) ----------

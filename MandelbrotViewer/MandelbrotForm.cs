@@ -15,6 +15,7 @@ public partial class MandelbrotForm : Form
     private RenderEngine _engine = RenderEngine.Cpu;
     private AppSettings _settings = new();
     private bool _suspendRender = true; // true finché il costruttore applica le impostazioni
+    private string? _gpuSelection;      // scheda video scelta (null = auto)
 
     private Bitmap? _fractal;
     private CancellationTokenSource? _renderCts;
@@ -49,13 +50,24 @@ public partial class MandelbrotForm : Form
 
         Shown += async (s, e) =>
         {
-            bool dxOk = DxMandelbrot.TryInitialize(dxPanel.Handle, Math.Max(1, dxPanel.Width), Math.Max(1, dxPanel.Height));
+            // Dropdown GPU: unione delle schede DirectX e dei device CUDA.
+            var dxNames = DxMandelbrot.AdapterNames();
+            var cudaNames = await Task.Run(GpuMandelbrot.DeviceNames);
+            foreach (string n in dxNames.Concat(cudaNames).Distinct().OrderBy(n => n))
+                if (!cmbGpu.Items.Contains(n)) cmbGpu.Items.Add(n);
+
+            string savedGpu = _settings.Gpu;
+            if (!string.IsNullOrEmpty(savedGpu) && cmbGpu.Items.Contains(savedGpu))
+                cmbGpu.SelectedItem = savedGpu;
+            _gpuSelection = cmbGpu.SelectedIndex > 0 ? cmbGpu.SelectedItem!.ToString() : null;
+
+            bool dxOk = DxMandelbrot.TryInitialize(dxPanel.Handle, Math.Max(1, dxPanel.Width), Math.Max(1, dxPanel.Height), _gpuSelection);
             if (dxOk) radioDx.Enabled = true;
             if (_settings.Engine == nameof(RenderEngine.DirectX) && dxOk)
                 radioDx.Checked = true;
             ApplyEngineVisibility(); // primo paint (bitmap, o DX se preselezionato)
 
-            bool gpu = await Task.Run(GpuMandelbrot.TryInitialize);
+            bool gpu = await Task.Run(() => GpuMandelbrot.TryInitialize(_gpuSelection));
             if (gpu && !IsDisposed)
             {
                 radioCuda.Enabled = true;
@@ -362,7 +374,8 @@ public partial class MandelbrotForm : Form
             "Palette: Fuoco, Ghiaccio o Termico dal menu a tendina\n" +
             "Iterazioni Auto: checkbox, crescono con l'ingrandimento\n" +
             "AA: 1x off, 2x/4x/8x con media dei pixel vicini\n" +
-            "Motori: CPU, CUDA (compute) o DirectX (realtime, float)\n\n" +
+            "Motori: CPU, CUDA (compute) o DirectX (realtime, float)\n" +
+            "GPU: scegli la scheda video dal menu a tendina (Auto = più potente)\n\n" +
             "Menu File: salva/carica la zona in formato JSON.",
             "Informazioni", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
@@ -383,6 +396,7 @@ public partial class MandelbrotForm : Form
         chkIterAuto.Checked = _settings.IterAuto;
         cmbPalette.SelectedIndex = Math.Clamp(_settings.Palette, 0, cmbPalette.Items.Count - 1);
         cmbAA.SelectedIndex = Math.Clamp(_settings.AaIndex, 0, cmbAA.Items.Count - 1);
+        _gpuSelection = string.IsNullOrEmpty(_settings.Gpu) ? null : _settings.Gpu;
 
         var r = new Rectangle(_settings.WinX, _settings.WinY, _settings.WinW, _settings.WinH);
         if (r.Width > 0 && r.Height > 0 && Screen.AllScreens.Any(s => s.Bounds.IntersectsWith(r)))
@@ -403,6 +417,7 @@ public partial class MandelbrotForm : Form
             _settings.Palette = cmbPalette.SelectedIndex;
             _settings.AaIndex = cmbAA.SelectedIndex;
             _settings.Engine = _engine.ToString();
+            _settings.Gpu = _gpuSelection ?? "";
             _settings.WinX = r.X;
             _settings.WinY = r.Y;
             _settings.WinW = r.Width;
@@ -449,12 +464,84 @@ public partial class MandelbrotForm : Form
 
     private void CmbPalette_SelectedIndexChanged(object? sender, EventArgs e) => InvalidateView();
 
+    /// <summary>Etichetta della GPU selezionata nel dropdown ("Auto" se indice 0).</summary>
+    private string GpuLabel() => cmbGpu.SelectedIndex > 0 ? cmbGpu.SelectedItem!.ToString() : "Auto";
+
+    private void CmbGpu_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        if (cmbGpu.SelectedIndex < 0) return;
+        _gpuSelection = cmbGpu.SelectedIndex > 0 ? cmbGpu.SelectedItem!.ToString() : null;
+        string name = GpuLabel();
+
+        if (_engine == RenderEngine.DirectX)
+        {
+            if (DxMandelbrot.TryInitialize(dxPanel.Handle, Math.Max(1, dxPanel.Width), Math.Max(1, dxPanel.Height), _gpuSelection))
+            {
+                _dxDirty = true;
+                lblStatus.Text = $"GPU: {name} (DirectX)";
+            }
+            else
+            {
+                FallbackToCpu($"DirectX su '{name}': {DxMandelbrot.LastError}");
+            }
+        }
+        else if (_engine == RenderEngine.Cuda)
+        {
+            if (GpuMandelbrot.TryInitialize(_gpuSelection))
+            {
+                InvalidateView();
+                lblStatus.Text = $"GPU: {name} (CUDA {GpuMandelbrot.DeviceShortName})";
+            }
+            else
+            {
+                _engine = RenderEngine.Cpu;
+                radioCpu.Checked = true;
+                ApplyEngineVisibility();
+                lblStatus.Text = $"CUDA su '{name}': {GpuMandelbrot.LastError} — passo a CPU";
+            }
+        }
+        else
+        {
+            // Motore CPU: selezione ricordata, si applica al cambio di motore.
+            lblStatus.Text = $"GPU: {name} (motore CPU, si applicherà al cambio motore)";
+        }
+    }
+
     private void EngineRadio_CheckedChanged(object? sender, EventArgs e)
     {
         if (sender is not RadioButton r || !r.Checked) return;
         _engine = r == radioCuda ? RenderEngine.Cuda
             : r == radioDx ? RenderEngine.DirectX
             : RenderEngine.Cpu;
+
+        // Motore GPU ancora non inizializzato: lo inizializza adesso sulla scheda scelta.
+        if (_engine == RenderEngine.Cuda && !GpuMandelbrot.IsReady)
+        {
+            Cursor = Cursors.WaitCursor;
+            bool ok = GpuMandelbrot.TryInitialize(_gpuSelection);
+            Cursor = Cursors.Default;
+            if (!ok)
+            {
+                _engine = RenderEngine.Cpu;
+                radioCpu.Checked = true;
+                ApplyEngineVisibility();
+                lblStatus.Text = "CUDA non disponibile: " + GpuMandelbrot.LastError;
+                return;
+            }
+        }
+        if (_engine == RenderEngine.DirectX && !DxMandelbrot.IsReady)
+        {
+            if (!DxMandelbrot.TryInitialize(dxPanel.Handle, Math.Max(1, dxPanel.Width), Math.Max(1, dxPanel.Height), _gpuSelection))
+            {
+                radioDx.Enabled = false;
+                _engine = RenderEngine.Cpu;
+                radioCpu.Checked = true;
+                ApplyEngineVisibility();
+                lblStatus.Text = "DirectX non disponibile: " + DxMandelbrot.LastError;
+                return;
+            }
+        }
+
         if (!RenderEngineInfo.IsAvailable(_engine)) _engine = RenderEngine.Cpu;
         ApplyEngineVisibility();
     }

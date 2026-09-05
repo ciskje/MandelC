@@ -13,6 +13,8 @@ public sealed class AppSettings
     public int Palette { get; set; }
     public int AaIndex { get; set; }
     public string Engine { get; set; } = nameof(RenderEngine.Cuda);
+    /// <summary>Scheda video scelta ("" = auto).</summary>
+    public string Gpu { get; set; } = "";
     public int WinX { get; set; }
     public int WinY { get; set; }
     public int WinW { get; set; }

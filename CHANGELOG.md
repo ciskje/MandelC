@@ -3,6 +3,16 @@
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
 
+- **v2.1** — Scelta della scheda video con più GPU: nuovo dropdown "GPU:" in
+  barra (Auto = scheda più potente, altrimenti la scheda nominata). Enumera
+  l'unione delle schede DirectX (DXGI) e dei device CUDA (ILGPU) e crea il
+  device/accelerator sulla scelta; la preferenza è persistita in
+  `settings.json` (`Gpu`) e applicata al cambio di motore. File: `DxMandelbrot.cs`
+  (`AdapterNames`, `TryInitialize(..., adapterName)`), `GpuMandelbrot.cs`
+  (`DeviceNames`, `TryInitialize(deviceName)`, `ResetAccelerator`),
+  `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs` (`lblGpu`, `cmbGpu`),
+  `Settings.cs`, `AppVersion.cs`, `.csproj`.
+
 - **v2.0.1** — Limite massimo iterazioni portato a 50000 (manuale e zone; il
   benchmark resta standard a 5000). L'app parte sempre dall'insieme completo:
   la vista precedente (centro/larghezza) non viene più memorizzata in
