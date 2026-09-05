@@ -3,11 +3,80 @@
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
 
-- **v2.1.1** — Dropdown GPU disabilitato quando il motore attivo è la CPU
+- **v2.3.14** — La finestra log non mostra più tutto il testo selezionato in blu
+  all’apertura; il focus iniziale va al pulsante `Chiudi`.
+
+- **v2.3.13** — Schiarite le palette con una curva comune a CPU, CUDA e
+  DirectX (`t × 1,35 + 0,03`, saturata a 1), mantenendo nero l’interno.
+
+- **v2.3.12** — Aggiunto il benchmark reale DirectX: esegue lo shader sulla
+  swapchain e conta i frame presentati, mostrando pixel/s e frame completati.
+
+- **v2.3.11** — Corretto il testo del benchmark: il fallback DirectX ora mostra
+  `precisione CPU`; `CUDA 32/64-bit` compare solo quando CUDA è realmente usata.
+
+- **v2.3.10** — Uniformata la colorazione CPU, CUDA e DirectX: stessa mappa
+  basata sulle iterazioni e stessi stop di palette.
+
+- **v2.3.9** — Allineata la colorazione CUDA/DirectX sulla stessa interpolazione
+  della palette; mantenuti su GPU il calcolo e il downsampling AA. Verificati
+  entrambi i motori a runtime.
+
+- **v2.3.8** — Corretto il kernel CUDA per la compilazione runtime ILGPU e
+  verificato il render sulla RTX 5070 Ti; DirectX ora inizializza l’adapter
+  hardware senza il marshalling difettoso della descrizione DXGI.
+
+- **v2.3.7** — Spostate su CUDA la colorazione e il downsampling AA;
+  alla CPU viene trasferito solo il bitmap finale. File: `GpuMandelbrot.cs`,
+  `AppVersion.cs`, `.csproj`.
+
+  serializzando calcolo e colorazione per evitare race tra render cancellati.
+  Il benchmark ora rispetta la precisione 32/64 selezionata e non ricopia più
+  il buffer completo alla CPU. File: `GpuMandelbrot.cs`, `BenchmarkForm.cs`,
+  `MandelbrotForm.cs`, `AppVersion.cs`, `.csproj`.
+
+  `D3D11CreateDevice` ora usa `DriverType.Unknown` quando riceve l'adapter DXGI
+  selezionato. File: `DxMandelbrot.cs`, `AppVersion.cs`, `.csproj`.
+
+  l'inizializzazione (es. `[IDXGIFactory2.CreateSwapChainForHwnd] ...`); swapchain
+  cambiata da `FlipDiscard` a `FlipSequential` (più compatibile) e `SampleDescription`
+  fissato esplicito a (1,0). File: `DxMandelbrot.cs` (`TryInitialize`), `AppVersion.cs`,
+  `.csproj`.
+
+  una finestra di sola lettura con lo stato dei motori (DirectX e CUDA: pronto,
+  scheda in uso, ultimo errore, schede disponibili), la selezione GPU, la
+  precisione e le impostazioni salvate — utile per capire perché un motore risulta
+  disabilitato. File: `MandelbrotForm.cs` (`LogItem_Click`, `BuildDiagnosticLog`),
+  `MandelbrotForm.Designer.cs`, nuovo `LogForm.cs`, `AppVersion.cs`, `.csproj`.
+
+  il motivo esatto (`LastError`) è ora mostrato nella barra di stato invece di
+  lasciare la radio semplicemente grigia. File: `MandelbrotForm.cs`
+  (handler `Shown`), `AppVersion.cs`, `.csproj`.
+
+  invece che disabilitato: la barra resta pulita e la scelta della scheda video
+  compare solo con CUDA o DirectX. File: `MandelbrotForm.cs`
+  (`ApplyEngineVisibility`), `MandelbrotForm.Designer.cs` (`lblGpu`/`cmbGpu`
+  `Visible`), `AppVersion.cs`, `.csproj`.
+
+  CUDA: 32 = float 32-bit (più veloce), 64 = double 64-bit (più preciso,
+  predefinito). Prima la precisione era decisa in automatico dalla scala
+  (`WantsDouble`); ora è a scelta dell'utente. I due radio sono abilitati solo
+  con motore CUDA (CPU = sempre double, DirectX = sempre float) e la scelta è
+  persistita in settings.json. File: `MandelbrotForm.cs`/
+  `MandelbrotForm.Designer.cs` (`precisionPanel`, `radPrec32`/`radPrec64`,
+  `UseDoublePrecision`), `GpuMandelbrot.cs` (`RenderFrame` con `useDouble`),
+  `Settings.cs` (`Single`), `AppVersion.cs`, `.csproj`.
+
+  File/Aiuto (spiegano funzione e scorciatoia); cursore "atteso" ora visibile
+  anche col mouse sopra un controllo (es. il dropdown AA) durante il calcolo,
+  perché viene imposto su form e controlli di input e non solo sulla form.
+  File: `MandelbrotForm.cs` (`SetBusyCursor`, `RenderAsync`),
+  `MandelbrotForm.Designer.cs` (componente `toolTip` + `SetToolTip`),
+  `AppVersion.cs`, `.csproj`.
+
   (la scheda si sceglie solo con CUDA o DirectX). File: `MandelbrotForm.cs`
   (`ApplyEngineVisibility`), `MandelbrotForm.Designer.cs`.
 
-- **v2.1** — Scelta della scheda video con più GPU: nuovo dropdown "GPU:" in
   barra (Auto = scheda più potente, altrimenti la scheda nominata). Enumera
   l'unione delle schede DirectX (DXGI) e dei device CUDA (ILGPU) e crea il
   device/accelerator sulla scelta; la preferenza è persistita in
@@ -17,13 +86,11 @@ Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
   `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs` (`lblGpu`, `cmbGpu`),
   `Settings.cs`, `AppVersion.cs`, `.csproj`.
 
-- **v2.0.1** — Limite massimo iterazioni portato a 50000 (manuale e zone; il
   benchmark resta standard a 5000). L'app parte sempre dall'insieme completo:
   la vista precedente (centro/larghezza) non viene più memorizzata in
   `settings.json`. File: `MandelbrotForm.Designer.cs`, `Settings.cs`,
   `MandelbrotForm.cs`.
 
-- **v2.0** — Motore DirectX 11 realtime: pixel shader HLSL che calcola il
   frattale a ogni frame (float, triangolo fullscreen), loop ~60 fps con
   pan/zoom immediati, AA 2x/4x/8x come supersampling dentro lo shader,
   salvataggio PNG dal backbuffer, fallback CPU automatico in caso di errore.
@@ -31,42 +98,33 @@ Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
   `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs` (`dxPanel`, `radioDx`),
   `.csproj` (dipendenze Vortice 3.8.3).
 
-- **v1.10** — Impostazioni persistite tra un lancio e l'altro
   (`%APPDATA%\MandelbrotViewer\settings.json`): iterazioni auto/manuale e valore,
   palette, AA, motore preferito, ultima vista e posizione finestra; preferenza
   GPU rispettata all'avvio. File: `Settings.cs` (nuovo), `MandelbrotForm.cs`.
 
-- **v1.9** — Dettaglio benchmark senza iterazioni totali. Benchmark GPU più
   veloce: kernel solo-iterazioni (niente buffer |z|²) + buffer riusati per tutti
   i frame (niente alloc/transfer extra). File: `BenchmarkForm.cs`,
   `GpuMandelbrot.cs`.
 
-- **v1.8.1** — Tasto "Salva PNG" sostituito da "Benchmark" (il PNG resta in
   File → Salva immagine con nome). File: `MandelbrotForm.Designer.cs`.
 
-- **v1.8** — Benchmark in AA 8x (64x pixel per frame, contati nel risultato) e
   aggiornamento UI limitato a ogni 3 s + report finale, così gli Invoke non
   falsano la misura (`BenchmarkProgress.ReportInterval`). File: `Mandelbrot.cs`,
   `GpuMandelbrot.cs`, `BenchmarkForm.cs`.
 
-- **v1.7.1** — Risultato benchmark in pixel/s (live e finale, con G/M/k suffissi);
   le iterazioni totali restano nel dettaglio. `BenchmarkProgress` riporta anche
   i frame. File: `BenchmarkForm.cs`, `Mandelbrot.cs`, `GpuMandelbrot.cs`.
 
-- **v1.7** — Benchmark standard (menu File, Ctrl+B): zona fissa 800x600 a 5000
   iterazioni max per 8 secondi, misura iterazioni/s del motore selezionato
   (fallback CPU), risultato in grande (Giter/s, Miter/s…) con barra di
   avanzamento e annullamento. File: `BenchmarkForm.cs` + `.Designer.cs` (nuovi),
   `Mandelbrot.cs` (`BenchmarkCpu`), `GpuMandelbrot.cs` (`BenchmarkGpu`),
   `MandelbrotForm.*` (voce menu).
 
-- **v1.6.1** — Antialias senza checkbox: solo dropdown (1x = off, 2x/4x/8x = on).
   File: `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`.
-- **v1.6** — Anteprima veloce durante il pan: niente AA e 1/4 dei pixel (metà
   per lato) con upscale bilineare, render completo al rilascio; stato marcato
   "(anteprima)". File: `MandelbrotForm.cs` (`RenderAsync(preview)`, `Upscale`).
 
-- **v1.5** — Antialias con checkbox + dropdown 1x/2x/4x/8x: supersampling a
   risoluzione k volte maggiore + media RGB di ogni blocco kxk (stessa logica su
   CPU con `AverageBlock` e su GPU); iterazioni automatiche da radio a checkbox
   (default manuale); finestra default 1152x720. Verificato con smoke test
@@ -74,7 +132,6 @@ Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
   `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`. Formula iter auto
   `200 + 790·log10(zoom)` (~2000 a scala 1,95e-4, ~4550 a scala 1e-5).
 
-- **v1.4** — Backend CUDA con ILGPU 1.5.3: kernel float (zoom bassi) e double
   (scala < 1e-3), un thread per pixel, device più capiente in automatico,
   fallback CPU se niente GPU, radio CUDA abilitata all'avvio se la GPU risponde;
   stato e Informazioni mostrano motore/precisione/device. Refactor:
@@ -85,39 +142,31 @@ Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
   `Mandelbrot.cs`, `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`,
   `RenderEngine.cs`, `.csproj` (dipendenza ILGPU).
 
-- **v1.3.3** — Radio di selezione motore di rendering (CPU/CUDA/DirectX) con
   enum `RenderEngine` + `RenderEngineInfo`; CUDA e DirectX disabilitati
   (roadmap v1.4/v2.0). Aiuto spostato nella `StatusStrip`, finestra default
   1024x680, motore attivo mostrato nello stato. File: `RenderEngine.cs`
   (nuovo), `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`.
 
-- **v1.3.2** — Rinomina `Form1` → `MandelbrotForm` (via `git mv`, storia
   preservata). File: `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`,
   `Program.cs`.
-- **v1.3.1** — In modalità Auto il numero delle iterazioni resta disabilitato ma
   mostra il valore automatico usato per il render. File: `Form1.cs`.
 
-- **v1.3** — Voce `Esci` (Alt+F4) nel menu File; dropdown palette colori
   (Fuoco, Ghiaccio, Termico) con gradienti dedicati in `Mandelbrot.cs` (via
   l'enum `Palette`); barra superiore rifatta con `TableLayoutPanel` così numero
   iterazioni, label, radio e dropdown sono allineati verticalmente; radio
   Auto/Manuale per le iterazioni (`AutoIter = 150 + 150·log10(zoom)`,
   clamp 50–5000, numero disabilitato in auto); stato spostato in `StatusStrip`
   in basso. File: `Form1.cs`, `Form1.Designer.cs`, `Mandelbrot.cs`.
-- **v1.2** — Menu File (carica zona Ctrl+O, salva zona Ctrl+S in JSON, salva
   immagine con nome Ctrl+Shift+S) + menu Aiuto con Informazioni (versione e
   comandi); zoom con rotella sul cursore (focus automatico al passaggio mouse);
   tasti singoli R/S/+/- ignorati con Ctrl/Alt premuti. File: `Form1.cs`
   (`ViewZone`, `SaveZone`, `LoadZone`, `ShowAbout`), `Form1.Designer.cs`
   (`MenuStrip`).
-- **v1.1.1** — Zoom solo col click (sx = avanti 2x, dx = indietro 2x centrati sul
   punto); trascinamento con pulsante premuto = pan con throttle 80 ms
   (soglia click/trascinamento 5 px). Rimossi zoom su rettangolo e zoom con
   rotella. File: `Form1.cs`, `Form1.Designer.cs` (testo aiuto aggiornato).
-- **v1.1** — Script di lancio (`avvia.bat`/`avvia.ps1` con fallback dotnet
   user-level); publish self-contained in `pubblicato/` così non serve installare
   il Desktop Runtime; versione in sorgente (`AppVersion.cs` + `<Version>` nel
   csproj, mostrata nel titolo); setup progetto (AGENTS.md, TODO.md,
   SPECIFICHE.md, `.gitignore`, tracking nel repo `test/`).
-- **v1.0** — Primo visualizzatore: rendering parallelo, zoom mouse/rotella,
   iterazioni configurabili, salvataggio PNG. File: `Form1.*`, `Mandelbrot.cs`.

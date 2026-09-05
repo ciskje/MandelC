@@ -109,21 +109,16 @@ public static class Mandelbrot
     }
 
     /// <summary>
-    /// Colore da iterazioni e |z|² finali con smooth coloring.
-    /// Usato sia dal percorso CPU sia per colorare i frame calcolati su GPU.
+    /// Colore da iterazioni e palette, condiviso dal percorso CPU.
     /// </summary>
     internal static int ColorFromEscape(int iter, double mod2, int maxIter, Palette palette)
     {
         if (iter >= maxIter)
             return unchecked((int)0xFF000000); // dentro -> nero
-        // Smooth coloring: mu evita le bande di colore nette.
-        double modulus = Math.Sqrt(mod2);
-        double mu = iter + 1 - Math.Log(Math.Log(modulus)) / Math.Log(2.0);
-        if (double.IsNaN(mu) || double.IsInfinity(mu)) mu = iter;
-        return ColorFor(mu, maxIter, palette);
+        return ColorFor(iter, maxIter, palette);
     }
 
-    // Gradiente (t, r, g, b) per ogni palette. t = iterazioni smussate / maxIter.
+    // Gradiente (t, r, g, b) per ogni palette. t = iterazioni / maxIter.
     private static readonly (double T, byte R, byte G, byte B)[] FireStops =
     [
         (0.00, 0, 0, 0),
@@ -159,10 +154,9 @@ public static class Mandelbrot
         _ => FireStops,
     };
 
-    private static int ColorFor(double mu, int maxIter, Palette palette)
+    private static int ColorFor(double iterations, int maxIter, Palette palette)
     {
-        double t = Math.Clamp(mu / Math.Max(1, maxIter), 0.0, 1.0);
-        t = Math.Pow(t, 0.65);
+        double t = Math.Clamp(iterations / Math.Max(1, maxIter) * 1.35 + 0.03, 0.0, 1.0);
         var stops = GetStops(palette);
 
         var (t0, r0, g0, b0) = stops[0];

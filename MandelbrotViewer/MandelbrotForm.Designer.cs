@@ -19,6 +19,10 @@
     private Label lblEngine = null!;
     private Label lblGpu = null!;
     private ComboBox cmbGpu = null!;
+    private Label lblPrec = null!;
+    private FlowLayoutPanel precisionPanel = null!;
+    private RadioButton radPrec32 = null!;
+    private RadioButton radPrec64 = null!;
     private RadioButton radioCpu = null!;
     private RadioButton radioCuda = null!;
     private RadioButton radioDx = null!;
@@ -38,6 +42,9 @@
     private ToolStripMenuItem exitItem = null!;
     private ToolStripMenuItem helpMenu = null!;
     private ToolStripMenuItem aboutItem = null!;
+    private ToolStripSeparator helpSeparator = null!;
+    private ToolStripMenuItem logItem = null!;
+    private System.Windows.Forms.ToolTip toolTip = null!;
 
     protected override void Dispose(bool disposing)
     {
@@ -67,6 +74,10 @@
         this.lblEngine = new Label();
         this.lblGpu = new Label();
         this.cmbGpu = new ComboBox();
+        this.lblPrec = new Label();
+        this.precisionPanel = new FlowLayoutPanel();
+        this.radPrec32 = new RadioButton();
+        this.radPrec64 = new RadioButton();
         this.radioCpu = new RadioButton();
         this.radioCuda = new RadioButton();
         this.radioDx = new RadioButton();
@@ -86,12 +97,16 @@
         this.exitItem = new ToolStripMenuItem();
         this.helpMenu = new ToolStripMenuItem();
         this.aboutItem = new ToolStripMenuItem();
+        this.helpSeparator = new ToolStripSeparator();
+        this.logItem = new ToolStripMenuItem();
+        this.toolTip = new System.Windows.Forms.ToolTip();
 
         ((System.ComponentModel.ISupportInitialize)(this.pictureBox)).BeginInit();
         ((System.ComponentModel.ISupportInitialize)(this.numIter)).BeginInit();
         this.topPanel.SuspendLayout();
         this.layoutTop.SuspendLayout();
         this.enginePanel.SuspendLayout();
+        this.precisionPanel.SuspendLayout();
         this.statusStrip.SuspendLayout();
         this.menuStrip.SuspendLayout();
         this.SuspendLayout();
@@ -108,8 +123,10 @@
         this.layoutTop.AutoSize = true;
         this.layoutTop.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         this.layoutTop.Margin = new Padding(0);
-        this.layoutTop.ColumnCount = 13;
+        this.layoutTop.ColumnCount = 15;
         this.layoutTop.RowCount = 1;
+        this.layoutTop.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        this.layoutTop.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         this.layoutTop.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         this.layoutTop.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         this.layoutTop.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -137,6 +154,8 @@
         this.layoutTop.Controls.Add(this.enginePanel, 10, 0);
         this.layoutTop.Controls.Add(this.lblGpu, 11, 0);
         this.layoutTop.Controls.Add(this.cmbGpu, 12, 0);
+        this.layoutTop.Controls.Add(this.lblPrec, 13, 0);
+        this.layoutTop.Controls.Add(this.precisionPanel, 14, 0);
 
         // btnReset
         this.btnReset.Anchor = AnchorStyles.None;
@@ -215,6 +234,7 @@
         this.lblGpu.Anchor = AnchorStyles.None;
         this.lblGpu.AutoSize = true;
         this.lblGpu.Text = "GPU:";
+        this.lblGpu.Visible = false; // nascosto con motore CPU
 
         // cmbGpu (scheda video: "Auto" + schede enumerate di CUDA e DirectX)
         this.cmbGpu.Anchor = AnchorStyles.None;
@@ -222,8 +242,34 @@
         this.cmbGpu.DropDownStyle = ComboBoxStyle.DropDownList;
         this.cmbGpu.Items.AddRange(new object[] { "Auto" });
         this.cmbGpu.SelectedIndex = 0;
-        this.cmbGpu.Enabled = false; // abilitato solo con motore CUDA o DirectX
+        this.cmbGpu.Visible = false; // nascosto con motore CPU (visibile con CUDA/DirectX)
         this.cmbGpu.SelectedIndexChanged += new EventHandler(this.CmbGpu_SelectedIndexChanged);
+
+        // lblPrec + precisionPanel: precisione CUDA (32 = float, 64 = double)
+        this.lblPrec.Anchor = AnchorStyles.None;
+        this.lblPrec.AutoSize = true;
+        this.lblPrec.Text = "Precisione:";
+
+        this.precisionPanel.Anchor = AnchorStyles.None;
+        this.precisionPanel.AutoSize = true;
+        this.precisionPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        this.precisionPanel.WrapContents = false;
+        this.precisionPanel.Margin = new Padding(0);
+        this.precisionPanel.Controls.Add(this.radPrec32);
+        this.precisionPanel.Controls.Add(this.radPrec64);
+
+        this.radPrec32.Anchor = AnchorStyles.None;
+        this.radPrec32.AutoSize = true;
+        this.radPrec32.Text = "32";
+        this.radPrec32.Enabled = false; // abilitata solo con motore CUDA
+        this.radPrec32.CheckedChanged += new EventHandler(this.PrecRadio_CheckedChanged);
+
+        this.radPrec64.Anchor = AnchorStyles.None;
+        this.radPrec64.AutoSize = true;
+        this.radPrec64.Text = "64";
+        this.radPrec64.Checked = true; // 64-bit (double) predefinita
+        this.radPrec64.Enabled = false; // abilitata solo con motore CUDA
+        this.radPrec64.CheckedChanged += new EventHandler(this.PrecRadio_CheckedChanged);
 
         // radioCpu
         this.radioCpu.Anchor = AnchorStyles.None;
@@ -319,12 +365,36 @@
 
         // helpMenu
         this.helpMenu.Text = "&Aiuto";
-        this.helpMenu.DropDownItems.AddRange(new ToolStripItem[] { this.aboutItem });
+        this.helpMenu.DropDownItems.AddRange(new ToolStripItem[] { this.aboutItem, this.helpSeparator, this.logItem });
 
         // aboutItem
         this.aboutItem.Text = "&Informazioni...";
         this.aboutItem.ShortcutKeys = Keys.F1;
         this.aboutItem.Click += new EventHandler(this.AboutItem_Click);
+
+        // logItem
+        this.logItem.Text = "Mostra &log / diagnostica...";
+        this.logItem.Click += new EventHandler(this.LogItem_Click);
+
+        // toolTip: spiegazione di ogni controllo (si mostra al passaggio del mouse)
+        this.toolTip.SetToolTip(this.btnReset, "Ripristina la vista iniziale dell'insieme (tasto R)");
+        this.toolTip.SetToolTip(this.btnBenchmark, "Apri il benchmark standard (Ctrl+B)");
+        this.toolTip.SetToolTip(this.numIter, "Numero massimo di iterazioni per pixel (tasti +/-)");
+        this.toolTip.SetToolTip(this.chkIterAuto, "Iterazioni automatiche: crescono con l'ingrandimento");
+        this.toolTip.SetToolTip(this.cmbPalette, "Palette colori del frattale (Fuoco, Ghiaccio, Termico)");
+        this.toolTip.SetToolTip(this.cmbAA, "Antialiasing: 1x disattivato, 2x/4x/8x media dei pixel vicini");
+        this.toolTip.SetToolTip(this.cmbGpu, "Scheda video da usare (Auto = la più potente)");
+        this.toolTip.SetToolTip(this.radPrec32, "Precisione CUDA 32-bit (float): più veloce, meno precisa. Ignorata con CPU/DirectX.");
+        this.toolTip.SetToolTip(this.radPrec64, "Precisione CUDA 64-bit (double): più precisa, più lenta. Ignorata con CPU/DirectX.");
+        this.toolTip.SetToolTip(this.radioCpu, "Motore CPU multicore (sempre disponibile)");
+        this.toolTip.SetToolTip(this.radioCuda, "Motore CUDA: GPU NVIDIA via ILGPU (float/double)");
+        this.toolTip.SetToolTip(this.radioDx, "Motore DirectX: GPU in tempo reale (float)");
+        // le voci menu sono ToolStripItem: si usa la proprietà ToolTipText
+        this.loadZoneItem.ToolTipText = "Ricarica la vista salvata in un file JSON (Ctrl+O)";
+        this.saveZoneItem.ToolTipText = "Salva la vista corrente (centro, scala, iterazioni) in un file JSON (Ctrl+S)";
+        this.saveImageItem.ToolTipText = "Salva l'immagine corrente come PNG (Ctrl+Shift+S)";
+        this.benchmarkItem.ToolTipText = "Benchmark standard: 8 s ad alte iterazioni (Ctrl+B)";
+        this.aboutItem.ToolTipText = "Informazioni su MandelC# (F1)";
 
         // MandelbrotForm
         this.AutoScaleMode = AutoScaleMode.Font;
@@ -342,6 +412,7 @@
         ((System.ComponentModel.ISupportInitialize)(this.pictureBox)).EndInit();
         ((System.ComponentModel.ISupportInitialize)(this.numIter)).EndInit();
         this.enginePanel.ResumeLayout(false);
+        this.precisionPanel.ResumeLayout(false);
         this.layoutTop.ResumeLayout(false);
         this.topPanel.ResumeLayout(false);
         this.statusStrip.ResumeLayout(false);

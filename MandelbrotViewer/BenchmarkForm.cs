@@ -18,23 +18,29 @@ public partial class BenchmarkForm : Form
 
     private readonly RenderEngine _engine;
     private readonly bool _useCuda;
+    private readonly bool _useDirectX;
+    private readonly bool _useDouble;
     private CancellationTokenSource? _cts;
     private bool _running;
 
-    public BenchmarkForm(RenderEngine engine)
+    public BenchmarkForm(RenderEngine engine, bool useDouble)
     {
         InitializeComponent();
 
         _useCuda = engine == RenderEngine.Cuda && GpuMandelbrot.IsReady;
-        _engine = _useCuda ? RenderEngine.Cuda : RenderEngine.Cpu;
+        _useDirectX = engine == RenderEngine.DirectX && DxMandelbrot.IsReady;
+        _useDouble = useDouble;
+        _engine = _useDirectX ? RenderEngine.DirectX : _useCuda ? RenderEngine.Cuda : RenderEngine.Cpu;
         string note = engine switch
         {
             RenderEngine.Cuda when !_useCuda => " (CUDA non pronta, uso CPU)",
-            RenderEngine.DirectX => " (DirectX non misurabile, uso CPU)",
+            RenderEngine.DirectX when !_useDirectX => " (DirectX non pronto, uso CPU)",
             _ => "",
         };
+        string precision = _useCuda ? $"CUDA {(_useDouble ? "64-bit" : "32-bit")}" : _useDirectX ? "DirectX float" : "CPU";
         lblInfo.Text = $"Motore: {RenderEngineInfo.DisplayName(_engine)}{note}\n" +
-            $"Zona standard {BW}x{BH} AA{BAA}x, {BMaxIter} iterazioni max, scala {BScale} — durata minima {Budget.TotalSeconds:F0} secondi.";
+            $"Zona standard {BW}x{BH} AA{BAA}x, {BMaxIter} iterazioni max, scala {BScale}, " +
+            $"precisione {precision} — durata minima {Budget.TotalSeconds:F0} secondi.";
         lblResult.Text = "—";
     }
 
@@ -70,15 +76,26 @@ public partial class BenchmarkForm : Form
 
         try
         {
-            var (_, seconds, frames) = await Task.Run(() =>
-                _useCuda
-                    ? GpuMandelbrot.BenchmarkGpu(BCx, BCy, BScale, BW, BH, BMaxIter, BAA, Budget, progress, _cts.Token)
-                    : Mandelbrot.BenchmarkCpu(BCx, BCy, BScale, BW, BH, BMaxIter, BAA, Budget, progress, _cts.Token),
-                _cts.Token);
+            double seconds;
+            int frames;
+            if (_useDirectX)
+            {
+                (seconds, frames) = await BenchmarkDirectX(progress, _cts.Token);
+            }
+            else
+            {
+                ( _, seconds, frames) = await Task.Run(() =>
+                    _useCuda
+                        ? GpuMandelbrot.BenchmarkGpu(BCx, BCy, BScale, BW, BH, BMaxIter, BAA, _useDouble, Budget, progress, _cts.Token)
+                        : Mandelbrot.BenchmarkCpu(BCx, BCy, BScale, BW, BH, BMaxIter, BAA, Budget, progress, _cts.Token),
+                    _cts.Token);
+            }
 
             progressBar.Value = progressBar.Maximum;
             lblResult.Text = FormatPixels(PixelsPerSecond(frames, seconds));
-            lblDetail.Text = $"{frames} frame {BW}x{BH} AA{BAA}x in {seconds:F1} s";
+            lblDetail.Text = _useDirectX
+                ? $"{frames} frame ({frames / seconds:F1} frame/s) {BW}x{BH} AA{BAA}x in {seconds:F1} s"
+                : $"{frames} frame {BW}x{BH} AA{BAA}x in {seconds:F1} s";
             lblLive.Text = "";
         }
         catch (OperationCanceledException)
@@ -96,6 +113,27 @@ public partial class BenchmarkForm : Form
     }
 
     private void BtnClose_Click(object? sender, EventArgs e) => Close();
+
+    private static async Task<(double Seconds, int Frames)> BenchmarkDirectX(IProgress<BenchmarkProgress> progress, CancellationToken ct)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        int frames = 0;
+        TimeSpan lastReport = TimeSpan.Zero;
+        while (sw.Elapsed < Budget)
+        {
+            ct.ThrowIfCancellationRequested();
+            DxMandelbrot.Render(BCx, BCy, BScale, BW, BH, BMaxIter, BAA, Palette.Fuoco);
+            frames++;
+            if (sw.Elapsed - lastReport >= BenchmarkProgress.ReportInterval)
+            {
+                progress.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));
+                lastReport = sw.Elapsed;
+            }
+            await Task.Yield();
+        }
+        progress.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));
+        return (sw.Elapsed.TotalSeconds, frames);
+    }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {

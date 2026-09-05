@@ -2,6 +2,22 @@
 
 Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
 
+- [x] v2.3.14: Correggere la selezione iniziale blu nella finestra log — `completed`
+- [x] v2.3.13: Schiarire la luminosità delle palette dopo la rimozione dello smooth coloring — `completed`
+- [x] v2.3.12: Aggiungere benchmark reale del motore DirectX — `completed`
+- [x] v2.3.11: Correggere testo benchmark DirectX fallback CPU e indicazione precisione — `completed`
+- [x] v2.3.10: Uniformare la colorazione CPU a CUDA/DirectX usando le iterazioni — `completed`
+- [x] v2.3.9: CUDA/DX: allineare la colorazione e mantenere AA/downsampling GPU; fix runtime — `completed`
+- [x] v2.3.6: Ottimizzare al massimo il render GPU e il benchmark CUDA — `completed`
+- [x] v2.3.5: Fix DirectX: usare `DriverType.Unknown` quando D3D11CreateDevice riceve un adapter DXGI — `completed`
+- [x] v2.3.4: DirectX: log con lo step esatto che fallisce; swapchain FlipDiscard→FlipSequential + SampleDescription esplicito — `completed`
+- [x] v2.3.3: voce di menù Aiuto → "Mostra log / diagnostica..." con stato motori (DirectX/CUDA), schede, errori e impostazioni — `completed`
+- [x] v2.3.2: all'avvio, se un motore GPU (DirectX/CUDA) non è disponibile, mostrare il motivo nella barra di stato — `completed`
+- [ ] DirectX: verificare dal log lo step esatto dopo FlipSequential; se ancora fallisce, valutare render su texture + blit a bitmap (fallback) — `pending`
+- [x] v2.3.1: nascondere il dropdown GPU (e la label) quando è selezionato il motore CPU — `completed`
+- [x] v2.3: radio "32"/"64" per la precisione del motore CUDA (float/double) — `completed`
+- [x] v2.2: ToolTip sui controlli e sulle voci del menu che ne spiegano la funzione — `completed`
+- [x] Fix: cursore wait visibile anche col mouse sopra un controllo (es. dropdown AA) durante il render — `completed`
 - [x] Dropdown GPU disabilitato se è selezionato il motore CPU — `completed`
 - [x] v2.1: più schede video, dropdown per scegliere quale usare (CUDA + DirectX) — `completed`
 - [x] Messaggi commit che partono col numero di versione (regola in AGENTS.md) — `completed`

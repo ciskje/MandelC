@@ -15,8 +15,9 @@ public readonly struct GpuViewParams
     public readonly int W;
     public readonly int H;
     public readonly int MaxIter;
+    public readonly int Supersample;
 
-    public GpuViewParams(double centerX, double centerY, double pixelSize, double topY, int w, int h, int maxIter)
+    public GpuViewParams(double centerX, double centerY, double pixelSize, double topY, int w, int h, int maxIter, int supersample = 1)
     {
         CenterX = centerX;
         CenterY = centerY;
@@ -25,32 +26,41 @@ public readonly struct GpuViewParams
         W = w;
         H = h;
         MaxIter = maxIter;
+        Supersample = supersample;
     }
 }
 
-/// <summary>Frame calcolato su GPU: iterazioni e |z|² finali per pixel.</summary>
-internal sealed class GpuFrame
+public readonly struct GpuPaletteParams
 {
-    public required int[] Iters;
-    public required double[] Mod2;
-    public required bool UsedDouble;
+    public readonly float S0R, S0G, S0B, S1R, S1G, S1B, S2R, S2G, S2B, S3R, S3G, S3B, S4R, S4G, S4B;
+
+    public GpuPaletteParams((double T, byte R, byte G, byte B)[] stops)
+    {
+        S0R = stops[0].R / 255f; S0G = stops[0].G / 255f; S0B = stops[0].B / 255f;
+        S1R = stops[1].R / 255f; S1G = stops[1].G / 255f; S1B = stops[1].B / 255f;
+        S2R = stops[2].R / 255f; S2G = stops[2].G / 255f; S2B = stops[2].B / 255f;
+        S3R = stops[3].R / 255f; S3G = stops[3].G / 255f; S3B = stops[3].B / 255f;
+        S4R = stops[4].R / 255f; S4G = stops[4].G / 255f; S4B = stops[4].B / 255f;
+    }
 }
 
 /// <summary>
-/// Backend CUDA via ILGPU: un thread GPU per pixel calcola solo la fuga
-/// (`z = z² + c`, solo aritmetica, niente Math sul device); la mappatura
-/// palette resta su CPU e riusa <see cref="Mandelbrot.ColorFromEscape"/>.
-/// Soglia float/double: sotto scala 1e-3 il float non basta più.
+/// Backend CUDA via ILGPU: un thread per pixel calcola fuga, colorazione smooth
+/// e downsampling AA direttamente sulla GPU.
 /// </summary>
 internal static class GpuMandelbrot
 {
     private static Context? _context;
     private static Accelerator? _accelerator;
-    private static Action<Index1D, ArrayView<int>, ArrayView<double>, GpuViewParams>? _floatKernel;
-    private static Action<Index1D, ArrayView<int>, ArrayView<double>, GpuViewParams>? _doubleKernel;
+    private static Action<Index1D, ArrayView<int>, GpuViewParams, GpuPaletteParams>? _floatKernel;
+    private static Action<Index1D, ArrayView<int>, GpuViewParams, GpuPaletteParams>? _doubleKernel;
     // Kernel benchmark: solo conteggio iterazioni, niente buffer |z|² (un terzo del traffico).
     private static Action<Index1D, ArrayView<int>, GpuViewParams>? _floatBenchKernel;
     private static Action<Index1D, ArrayView<int>, GpuViewParams>? _doubleBenchKernel;
+    private static readonly object RenderGate = new();
+    private static MemoryBuffer1D<int, Stride1D.Dense>? _renderPixelsBuffer;
+    private static int[]? _renderPixels;
+    private static int _renderCount;
 
     public static bool IsReady => _accelerator != null;
     public static string DeviceName { get; private set; } = "";
@@ -117,8 +127,8 @@ internal static class GpuMandelbrot
                 {
                     _accelerator = device.CreateAccelerator(_context);
                     DeviceName = device.Name;
-                    _floatKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, ArrayView<double>, GpuViewParams>(FloatKernel);
-                    _doubleKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, ArrayView<double>, GpuViewParams>(DoubleKernel);
+                    _floatKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams, GpuPaletteParams>(FloatKernel);
+                    _doubleKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams, GpuPaletteParams>(DoubleKernel);
                     _floatBenchKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams>(FloatBenchKernel);
                     _doubleBenchKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams>(DoubleBenchKernel);
                     return true;
@@ -142,10 +152,20 @@ internal static class GpuMandelbrot
     /// <summary>Scarica accelerator+kernel (il contesto CUDA resta riusabile).</summary>
     private static void ResetAccelerator()
     {
+        lock (RenderGate)
+            ResetAcceleratorCore();
+    }
+
+    private static void ResetAcceleratorCore()
+    {
         _floatKernel = null;
         _doubleKernel = null;
         _floatBenchKernel = null;
         _doubleBenchKernel = null;
+        _renderPixelsBuffer?.Dispose();
+        _renderPixelsBuffer = null;
+        _renderPixels = null;
+        _renderCount = 0;
         _accelerator?.Dispose();
         _accelerator = null;
         DeviceName = "";
@@ -153,81 +173,55 @@ internal static class GpuMandelbrot
 
     /// <summary>Calcola il frame su GPU (lancio kernel + ricopia in RAM).</summary>
     /// <param name="supersample">Antialias: risoluzione k volte maggiore (1 = nessuno).</param>
-    public static GpuFrame RenderFrame(double centerX, double centerY, double scale, int w, int h, int maxIter, int supersample, CancellationToken ct)
+    /// <param name="useDouble">True per il kernel double 64-bit, false per single 32-bit (float).</param>
+    public static bool Render(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette, int supersample, bool useDouble, CancellationToken ct)
     {
-        if (!IsReady) throw new InvalidOperationException("GPU non inizializzata.");
-        bool useDouble = WantsDouble(scale);
-        int k = Math.Max(1, supersample);
-        int bigW = w * k;
-        int bigH = h * k;
-        double pixelSize = scale / bigW;
-        double topY = centerY - (bigH * 0.5) * pixelSize;
-        var pars = new GpuViewParams(centerX, centerY, pixelSize, topY, bigW, bigH, maxIter);
-
-        int count = bigW * bigH;
-        using var itersBuf = _accelerator!.Allocate1D<int>(count);
-        using var modBuf = _accelerator.Allocate1D<double>(count);
-
-        var kernel = useDouble ? _doubleKernel! : _floatKernel!;
-        kernel(count, itersBuf.View, modBuf.View, pars);
-        _accelerator.Synchronize();
-        ct.ThrowIfCancellationRequested();
-
-        var iters = new int[count];
-        var mod = new double[count];
-        itersBuf.CopyToCPU(iters);
-        modBuf.CopyToCPU(mod);
-        return new GpuFrame { Iters = iters, Mod2 = mod, UsedDouble = useDouble };
-    }
-
-    /// <summary>Colora il frame GPU nel bitmap (stessa palette del percorso CPU).</summary>
-    public static void RenderToBitmap(Bitmap bmp, GpuFrame frame, int maxIter, Palette palette, int supersample, CancellationToken ct)
-    {
-        int w = bmp.Width;
-        int h = bmp.Height;
-        int k = Math.Max(1, supersample);
-        int bigW = w * k;
-
-        var rect = new Rectangle(0, 0, w, h);
-        BitmapData data = bmp.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
-
-        try
+        lock (RenderGate)
         {
-            int stride = data.Stride / 4;
-            int[] big = new int[bigW * (h * k)];
-
-            Parallel.For(0, h * k, new ParallelOptions { CancellationToken = ct }, by =>
+            var accelerator = _accelerator ?? throw new InvalidOperationException("GPU non inizializzata.");
+            int k = Math.Max(1, supersample);
+            int bigW = bmp.Width * k;
+            int bigH = bmp.Height * k;
+            double pixelSize = scale / bigW;
+            double topY = centerY - (bigH * 0.5) * pixelSize;
+            var view = new GpuViewParams(centerX, centerY, pixelSize, topY, bmp.Width, bmp.Height, maxIter, k);
+            var paletteParams = new GpuPaletteParams(Mandelbrot.GetStops(palette));
+            int count = bmp.Width * bmp.Height;
+            if (_renderCount != count)
             {
-                for (int bx = 0; bx < bigW; bx++)
-                {
-                    int i = by * bigW + bx;
-                    big[i] = Mandelbrot.ColorFromEscape(frame.Iters[i], frame.Mod2[i], maxIter, palette);
-                }
-            });
+                _renderPixelsBuffer?.Dispose();
+                _renderPixelsBuffer = accelerator.Allocate1D<int>(count);
+                _renderPixels = new int[count];
+                _renderCount = count;
+            }
 
-            int[] pixels = new int[stride * h];
-            Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, y =>
+            var kernel = useDouble ? _doubleKernel! : _floatKernel!;
+            var pixelsBuffer = _renderPixelsBuffer!;
+            var pixels = _renderPixels!;
+            kernel(count, pixelsBuffer.View, view, paletteParams);
+            accelerator.Synchronize();
+            ct.ThrowIfCancellationRequested();
+            pixelsBuffer.CopyToCPU(pixels);
+
+            var rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
+            BitmapData data = bmp.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+            try
             {
-                for (int x = 0; x < w; x++)
-                    pixels[y * stride + x] = Mandelbrot.AverageBlock(big, bigW, x * k, y * k, k);
-            });
-
-            System.Runtime.InteropServices.Marshal.Copy(pixels, 0, data.Scan0, pixels.Length);
-        }
-        finally
-        {
-            bmp.UnlockBits(data);
+                System.Runtime.InteropServices.Marshal.Copy(pixels, 0, data.Scan0, pixels.Length);
+            }
+            finally
+            {
+                bmp.UnlockBits(data);
+            }
+            return useDouble;
         }
     }
 
-    /// <summary>
-    /// Benchmark GPU: ripete frame completi (kernel + ricopia) per il budget dato
-    /// e somma le iterazioni. Ritorna (iterazioni, secondi, frame).
     /// Il progresso alla UI è limitato (ogni 3 s) per non falsare la misura.
     /// </summary>
-    public static (long TotalIters, double Seconds, int Frames) BenchmarkGpu(double centerX, double centerY, double scale, int w, int h, int maxIter, int supersample, TimeSpan budget, IProgress<BenchmarkProgress>? progress, CancellationToken ct)
+    public static (long TotalIters, double Seconds, int Frames) BenchmarkGpu(double centerX, double centerY, double scale, int w, int h, int maxIter, int supersample, bool useDouble, TimeSpan budget, IProgress<BenchmarkProgress>? progress, CancellationToken ct)
     {
-        if (!IsReady) throw new InvalidOperationException("GPU non inizializzata.");
+        var accelerator = _accelerator ?? throw new InvalidOperationException("GPU non inizializzata.");
 
         // Buffer allocati una volta sola e riusati per tutti i frame (niente alloc/copy extra).
         int k = Math.Max(1, supersample);
@@ -237,10 +231,8 @@ internal static class GpuMandelbrot
         double topY = centerY - (bigH * 0.5) * pixelSize;
         var pars = new GpuViewParams(centerX, centerY, pixelSize, topY, bigW, bigH, maxIter);
         int count = bigW * bigH;
-        bool useDouble = WantsDouble(scale);
         var kernel = useDouble ? _doubleBenchKernel! : _floatBenchKernel!;
-        using var itersBuf = _accelerator!.Allocate1D<int>(count);
-        var iters = new int[count];
+        using var itersBuffer = accelerator.Allocate1D<int>(count);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
         long total = 0;
@@ -251,13 +243,9 @@ internal static class GpuMandelbrot
         while (sw.Elapsed < budget)
         {
             ct.ThrowIfCancellationRequested();
-            kernel(count, itersBuf.View, pars);
-            _accelerator.Synchronize();
+            kernel(count, itersBuffer.View, pars);
+            accelerator.Synchronize();
             ct.ThrowIfCancellationRequested();
-            itersBuf.CopyToCPU(iters);
-            long sum = 0;
-            foreach (int v in iters) sum += v;
-            total += sum;
             frames++;
             if (first || sw.Elapsed - lastReport >= BenchmarkProgress.ReportInterval)
             {
@@ -323,50 +311,86 @@ internal static class GpuMandelbrot
         iters[index] = iter;
     }
 
-    // ---------- Kernel (solo aritmetica: niente Math sul device) ----------
-
-    private static void FloatKernel(Index1D index, ArrayView<int> iters, ArrayView<double> mod2, GpuViewParams p)
+    private static int ColorFromIterations(int iter, int maxIter, GpuPaletteParams p)
     {
-        int i = index.X;
-        int x = i % p.W;
-        int y = i / p.W;
-        float pixel = (float)p.PixelSize;
-        float cx = (float)p.CenterX + (x - p.W * 0.5f) * pixel;
-        float cy = (float)p.TopY + y * pixel;
-
-        float zx = 0, zy = 0, zx2 = 0, zy2 = 0;
-        int iter = 0;
-        while (iter < p.MaxIter && zx2 + zy2 <= 4f)
-        {
-            zy = 2 * zx * zy + cy;
-            zx = zx2 - zy2 + cx;
-            zx2 = zx * zx;
-            zy2 = zy * zy;
-            ++iter;
-        }
-        iters[index] = iter;
-        mod2[index] = zx2 + zy2;
+        if (iter >= maxIter) return unchecked((int)0xFF000000);
+        float t = (float)iter / (maxIter > 0 ? maxIter : 1) * 1.35f + 0.03f;
+        float segment = t * 4f;
+        int i = (int)(segment < 3f ? segment : 3f);
+        float f = segment - i;
+        float ar = i == 0 ? p.S0R : i == 1 ? p.S1R : i == 2 ? p.S2R : p.S3R;
+        float ag = i == 0 ? p.S0G : i == 1 ? p.S1G : i == 2 ? p.S2G : p.S3G;
+        float ab = i == 0 ? p.S0B : i == 1 ? p.S1B : i == 2 ? p.S2B : p.S3B;
+        float br = i == 0 ? p.S1R : i == 1 ? p.S2R : i == 2 ? p.S3R : p.S4R;
+        float bg = i == 0 ? p.S1G : i == 1 ? p.S2G : i == 2 ? p.S3G : p.S4G;
+        float bb = i == 0 ? p.S1B : i == 1 ? p.S2B : i == 2 ? p.S3B : p.S4B;
+        return unchecked((int)(0xFF000000u | ((uint)((ar + f * (br - ar)) * 255f) << 16) | ((uint)((ag + f * (bg - ag)) * 255f) << 8) | (uint)((ab + f * (bb - ab)) * 255f)));
     }
 
-    private static void DoubleKernel(Index1D index, ArrayView<int> iters, ArrayView<double> mod2, GpuViewParams p)
+    private static void FloatKernel(Index1D index, ArrayView<int> pixels, GpuViewParams p, GpuPaletteParams palette)
     {
         int i = index.X;
         int x = i % p.W;
         int y = i / p.W;
-        double cx = p.CenterX + (x - p.W * 0.5) * p.PixelSize;
-        double cy = p.TopY + y * p.PixelSize;
-
-        double zx = 0, zy = 0, zx2 = 0, zy2 = 0;
-        int iter = 0;
-        while (iter < p.MaxIter && zx2 + zy2 <= 4.0)
+        int k = p.Supersample;
+        float pixel = (float)p.PixelSize;
+        float sumR = 0, sumG = 0, sumB = 0;
+        for (int sy = 0; sy < k; sy++)
         {
-            zy = 2 * zx * zy + cy;
-            zx = zx2 - zy2 + cx;
-            zx2 = zx * zx;
-            zy2 = zy * zy;
-            ++iter;
+            for (int sx = 0; sx < k; sx++)
+            {
+                float cx = (float)p.CenterX + (x * k + sx - p.W * k * 0.5f) * pixel;
+                float cy = (float)p.TopY + (y * k + sy) * pixel;
+                float zx = 0, zy = 0, zx2 = 0, zy2 = 0;
+                int iter = 0;
+                while (iter < p.MaxIter && zx2 + zy2 <= 4f)
+                {
+                    zy = 2 * zx * zy + cy;
+                    zx = zx2 - zy2 + cx;
+                    zx2 = zx * zx;
+                    zy2 = zy * zy;
+                    ++iter;
+                }
+                int color = ColorFromIterations(iter, p.MaxIter, palette);
+                sumR += (color >> 16) & 255;
+                sumG += (color >> 8) & 255;
+                sumB += color & 255;
+            }
         }
-        iters[index] = iter;
-        mod2[index] = zx2 + zy2;
+        float samples = k * k;
+        pixels[index] = unchecked((int)(0xFF000000u | ((uint)(sumR / samples) << 16) | ((uint)(sumG / samples) << 8) | (uint)(sumB / samples)));
+    }
+
+    private static void DoubleKernel(Index1D index, ArrayView<int> pixels, GpuViewParams p, GpuPaletteParams palette)
+    {
+        int i = index.X;
+        int x = i % p.W;
+        int y = i / p.W;
+        int k = p.Supersample;
+        double sumR = 0, sumG = 0, sumB = 0;
+        for (int sy = 0; sy < k; sy++)
+        {
+            for (int sx = 0; sx < k; sx++)
+            {
+                double cx = p.CenterX + (x * k + sx - p.W * k * 0.5) * p.PixelSize;
+                double cy = p.TopY + (y * k + sy) * p.PixelSize;
+                double zx = 0, zy = 0, zx2 = 0, zy2 = 0;
+                int iter = 0;
+                while (iter < p.MaxIter && zx2 + zy2 <= 4.0)
+                {
+                    zy = 2 * zx * zy + cy;
+                    zx = zx2 - zy2 + cx;
+                    zx2 = zx * zx;
+                    zy2 = zy * zy;
+                    ++iter;
+                }
+                int color = ColorFromIterations(iter, p.MaxIter, palette);
+                sumR += (color >> 16) & 255;
+                sumG += (color >> 8) & 255;
+                sumB += color & 255;
+            }
+        }
+        double samples = k * k;
+        pixels[index] = unchecked((int)(0xFF000000u | ((uint)(sumR / samples) << 16) | ((uint)(sumG / samples) << 8) | (uint)(sumB / samples)));
     }
 }

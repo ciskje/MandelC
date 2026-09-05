@@ -62,8 +62,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
             float3 col = 0.0;
             if (iter < maxIter)
             {
-                float mu = (float)iter + 1.0 - log2(log(length(z)));
-                float t = pow(saturate(mu / (float)maxIter), 0.65);
+                float t = saturate((float)iter / (float)maxIter * 1.35 + 0.03);
                 col = Graded(t);
             }
             acc += col;
@@ -108,11 +107,14 @@ float4 PS(float4 pos : SV_Position) : SV_Target
         try
         {
             using IDXGIFactory1 factory = DXGI.CreateDXGIFactory1<IDXGIFactory1>();
-            for (uint i = 0; ; i++)
+            for (uint i = 0; i < 32; i++)
             {
-                if (factory.EnumAdapters1(i, out IDXGIAdapter1 adapter).Code != 0) break;
+                if (factory.EnumAdapters(i, out IDXGIAdapter adapter).Failure) break;
+                using (adapter)
+                {
                 if (adapter.Description.DedicatedVideoMemory > 0)
                     names.Add(adapter.Description.Description);
+                }
             }
         }
         catch
@@ -133,64 +135,25 @@ float4 PS(float4 pos : SV_Position) : SV_Target
             Dispose(); // cambio scheda: il device va ricreato sull'adapter scelto
         }
         LastError = "";
+        string step = "inizio";
         try
         {
-            using IDXGIFactory1 factory1 = DXGI.CreateDXGIFactory1<IDXGIFactory1>();
-            IDXGIAdapter1? chosen = null;
-            for (uint i = 0; ; i++)
-            {
-                if (factory1.EnumAdapters1(i, out IDXGIAdapter1 adapter).Code != 0) break;
-                if (adapterName == null)
-                {
-                    // Auto: la scheda hardware con più memoria dedicata.
-                    if (adapter.Description.DedicatedVideoMemory > 0 &&
-                        (chosen == null || adapter.Description.DedicatedVideoMemory > chosen.Description.DedicatedVideoMemory))
-                        chosen = adapter;
-                }
-                else if (string.Equals(adapter.Description.Description, adapterName, StringComparison.OrdinalIgnoreCase))
-                {
-                    chosen = adapter;
-                    break;
-                }
-            }
-            if (chosen == null)
-                throw new InvalidOperationException(adapterName == null
-                    ? "Nessun adapter DXGI trovato."
-                    : $"Scheda video non trovata: {adapterName}");
-            AdapterName = chosen.Description.Description;
+            step = "D3D11CreateDevice (adapter hardware predefinito)";
+            var result = D3D11.D3D11CreateDevice(
+                null, DriverType.Hardware,
+                DeviceCreationFlags.BgraSupport,
+                new[] { FeatureLevel.Level_11_0, FeatureLevel.Level_10_0 },
+                out ID3D11Device device,
+                out FeatureLevel level,
+                out ID3D11DeviceContext context);
+            if (result.Failure)
+                throw new InvalidOperationException($"D3D11CreateDevice fallito (HRESULT 0x{result.Code:X8})");
+            _device = device;
+            _context = context;
+            AdapterName = adapterName ?? "Auto (adapter hardware predefinito)";
 
-            using (chosen)
-            {
-                // Device sull'adapter scelto; la swapchain di rito va scartata
-                // (ne viene creata una flip-discard legata alla finestra).
-                var throwaway = new SwapChainDescription
-                {
-                    BufferDescription = new ModeDescription(1, 1)
-                    {
-                        Format = DxgiFormat.R8G8B8A8_UNorm,
-                        RefreshRate = new Rational(60, 1),
-                    },
-                    SampleDescription = new SampleDescription(1, 0),
-                    BufferUsage = Usage.RenderTargetOutput,
-                    BufferCount = 2,
-                    OutputWindow = IntPtr.Zero,
-                    Windowed = true,
-                    SwapEffect = SwapEffect.FlipDiscard,
-                };
-                D3D11.D3D11CreateDeviceAndSwapChain(
-                    chosen, DriverType.Hardware,
-                    DeviceCreationFlags.BgraSupport,
-                    new[] { FeatureLevel.Level_11_0, FeatureLevel.Level_10_0 },
-                    throwaway,
-                    out IDXGISwapChain? sc,
-                    out ID3D11Device? device,
-                    out FeatureLevel? level,
-                    out ID3D11DeviceContext? context);
-                sc?.Dispose();
-                _device = device;
-                _context = context;
-
-                using IDXGIFactory2 factory = chosen.GetParent<IDXGIFactory2>();
+            step = "DXGI.CreateDXGIFactory2";
+            using IDXGIFactory2 factory = DXGI.CreateDXGIFactory2<IDXGIFactory2>(false);
 
                 width = Math.Max(1, width);
                 height = Math.Max(1, height);
@@ -201,32 +164,35 @@ float4 PS(float4 pos : SV_Position) : SV_Target
                     Format = DxgiFormat.R8G8B8A8_UNorm,
                     BufferCount = 2,
                     BufferUsage = Usage.RenderTargetOutput,
-                    SampleDescription = SampleDescription.Default,
+                    SampleDescription = new SampleDescription(1, 0),
                     Scaling = Scaling.Stretch,
-                    SwapEffect = SwapEffect.FlipDiscard,
+                    SwapEffect = SwapEffect.FlipSequential,
                     AlphaMode = AlphaMode.Ignore,
                 };
                 var fullscreen = new SwapChainFullscreenDescription { Windowed = true };
-                _swapChain = factory.CreateSwapChainForHwnd(_device, hwnd, desc, fullscreen);
-            }
+                step = "IDXGIFactory2.CreateSwapChainForHwnd";
+            _swapChain = factory.CreateSwapChainForHwnd(_device, hwnd, desc, fullscreen);
 
+            step = "D3DCompiler.Compile (shader)";
             ReadOnlyMemory<byte> vsCode = Compiler.Compile(VsSource, "VS", "mandelbrot-vs", "vs_5_0");
             ReadOnlyMemory<byte> psCode = Compiler.Compile(PsSource, "PS", "mandelbrot-ps", "ps_5_0");
             _vs = _device.CreateVertexShader(vsCode.Span);
             _ps = _device.CreatePixelShader(psCode.Span);
 
+            step = "CreateBuffer (constant buffer)";
             _cbuffer = _device.CreateBuffer(
                 (uint)Marshal.SizeOf<DxParams>(),
                 BindFlags.ConstantBuffer,
                 ResourceUsage.Dynamic,
                 CpuAccessFlags.Write);
 
+            step = "CreateViews (render target)";
             CreateViews(width, height);
             return true;
         }
         catch (Exception ex)
         {
-            LastError = ex.GetType().Name + ": " + ex.Message;
+            LastError = $"[{step}] {ex.GetType().Name}: {ex.Message}";
             Dispose();
             return false;
         }

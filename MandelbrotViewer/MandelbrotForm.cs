@@ -76,6 +76,13 @@ public partial class MandelbrotForm : Form
                     && _settings.Engine != nameof(RenderEngine.DirectX))
                     radioCuda.Checked = true;
             }
+
+            // Se un motore GPU non è disponibile, mostra il motivo (prima restava solo grigio).
+            var problemi = new List<string>();
+            if (!dxOk) problemi.Add("DirectX: " + (DxMandelbrot.LastError.Length > 0 ? DxMandelbrot.LastError : "inizializzazione non riuscita"));
+            if (!gpu) problemi.Add("CUDA: " + (GpuMandelbrot.LastError.Length > 0 ? GpuMandelbrot.LastError : "nessun device disponibile"));
+            if (problemi.Count > 0 && !IsDisposed)
+                lblStatus.Text = string.Join("   |   ", problemi);
         };
     }
 
@@ -87,6 +94,9 @@ public partial class MandelbrotForm : Form
     private Palette ActivePalette => cmbPalette.SelectedIndex < 0
         ? Palette.Fuoco
         : (Palette)cmbPalette.SelectedIndex;
+
+    /// <summary>Precisione CUDA scelta dall'utente: 64-bit (double) se radio 64, altrimenti 32-bit (float).</summary>
+    private bool UseDoublePrecision => radPrec64.Checked;
 
     private int AutoIter()
     {
@@ -125,13 +135,13 @@ public partial class MandelbrotForm : Form
             numIter.Value = maxIter; // in auto il numero è disabilitato ma mostra il valore usato
 
         lblStatus.Text = $"Calcolo {(preview ? "anteprima " : "")}{w}x{h}, iter={maxIter}...";
-        Cursor = Cursors.WaitCursor;
+        SetBusyCursor(true);
 
         try
         {
             var bmp = new Bitmap(w, h);
             if (useCuda)
-                gpuDouble = await Task.Run(() => RenderGpu(bmp, cx, cy, scale, maxIter, palette, aa, token), token);
+                gpuDouble = await Task.Run(() => RenderGpu(bmp, cx, cy, scale, maxIter, palette, aa, UseDoublePrecision, token), token);
             else
                 await Task.Run(() => Mandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, token), token);
 
@@ -152,8 +162,22 @@ public partial class MandelbrotForm : Form
         catch (OperationCanceledException) { /* rendering superato, ignora */ }
         finally
         {
-            if (!token.IsCancellationRequested) Cursor = Cursors.Default;
+            if (!token.IsCancellationRequested) SetBusyCursor(false);
         }
+    }
+
+    /// <summary>
+    /// Imposta (o ripristina) il cursore "atteso" sia sulla form sia sui controlli di
+    /// input: così resta visibile anche se il mouse è sopra un controllo (es. il
+    /// dropdown AA) che altrimenti mostrerebbe il proprio cursore.
+    /// </summary>
+    private void SetBusyCursor(bool busy)
+    {
+        Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
+        Cursor c = busy ? Cursors.WaitCursor : Cursors.Default;
+        foreach (Control ctl in new Control[] { cmbAA, cmbPalette, numIter, chkIterAuto, cmbGpu, radPrec32, radPrec64,
+                                               radioCpu, radioCuda, radioDx, btnReset, btnBenchmark })
+            ctl.Cursor = c;
     }
 
     /// <summary>Ingrandisce il bitmap di anteprima a piena risoluzione (bilineare).</summary>
@@ -170,11 +194,9 @@ public partial class MandelbrotForm : Form
     }
 
     /// <summary>Render su GPU: frame CUDA + colorazione palette. Ritorna la precisione usata.</summary>
-    private static bool RenderGpu(Bitmap bmp, double cx, double cy, double scale, int maxIter, Palette palette, int aa, CancellationToken token)
+    private static bool RenderGpu(Bitmap bmp, double cx, double cy, double scale, int maxIter, Palette palette, int aa, bool useDouble, CancellationToken token)
     {
-        GpuFrame frame = GpuMandelbrot.RenderFrame(cx, cy, scale, bmp.Width, bmp.Height, maxIter, aa, token);
-        GpuMandelbrot.RenderToBitmap(bmp, frame, maxIter, palette, aa, token);
-        return frame.UsedDouble;
+        return GpuMandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, useDouble, token);
     }
 
     /// <summary>Ridisegna: realtime se motore DirectX, altrimenti render bitmap (eventuale anteprima).</summary>
@@ -191,7 +213,12 @@ public partial class MandelbrotForm : Form
         bool dx = _engine == RenderEngine.DirectX && DxMandelbrot.IsReady;
         dxPanel.Visible = dx;
         pictureBox.Visible = !dx;
-        cmbGpu.Enabled = _engine != RenderEngine.Cpu; // la GPU si sceglie solo con un motore GPU
+        bool gpuEngine = _engine != RenderEngine.Cpu; // il dropdown GPU si mostra solo con un motore GPU
+        lblGpu.Visible = gpuEngine;
+        cmbGpu.Visible = gpuEngine;
+        bool prec = _engine == RenderEngine.Cuda; // la scelta di precisione vale solo per CUDA
+        radPrec32.Enabled = prec;
+        radPrec64.Enabled = prec;
         if (dx)
             _dxDirty = true;
         else
@@ -397,6 +424,7 @@ public partial class MandelbrotForm : Form
         chkIterAuto.Checked = _settings.IterAuto;
         cmbPalette.SelectedIndex = Math.Clamp(_settings.Palette, 0, cmbPalette.Items.Count - 1);
         cmbAA.SelectedIndex = Math.Clamp(_settings.AaIndex, 0, cmbAA.Items.Count - 1);
+        radPrec32.Checked = _settings.Single; // 32-bit se Single, altrimenti resta 64-bit
         _gpuSelection = string.IsNullOrEmpty(_settings.Gpu) ? null : _settings.Gpu;
 
         var r = new Rectangle(_settings.WinX, _settings.WinY, _settings.WinW, _settings.WinH);
@@ -417,6 +445,7 @@ public partial class MandelbrotForm : Form
             _settings.MaxIter = (int)numIter.Value;
             _settings.Palette = cmbPalette.SelectedIndex;
             _settings.AaIndex = cmbAA.SelectedIndex;
+            _settings.Single = radPrec32.Checked; // true = 32-bit (float)
             _settings.Engine = _engine.ToString();
             _settings.Gpu = _gpuSelection ?? "";
             _settings.WinX = r.X;
@@ -444,9 +473,54 @@ public partial class MandelbrotForm : Form
 
     private void AboutItem_Click(object? sender, EventArgs e) => ShowAbout();
 
+    private void LogItem_Click(object? sender, EventArgs e)
+    {
+        var dlg = new LogForm(BuildDiagnosticLog()) { Owner = this };
+        dlg.ShowDialog(this);
+    }
+
+    private string BuildDiagnosticLog()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Visualizzatore Insieme di Mandelbrot   v{AppVersion.Full}");
+        sb.AppendLine($"Aperto il: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"OS: {Environment.OSVersion.VersionString}");
+        sb.AppendLine($"Runtime .NET: {Environment.Version}");
+        sb.AppendLine();
+        sb.AppendLine("=== Motore ===");
+        sb.AppendLine($"Selezionato: {RenderEngineInfo.DisplayName(_engine)}");
+        sb.AppendLine($"In uso:     {EngineDescription()}");
+        sb.AppendLine();
+        sb.AppendLine("=== DirectX (D3D11) ===");
+        sb.AppendLine($"Pronto:        {(DxMandelbrot.IsReady ? "sì" : "NO")}");
+        sb.AppendLine($"Scheda in uso: {(DxMandelbrot.AdapterName.Length > 0 ? DxMandelbrot.AdapterName : "(nessuna)")}");
+        sb.AppendLine($"Ultimo errore: {(DxMandelbrot.LastError.Length > 0 ? DxMandelbrot.LastError : "(nessuno)")}");
+        sb.AppendLine($"Schede DXGI:   {JoinOrNone(DxMandelbrot.AdapterNames())}");
+        sb.AppendLine();
+        sb.AppendLine("=== CUDA (ILGPU) ===");
+        sb.AppendLine($"Pronto:         {(GpuMandelbrot.IsReady ? "sì" : "NO")}");
+        sb.AppendLine($"Device in uso:  {(GpuMandelbrot.DeviceName.Length > 0 ? GpuMandelbrot.DeviceName : "(nessuno)")}");
+        sb.AppendLine($"Ultimo errore:  {(GpuMandelbrot.LastError.Length > 0 ? GpuMandelbrot.LastError : "(nessuno)")}");
+        sb.AppendLine($"Device CUDA:    {JoinOrNone(GpuMandelbrot.DeviceNames())}");
+        sb.AppendLine();
+        sb.AppendLine("=== Selezione GPU ===");
+        sb.AppendLine($"Scheda scelta:   {(_gpuSelection ?? "Auto")}");
+        sb.AppendLine($"Precisione CUDA: {(UseDoublePrecision ? "64-bit (double)" : "32-bit (float)")}");
+        sb.AppendLine();
+        sb.AppendLine("=== Impostazioni salvate ===");
+        sb.AppendLine($"Motore:     {_settings.Engine}");
+        sb.AppendLine($"GPU:        {(_settings.Gpu.Length > 0 ? _settings.Gpu : "Auto")}");
+        sb.AppendLine($"Palette:    {_settings.Palette}    AA: {_settings.AaIndex}    Iterazioni: {_settings.MaxIter} (auto = {_settings.IterAuto})");
+        sb.AppendLine($"Precisione (Single): {_settings.Single}");
+        return sb.ToString();
+    }
+
+    private static string JoinOrNone(IReadOnlyList<string> items)
+        => items.Count > 0 ? string.Join(",  ", items) : "(nessuna)";
+
     private void BenchmarkItem_Click(object? sender, EventArgs e)
     {
-        using var dlg = new BenchmarkForm(_engine);
+        using var dlg = new BenchmarkForm(_engine, UseDoublePrecision);
         dlg.ShowDialog(this);
     }
 
@@ -465,8 +539,10 @@ public partial class MandelbrotForm : Form
 
     private void CmbPalette_SelectedIndexChanged(object? sender, EventArgs e) => InvalidateView();
 
+    private void PrecRadio_CheckedChanged(object? sender, EventArgs e) => InvalidateView();
+
     /// <summary>Etichetta della GPU selezionata nel dropdown ("Auto" se indice 0).</summary>
-    private string GpuLabel() => cmbGpu.SelectedIndex > 0 ? cmbGpu.SelectedItem!.ToString() : "Auto";
+    private string GpuLabel() => cmbGpu.SelectedIndex > 0 ? cmbGpu.SelectedItem?.ToString() ?? "Auto" : "Auto";
 
     private void CmbGpu_SelectedIndexChanged(object? sender, EventArgs e)
     {
