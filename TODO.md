@@ -2,6 +2,7 @@
 
 Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
 
+- [x] Dropdown GPU disabilitato se è selezionato il motore CPU — `completed`
 - [x] v2.1: più schede video, dropdown per scegliere quale usare (CUDA + DirectX) — `completed`
 - [x] Messaggi commit che partono col numero di versione (regola in AGENTS.md) — `completed`
 - [x] Parti sempre dall'insieme (non memorizzare la zona tra un lancio e l'altro) — `completed`

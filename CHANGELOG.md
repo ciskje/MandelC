@@ -3,6 +3,10 @@
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
 
+- **v2.1.1** — Dropdown GPU disabilitato quando il motore attivo è la CPU
+  (la scheda si sceglie solo con CUDA o DirectX). File: `MandelbrotForm.cs`
+  (`ApplyEngineVisibility`), `MandelbrotForm.Designer.cs`.
+
 - **v2.1** — Scelta della scheda video con più GPU: nuovo dropdown "GPU:" in
   barra (Auto = scheda più potente, altrimenti la scheda nominata). Enumera
   l'unione delle schede DirectX (DXGI) e dei device CUDA (ILGPU) e crea il

@@ -17,7 +17,8 @@ altrimenti fallback CPU); DirectX realtime (v2.0, shader HLSL, float, loop
 ~60 fps, pan/zoom immediati, fallback CPU in caso di errore). Dropdown GPU
 (v2.1): con più schede video si sceglie quale usare — "Auto" = la più potente,
 altrimenti la scheda nominata; unisce le schede DirectX (DXGI) e i device
-CUDA (ILGPU); la scelta è persistita e applicata al cambio di motore. Menu File: carica zona
+CUDA (ILGPU); la scelta è persistita e applicata al cambio di motore; il
+dropdown è disabilitato quando il motore attivo è la CPU. Menu File: carica zona
 (Ctrl+O) e salva zona (Ctrl+S) in formato JSON (centro, scala, iterazioni),
 salva immagine con nome (Ctrl+Shift+S), benchmark standard 8s (Ctrl+B) con
 pixel/s in grande, Esci (Alt+F4).

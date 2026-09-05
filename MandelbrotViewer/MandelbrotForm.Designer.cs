@@ -222,6 +222,7 @@
         this.cmbGpu.DropDownStyle = ComboBoxStyle.DropDownList;
         this.cmbGpu.Items.AddRange(new object[] { "Auto" });
         this.cmbGpu.SelectedIndex = 0;
+        this.cmbGpu.Enabled = false; // abilitato solo con motore CUDA o DirectX
         this.cmbGpu.SelectedIndexChanged += new EventHandler(this.CmbGpu_SelectedIndexChanged);
 
         // radioCpu

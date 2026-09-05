@@ -191,6 +191,7 @@ public partial class MandelbrotForm : Form
         bool dx = _engine == RenderEngine.DirectX && DxMandelbrot.IsReady;
         dxPanel.Visible = dx;
         pictureBox.Visible = !dx;
+        cmbGpu.Enabled = _engine != RenderEngine.Cpu; // la GPU si sceglie solo con un motore GPU
         if (dx)
             _dxDirty = true;
         else
