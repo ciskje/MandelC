@@ -3,6 +3,9 @@
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
 
+- **v2.3.15** — Rimossi i launcher `avvia.bat` e `avvia.ps1`; l'avvio avviene
+  tramite il file pubblicato o i comandi .NET documentati.
+
 - **v2.3.14** — La finestra log non mostra più tutto il testo selezionato in blu
   all’apertura; il focus iniziale va al pulsante `Chiudi`.
 

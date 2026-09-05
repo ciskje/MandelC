@@ -99,8 +99,6 @@ viene passato un adapter DXGI esplicito; `DriverType.Hardware` causava
   fallback CPU, `LastError` diagnostico. `DeviceNames()` elenca i device CUDA;
   `TryInitialize(deviceName)` usa la scheda scelta (auto = la più capiente);
   `ResetAccelerator` riusa il contesto CUDA al cambio di scheda.
-- `avvia.bat` / `avvia.ps1` — lancio: usa `pubblicato\` se presente, altrimenti
-  `bin\Debug`, altrimenti `dotnet run`.
 - `pubblicato/` — build self-contained single-file (~150 MB), rigenerabile,
   esclusa da git.
 

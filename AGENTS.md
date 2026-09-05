@@ -27,7 +27,8 @@ Root del progetto: `MandelC#/`. Codice: `MandelC#/MandelbrotViewer/`.
 & "$env:USERPROFILE\.dotnet\dotnet.exe" publish "MandelbrotViewer\MandelbrotViewer.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "pubblicato"
 ```
 
-- Lancio per l'utente finale: doppio clic su `avvia.bat` (usa `pubblicato\` se presente).
+- Lancio per l'utente finale: eseguire il file pubblicato in `pubblicato\` se presente;
+  per lo sviluppo usare il comando `dotnet run` indicato sopra.
 
 ## Versionamento (obbligatorio)
 

@@ -2,6 +2,7 @@
 
 Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
 
+- [x] v2.3.15: Rimuovere tutti i launcher `avvia.*` — `completed`
 - [x] v2.3.14: Correggere la selezione iniziale blu nella finestra log — `completed`
 - [x] v2.3.13: Schiarire la luminosità delle palette dopo la rimozione dello smooth coloring — `completed`
 - [x] v2.3.12: Aggiungere benchmark reale del motore DirectX — `completed`
