@@ -39,8 +39,8 @@ Root del progetto: `MandelC#/`. Codice: `MandelC#/MandelbrotViewer/`.
   - `Z` (patch): fix, refactor, docs, modifiche minori.
   - `Y` (minor): nuove funzionalità compatibili.
   - `X` (major): breaking change / riscritture.
-- Ad ogni bump: aggiornare `AppVersion.cs` + `.csproj` e aggiungere riga nel
-  changelog in `SPECIFICHE.md`.
+- Ad ogni bump: aggiornare `AppVersion.cs` + `.csproj` e aggiungere voce in
+  `CHANGELOG.md`.
 
 ## Workflow per ogni richiesta utente (obbligatorio)
 
@@ -54,5 +54,6 @@ Root del progetto: `MandelC#/`. Codice: `MandelC#/MandelbrotViewer/`.
 - Il progetto vive nel repo `test/` (root sopra `MandelC#/`). Niente repo annidato.
 - Scope commit: solo file di `MandelC#/`. Mai committare segreti.
 - Ignorati via `MandelC#/.gitignore`: `bin/`, `obj/`, `pubblicato/` (rigenerabili).
-- Messaggi concisi in italiano, stile repo esistente (es. `Add ...`, `Fix: ...`).
+- Messaggi concisi in italiano che partono col numero di versione
+  (es. `v2.0.1: DirectX realtime, benchmark, ...`).
 - Commit/push solo su richiesta esplicita dell'utente.
