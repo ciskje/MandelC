@@ -139,10 +139,22 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     /// <summary>Nome della scheda video attualmente usata ("" se non inizializzato).</summary>
     public static string AdapterName { get; private set; } = "";
 
+    /// <summary>Errore dell'ultima enumerazione fallita (diagnostica), vuoto se OK.</summary>
+    public static string EnumerationError { get; private set; } = "";
+
     /// <summary>Schede video hardware disponibili (esclusi i renderizzatori software WARP).</summary>
+    /// <remarks>
+    /// NON leggere né confrontare direttamente DedicatedVideoMemory: è un
+    /// PointerUSize (SIZE_T) e la conversione implicita di SharpGen passa per 32 bit
+    /// (UIntPtr.ToUInt32), che lancia OverflowException con GPU da più di 4 GB — è il
+    /// motivo per cui l'enumerazione restava vuota su macchine con GPU moderne
+    /// (cfr. nota v2.3.8 "overflow del wrapper"). I renderizzatori software si
+    /// escludono per nome: "Microsoft Basic Render Driver" è il WARP di D3D11.
+    /// </remarks>
     public static IReadOnlyList<string> AdapterNames()
     {
         var names = new List<string>();
+        EnumerationError = "";
         try
         {
             using IDXGIFactory1 factory = DXGI.CreateDXGIFactory1<IDXGIFactory1>();
@@ -151,14 +163,15 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
                 if (factory.EnumAdapters(i, out IDXGIAdapter adapter).Failure) break;
                 using (adapter)
                 {
-                    if (adapter.Description.DedicatedVideoMemory > 0)
-                        names.Add(adapter.Description.Description);
+                    string name = adapter.Description.Description;
+                    if (!name.StartsWith("Microsoft Basic", StringComparison.OrdinalIgnoreCase))
+                        names.Add(name);
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Enumerazione non riuscita: nessuna scheda riportata.
+            EnumerationError = $"{ex.GetType().Name}: {ex.Message}";
         }
         return names;
     }

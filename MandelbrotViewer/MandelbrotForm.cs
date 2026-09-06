@@ -489,6 +489,7 @@ public partial class MandelbrotForm : Form
         sb.AppendLine($"Scheda in uso: {(DxMandelbrot.AdapterName.Length > 0 ? DxMandelbrot.AdapterName : "(nessuna)")}");
         sb.AppendLine($"Ultimo errore: {(DxMandelbrot.LastError.Length > 0 ? DxMandelbrot.LastError : "(nessuno)")}");
         sb.AppendLine($"Schede DXGI:   {JoinOrNone(DxMandelbrot.AdapterNames())}");
+        sb.AppendLine($"Enum DXGI errore: {(DxMandelbrot.EnumerationError.Length > 0 ? DxMandelbrot.EnumerationError : "(nessuno)")}");
         sb.AppendLine();
         sb.AppendLine("=== CUDA (ILGPU) ===");
         sb.AppendLine($"Pronto:         {(GpuMandelbrot.IsReady ? "sì" : "NO")}");

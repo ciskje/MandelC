@@ -2,6 +2,21 @@
 
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
+- **v2.5.17** — Fix: `AdapterNames()` restituiva sempre un elenco vuoto su
+  macchine con GPU moderne (≥4 GB): `DedicatedVideoMemory` è un PointerUSize
+  (SIZE_T) e il confronto `> 0` passava per la conversione implicita a 32 bit
+  di SharpGen (`UIntPtr.ToUInt32`), che lancia OverflowException oltre i 4 GB —
+  la RTX 5070 Ti (16 GB, primo adapter) uccideva l'intera enumerazione, con
+  l'errore inghiottito dal catch (è l'"overflow del wrapper Vortice" della nota
+  v2.3.8). Ora i renderizzatori software si escludono per nome ("Microsoft
+  Basic*") e l'elenco riporta davvero le schede. `DiagDx` stampa l'enumerazione
+  dettagliata per adapter e l'eventuale errore di enumerazione; il log
+  diagnostico della GUI riporta `EnumerationError`. Verificato a runtime:
+  elenco completo (RTX 5070 Ti, AMD Radeon iGPU, RTX 4070 SUPER) e selezione
+  esplicita operativa su 4070 SUPER e iGPU (`IsReady: True`, `Render: OK`).
+  File: `DxMandelbrot.cs`, `Diagnostics.cs`, `MandelbrotForm.cs`, `TODO.md`,
+  `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
+
 - **v2.5.16** — Fix: il dropdown GPU non applicava la scheda DirectX scelta:
   `TryInitialize` creava sempre il device sull'adapter predefinito
   (`D3D11CreateDevice(null, DriverType.Hardware)`). Ora la scheda richiesta viene

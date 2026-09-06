@@ -100,6 +100,18 @@ quando si passa un adapter); il motivo dell'eventuale fallimento finisce in
 corrisponde). `Diagnostics.DiagDx` accetta il nome scheda come secondo
 argomento CLI per verificarla senza UI (`--diag-dx "Nome Scheda"`).
 
+Fix v2.5.17: l'enumerazione DXGI (`AdapterNames`) restituiva un elenco vuoto
+su GPU ≥4 GB: `DedicatedVideoMemory` è un PointerUSize e la conversione
+implicita di SharpGen passa per 32 bit (`UIntPtr.ToUInt32`), lanciando
+OverflowException per schede oltre i 4 GB — la RTX 5070 Ti (16 GB, primo
+adapter) azzerava l'elenco (radice dell'"overflow del wrapper Vortice" visto
+in v2.3.8). Ora i renderizzatori software si escludono per nome ("Microsoft
+Basic*") senza toccare `DedicatedVideoMemory`; `DiagDx` mostra l'enumerazione
+dettagliata e l'errore; il log GUI include `EnumerationError`. Verificato a
+runtime: elenco con RTX 5070 Ti / AMD Radeon iGPU / RTX 4070 SUPER e selezione
+esplicita operativa su entrambe le NVIDIA e sull'iGPU (`IsReady: True`,
+`Render: OK`).
+
 
 
 Ottimizzazione v2.3.6: il render CUDA riusa i buffer device e host tra frame;

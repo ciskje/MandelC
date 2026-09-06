@@ -2,6 +2,8 @@
 
 Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
 
+- [x] v2.5.17: DXGI: AdapterNames restituiva elenco vuoto (overflow su GPU >4GB via PointerUSize→uint); elencare davvero le schede DirectX — `completed`
+
 - [x] v2.5.16: DirectX: applicare davvero la scheda scelta dal dropdown (creare il device sull'adapter DXGI selezionato) — `completed`
 
 - [x] v2.5.15: Revisione e pulizia del codice (codice morto, deduplicazione, riordino file) — `completed`
