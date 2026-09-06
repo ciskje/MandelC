@@ -403,6 +403,31 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         _swapChain!.Present(0, PresentFlags.None);
     }
 
+    /// <summary>
+    /// Loop di misura standard: rende frame solo-iterazioni sulla griglia dei campioni
+    /// per il budget indicato (Present(0), senza v-sync) e ritorna i secondi effettivi
+    /// e il numero di frame completati. Condiviso dal benchmark GUI e da `--bench-dx`.
+    /// </summary>
+    /// <param name="tick">Callback opzionale (frames, secondi) dopo ogni frame.</param>
+    public static (double Seconds, int Frames) RunBenchmarkFrames(double centerX, double centerY, double scale, int gridW, int gridH, int maxIter, TimeSpan budget, Action<int, double>? tick, CancellationToken ct)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        int frames = 0;
+        while (sw.Elapsed < budget)
+        {
+            ct.ThrowIfCancellationRequested();
+            RenderBenchmark(centerX, centerY, scale, gridW, gridH, maxIter);
+            frames++;
+            tick?.Invoke(frames, sw.Elapsed.TotalSeconds);
+        }
+        return (sw.Elapsed.TotalSeconds, frames);
+    }
+
+    /// <summary>Nome compresso per la UI e lo storico: "NVIDIA GeForce RTX 5070 Ti"
+    /// → "RTX 5070 Ti", "AMD Radeon(TM) Graphics" → "AMD Radeon Graphics".</summary>
+    public static string ShortAdapterName(string fullName) =>
+        fullName.Replace("NVIDIA GeForce ", "").Replace("(TM)", "").Trim();
+
     private static DxStop ToStop((double T, byte R, byte G, byte B) s) =>
         new() { R = s.R / 255f, G = s.G / 255f, B = s.B / 255f };
 

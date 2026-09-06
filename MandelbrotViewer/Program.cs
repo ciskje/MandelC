@@ -8,10 +8,16 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
-        // Diagnostica senza UI: MandelbrotViewer --diag-dx [nome scheda] | --diag-gpu (vedi Diagnostics.cs).
+        // Diagnostica e benchmark senza UI: --diag-dx [scheda] | --diag-gpu | --bench-dx [scheda] (vedi Diagnostics.cs).
         if (args.Length > 0 && args[0] == "--diag-dx")
         {
             Diagnostics.DiagDx(args.Length > 1 ? args[1] : null);
+            return;
+        }
+        if (args.Length > 0 && args[0] == "--bench-dx")
+        {
+            Diagnostics.BenchDx(args.Length > 1 ? args[1] : null,
+                runs: 3, budget: BenchmarkStandard.Budget);
             return;
         }
         if (args.Length > 0 && args[0] == "--diag-gpu")

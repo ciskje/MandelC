@@ -2,6 +2,8 @@
 
 Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
 
+- [x] v2.5.18: Triplo test DirectX per ogni scheda (3×8 s, best per scheda) via `--bench-dx` e storico per scheda nel grafico benchmark — `completed`
+
 - [x] v2.5.17: DXGI: AdapterNames restituiva elenco vuoto (overflow su GPU >4GB via PointerUSize→uint); elencare davvero le schede DirectX — `completed`
 
 - [x] v2.5.16: DirectX: applicare davvero la scheda scelta dal dropdown (creare il device sull'adapter DXGI selezionato) — `completed`

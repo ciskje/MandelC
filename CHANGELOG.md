@@ -2,6 +2,21 @@
 
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
+- **v2.5.18** — Triplo test DirectX per scheda e storico aggiornato: nuovo comando
+  `--bench-dx [nome scheda]` che esegue 3 run da 8 s del test standardizzato su
+  ogni scheda DXGI disponibile e stampa i valori in MPixel/s con il migliore
+  (finestra visibile minima: con Present(0) su finestra nascosta il compositor
+  potrebbe saltare il lavoro GPU). Parametri del test spostati nella classe
+  condivisa `BenchmarkStandard` (usata da GUI e CLI); loop di misura estratto in
+  `DxMandelbrot.RunBenchmarkFrames` (riusato dal benchmark GUI, ora anche su
+  worker thread); `DxMandelbrot.ShortAdapterName` per i nomi compressi. Nel
+  grafico del benchmark la barra obsoleta "DirectX 5070 Ti 1750" (test vecchio
+  con v-sync, non confrontabile) è sostituita dai riferimenti per scheda
+  misurati ora (best di 3 run, vedi SPECIFICHE); asse calcolato dalle barre.
+  File: `BenchmarkStandard.cs` (nuovo), `DxMandelbrot.cs`, `BenchmarkForm.cs`,
+  `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`,
+  `.csproj`.
+
 - **v2.5.17** — Fix: `AdapterNames()` restituiva sempre un elenco vuoto su
   macchine con GPU moderne (≥4 GB): `DedicatedVideoMemory` è un PointerUSize
   (SIZE_T) e il confronto `> 0` passava per la conversione implicita a 32 bit

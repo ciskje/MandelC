@@ -112,6 +112,16 @@ runtime: elenco con RTX 5070 Ti / AMD Radeon iGPU / RTX 4070 SUPER e selezione
 esplicita operativa su entrambe le NVIDIA e sull'iGPU (`IsReady: True`,
 `Render: OK`).
 
+Triplo test per scheda (v2.5.18): `--bench-dx [nome scheda]` esegue 3 run da 8 s
+del test standardizzato su ogni scheda DXGI disponibile (o solo su quella
+indicata) e stampa i valori in MPixel/s con il migliore; usa una piccola
+finestra visibile perché con Present(0) su finestra nascosta il compositor può
+saltare il lavoro GPU. I parametri del test vivono in `BenchmarkStandard`
+(condivisi GUI/CLI) e il loop di misura in `DxMandelbrot.RunBenchmarkFrames`.
+Riferimenti storici del grafico (best di 3 run, aggiornati a mano con
+`--bench-dx`): la barra "DirectX 5070 Ti 1750" del vecchio test con v-sync è
+stata sostituita dai valori per scheda misurati con questo metodo.
+
 
 
 Ottimizzazione v2.3.6: il render CUDA riusa i buffer device e host tra frame;

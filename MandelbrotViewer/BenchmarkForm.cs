@@ -6,15 +6,16 @@ namespace MandelbrotViewer;
 /// </summary>
 public partial class BenchmarkForm : Form
 {
-    // Parametri standard del test (fissi, così i risultati sono confrontabili).
-    private const int BW = 960;
-    private const int BH = 540;
-    private const int BMaxIter = 5000;
-    private const int BAA = 8; // il test gira in AA 8x (64x pixel per frame)
-    private const double BCx = -0.743643887037151; // valle dei cavallucci marini
-    private const double BCy = 0.131825904205330;
-    private const double BScale = 0.0005;
-    private static readonly TimeSpan Budget = TimeSpan.FromSeconds(8);
+    // Parametri standard del test (fissi, così i risultati sono confrontabili):
+    // vivono in BenchmarkStandard, condivisi anche dalla CLI --bench-dx.
+    private const int BW = BenchmarkStandard.Width;
+    private const int BH = BenchmarkStandard.Height;
+    private const int BMaxIter = BenchmarkStandard.MaxIter;
+    private const int BAA = BenchmarkStandard.Aa; // il test gira in AA 8x (64x pixel per frame)
+    private const double BCx = BenchmarkStandard.CenterX; // valle dei cavallucci marini
+    private const double BCy = BenchmarkStandard.CenterY;
+    private const double BScale = BenchmarkStandard.Scale;
+    private static readonly TimeSpan Budget = BenchmarkStandard.Budget;
 
     private readonly RenderEngine _engine;
     private readonly bool _useCuda;
@@ -65,7 +66,7 @@ public partial class BenchmarkForm : Form
     };
 
     private double PixelsPerSecond(int frames, double seconds) =>
-        seconds > 0 ? frames * (long)BW * BH * BAA * BAA / seconds : 0;
+        BenchmarkStandard.PixelsPerSecond(frames, seconds);
 
     private async void BtnStart_Click(object? sender, EventArgs e)
     {
@@ -177,10 +178,6 @@ public partial class BenchmarkForm : Form
     private void ChartPanel_Paint(object? sender, PaintEventArgs e)
     {
         e.Graphics.Clear(chartPanel.BackColor);
-        const double referenceCuda = 5940.0;
-        const double referenceDirectX = 1750.0;
-        const double referenceCpu = 30.0;
-        double maximum = Math.Max(referenceCuda, Math.Max(referenceDirectX, Math.Max(referenceCpu, _measuredMpixel))) * 1.15;
         float left = 108;
         float right = 56;
         float top = 22;
@@ -197,9 +194,23 @@ public partial class BenchmarkForm : Form
         using var titleBrush = new SolidBrush(Color.FromArgb(45, 45, 48));
         using var actualBrush = new SolidBrush(Color.FromArgb(36, 113, 163));
         using var cudaBrush = new SolidBrush(Color.FromArgb(226, 126, 34));
+        using var dxBrush = new SolidBrush(Color.FromArgb(74, 143, 87));
         using var cpuBrush = new SolidBrush(Color.FromArgb(112, 128, 144));
         using var centered = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
         using var rightAligned = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
+
+        // Riferimenti storici, misurati con il test standardizzato (best di 3 run da
+        // 8 s per scheda; rinnovabili con `--bench-dx`). Unità: MPixel/s.
+        (string Label, double Value, Brush Brush)[] bars =
+        [
+            ("Risultato", _measuredMpixel, actualBrush),
+            ("CUDA 5070 Ti", 5940.0, cudaBrush),
+            ("DirectX 5070 Ti", 5715.7, dxBrush),
+            ("DirectX 4070 SUPER", 1655.7, dxBrush),
+            ("DirectX AMD Radeon", 113.3, dxBrush),
+            ("CPU", 30.0, cpuBrush),
+        ];
+        double maximum = bars.Max(b => b.Value) * 1.15;
 
         e.Graphics.DrawString("Confronto prestazioni (MPixel/s)", titleFont, titleBrush, left, 2);
         for (int step = 0; step <= 2; step++)
@@ -211,13 +222,6 @@ public partial class BenchmarkForm : Form
         }
         e.Graphics.DrawLine(axisPen, left, top, left, top + plotHeight);
 
-        (string Label, double Value, Brush Brush)[] bars =
-        [
-            ("Risultato", _measuredMpixel, actualBrush),
-            ("CUDA 5070 Ti", referenceCuda, cudaBrush),
-            ("DirectX 5070 Ti", referenceDirectX, cpuBrush),
-            ("CPU", referenceCpu, cpuBrush),
-        ];
         float rowHeight = plotHeight / bars.Length;
         float barHeight = Math.Min(22f, rowHeight * 0.62f);
         for (int i = 0; i < bars.Length; i++)
@@ -272,23 +276,19 @@ public partial class BenchmarkForm : Form
         DxMandelbrot.BeginBenchmark(gridW, gridH);
         try
         {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            int frames = 0;
-            TimeSpan lastReport = TimeSpan.Zero;
-            while (sw.Elapsed < Budget)
-            {
-                ct.ThrowIfCancellationRequested();
-                DxMandelbrot.RenderBenchmark(BCx, BCy, BScale, gridW, gridH, BMaxIter);
-                frames++;
-                if (sw.Elapsed - lastReport >= BenchmarkProgress.ReportInterval)
-                {
-                    progress.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));
-                    lastReport = sw.Elapsed;
-                }
-                await Task.Yield();
-            }
-            progress.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));
-            return (sw.Elapsed.TotalSeconds, frames);
+            double lastReport = 0;
+            var (seconds, frames) = await Task.Run(() =>
+                DxMandelbrot.RunBenchmarkFrames(BCx, BCy, BScale, gridW, gridH, BMaxIter, Budget,
+                    (f, elapsed) =>
+                    {
+                        if (elapsed - lastReport >= BenchmarkProgress.ReportInterval.TotalSeconds)
+                        {
+                            progress.Report(new BenchmarkProgress(elapsed, 0, f));
+                            lastReport = elapsed;
+                        }
+                    }, ct), ct);
+            progress.Report(new BenchmarkProgress(seconds, 0, frames));
+            return (seconds, frames);
         }
         finally
         {
