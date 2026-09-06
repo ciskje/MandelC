@@ -32,7 +32,13 @@ impostazioni (utile per capire perché un motore è disabilitato). Barra di
 stato in basso con centro, larghezza, iterazioni e palette. Ogni controllo della
 barra e le voci dei menu hanno un ToolTip esplicativo (v2.2, si mostra al
 passaggio del mouse); durante il calcolo il cursore "atteso" è imposto su form
-e controlli di input (v2.2), così è visibile anche sopra un dropdown.
+e controlli di input (v2.2), così è visibile anche sopra un dropdown; dalla
+v2.5.21 la form usa anche `UseWaitCursor`, che copre pure pictureBox, menu e
+stato (prima il cursore restava freccia sopra l'immagine durante i render
+lunghi, es. passaggio CUDA 32→64 bit in zone difficili AA8x). Dalla v2.5.22 il
+cursore durante il render è AppStarting (freccia+clessidra, assegnato in
+ricorsione a tutti i controlli) perché l'UI resta interattiva; Wait solo per
+l'init CUDA sincrona a UI congelata.
 Rendering parallelo (`Parallel.For` + `LockBits`), asincrono con cancellazione,
 anteprima in pan (1/4 risoluzione, no AA, upscale bilineare, full al rilascio),
 throttle del pan (80 ms) e anti-rimbalzo sul resize.
@@ -121,6 +127,28 @@ saltare il lavoro GPU. I parametri del test vivono in `BenchmarkStandard`
 Riferimenti storici del grafico (best di 3 run, aggiornati a mano con
 `--bench-dx`): la barra "DirectX 5070 Ti 1750" del vecchio test con v-sync è
 stata sostituita dai valori per scheda misurati con questo metodo.
+
+Triplo test CUDA (v2.5.19): `--bench-cuda [nome device]` esegue 3 run da 8 s
+per ogni device CUDA in float 32-bit e double 64-bit
+(`GpuMandelbrot.BenchmarkGpu` sui parametri di `BenchmarkStandard`) e stampa i
+valori con il migliore. Misurato ora: RTX 5070 Ti 5653,6 (32-bit) / 140,7
+(64-bit), RTX 4070 SUPER 4667,8 (32-bit) / 110,3 (64-bit); il vecchio
+riferimento unico "CUDA 5070 Ti 5940" è sostituito da queste quattro barre.
+Il rapporto ~40× tra 32 e 64-bit riflette le unità FP64 limitate (1/64) delle
+GeForce consumer. Grafico a 9 barre (margine sinistro 132, pannello alto 205).
+
+Benchmark DirectX offscreen (v2.5.20): il test non presenta più sulla swapchain
+(`Present(0)`) ma rende su una render target in memoria della GPU (132 MB) senza
+finestra né DWM, contando i frame davvero completati con 4 event query in anello.
+Motivo: il monitor è sulla 5070 Ti e la 4070 SUPER è headless su slot PCIe x4 —
+ogni `Present` da 132 MB veniva copiato via PCIe alla scheda del display
+(~11 GB/s misurati, ~13 ms/frame), così la 4070S risultava a 1655 contro 4667 di
+CUDA mentre la 5070 Ti (Present locale) pareggiava CUDA. Con l'offscreen la 4070S
+misura 4441,6 (≈ CUDA ×0,95: lo shader DX scrive float4 contro int) e il rapporto
+5070Ti/4070S torna a 1,30× contro 1,21× di CUDA (atteso ~1,2× da core×clock). I
+vecchi storici con Present non sono confrontabili e sono stati sostituiti; anche
+l'iGPU scende 113,3 → 102,2 perché prima si contavano Present accodati, ora
+completamenti reali.
 
 
 
@@ -237,6 +265,10 @@ Vedi [CHANGELOG.md](CHANGELOG.md).
 ## Note tecniche
 
 - `dotnet` solo in `~\.dotnet`, non nel PATH: usare percorso completo.
+- Audit 2026-09-06: SDK 8.0.424 + runtime 8.0.30 (ultimi), ILGPU 1.5.3 e
+  Vortice 3.8.3 (ultimi stabili) — nessun aggiornamento sicuro disponibile;
+  target resta `net8.0-windows` (LTS fino al 10/11/2026, poi valutare migrazione
+  a .NET 10 LTS).
 - `pubblicato/`, `bin/`, `obj/` esclusi da git (rigenerabili).
 - Il backend CUDA richiede GPU NVIDIA + driver sulla macchina target (il toolkit
   CUDA non serve a runtime); senza GPU l'app usa la CPU in automatico.

@@ -2,6 +2,45 @@
 
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
+- **v2.5.22** — Cursore AppStarting (freccia+clessidra) invece di Wait durante i
+  render: il calcolo è async e l'UI resta interattiva, quindi è il cursore
+  corretto; assegnato in ricorsione a form e discendenti (copre pictureBox,
+  menu, stato; `UseWaitCursor` rimosso perché forza la clessidra piena). Resta
+  Wait solo per l'init CUDA sincrona a UI congelata. File: `MandelbrotForm.cs`,
+  `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.5.21** — Fix cursore wait: durante i render lunghi (es. zona difficile AA8x
+  passando CUDA da 32 a 64 bit) il cursore restava freccia se il mouse era
+  sull'immagine, perché `pictureBox` non era nella lista di `SetBusyCursor`.
+  Ora la form usa anche `UseWaitCursor`, che copre tutti i controlli e le
+  superfici (immagine, menu, stato). File: `MandelbrotForm.cs`, `TODO.md`,
+  `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.5.20** — Benchmark DirectX offscreen senza Present: risolve la misura
+  falsata sulle schede senza monitor (la 4070 SUPER, headless su slot PCIe x4,
+  pagava la copia di 132 MB/frame verso la 5070 Ti del display: 1655 → 4441
+  MPixel/s, ~2,7×). Il test rende su render target in memoria (headless, senza
+  finestra né DWM) e conta i frame davvero completati con un anello di event
+  query (`QueryType.Event`, `GetData` con pData NULL: S_OK = pronta). Dettaglio
+  Vortice: l'overload `GetData(async, flags)` restituisce sempre un DataStream
+  non-null, per lo status serve l'overload raw (S_OK vs S_FALSE). Creazione
+  device/shader estratta in `EnsureDevice`, riusata da `TryInitialize` (GUI) e
+  `TryInitializeHeadless` (CLI). GUI e CLI usano lo stesso percorso; storici DX
+  sostituiti con le misure offscreen (best di 3): 5070 Ti 5780,7 (+1%),
+  4070 SUPER 4441,6, AMD Radeon 102,2. File: `DxMandelbrot.cs`, `Diagnostics.cs`,
+  `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.5.19** — Triplo test CUDA per device e storici aggiornati: nuovo comando
+  `--bench-cuda [nome device]` che esegue 3 run da 8 s del test standardizzato
+  su ogni device CUDA in float 32-bit e double 64-bit e stampa i valori in
+  MPixel/s con il migliore (analogo di `--bench-dx`). Misurato ora (best di 3):
+  RTX 5070 Ti 5653,6 (32-bit) / 140,7 (64-bit), RTX 4070 SUPER 4667,8 (32-bit) /
+  110,3 (64-bit) — il vecchio riferimento unico "CUDA 5070 Ti 5940" è sostituito
+  da queste quattro barre. Grafico allargato (9 barre: margine sinistro e altezza
+  pannello aumentati). File: `Diagnostics.cs`, `Program.cs`, `BenchmarkForm.cs`,
+  `BenchmarkForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`,
+  `.csproj`.
+
 - **v2.5.18** — Triplo test DirectX per scheda e storico aggiornato: nuovo comando
   `--bench-dx [nome scheda]` che esegue 3 run da 8 s del test standardizzato su
   ogni scheda DXGI disponibile e stampa i valori in MPixel/s con il migliore

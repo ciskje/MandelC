@@ -128,11 +128,15 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     private static ID3D11PixelShader? _benchPs;
     private static int _backWidth, _backHeight;
 
-    // Stato del benchmark: la swapchain viene ingrandita alla griglia di campioni
-    // (es. 7680x4320) e ripristinata alla fine; nel frattempo i resize del pannello
-    // vengono ricordati ma non applicati.
-    private static bool _benchmarking;
-    private static int _preBenchWidth, _preBenchHeight;
+    // Benchmark offscreen (v2.5.20): render target in memoria della GPU testata,
+    // senza swapchain né Present — niente DWM, niente copia inter-GPU verso la
+    // scheda del monitor (che falsava le schede headless, vedi SPECIFICHE).
+    // Draw ritorna subito (comandi in coda): il completamento dei frame è rilevato
+    // con un anello di event query.
+    private static ID3D11Texture2D? _benchTarget;
+    private static ID3D11RenderTargetView? _benchRtv;
+    private static ID3D11Query?[] _benchQueries = Array.Empty<ID3D11Query?>();
+    private static int _benchGridW, _benchGridH;
 
     public static bool IsReady => _device != null;
     public static string LastError { get; private set; } = "";
@@ -179,6 +183,59 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     /// <param name="adapterName">Scheda da usare (nome DXGI esatto); null = adapter hardware predefinito.
     /// Con una scheda richiesta, il device viene creato esplicitamente sull'adapter scelto.</param>
     public static bool TryInitialize(IntPtr hwnd, int width, int height, string? adapterName = null)
+    {
+        if (!EnsureDevice(adapterName))
+            return false;
+        LastError = "";
+        string step = "inizio";
+        try
+        {
+            step = "DXGI.CreateDXGIFactory2";
+            using IDXGIFactory2 factory = DXGI.CreateDXGIFactory2<IDXGIFactory2>(false);
+
+            width = Math.Max(1, width);
+            height = Math.Max(1, height);
+            var desc = new SwapChainDescription1
+            {
+                Width = (uint)width,
+                Height = (uint)height,
+                Format = DxgiFormat.R8G8B8A8_UNorm,
+                BufferCount = 2,
+                BufferUsage = Usage.RenderTargetOutput,
+                SampleDescription = new SampleDescription(1, 0),
+                Scaling = Scaling.Stretch,
+                SwapEffect = SwapEffect.FlipSequential,
+                AlphaMode = AlphaMode.Ignore,
+            };
+            var fullscreen = new SwapChainFullscreenDescription { Windowed = true };
+            step = "IDXGIFactory2.CreateSwapChainForHwnd";
+            _swapChain = factory.CreateSwapChainForHwnd(_device!, hwnd, desc, fullscreen);
+
+            step = "CreateViews (render target)";
+            CreateViews(width, height);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LastError = $"[{step}] {ex.GetType().Name}: {ex.Message}";
+            Dispose();
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Inizializza device, context e shader sulla scheda scelta senza finestra né
+    /// swapchain (headless): per il benchmark offscreen, che non presenta nulla.
+    /// </summary>
+    /// <param name="adapterName">Scheda da usare (nome DXGI esatto); null = predefinito.</param>
+    public static bool TryInitializeHeadless(string? adapterName = null) =>
+        EnsureDevice(adapterName);
+
+    /// <summary>
+    /// Crea (o riusa) device, context e shader sull'adapter scelto. La swapchain
+    /// resta di competenza di <see cref="TryInitialize"/> (serve una finestra).
+    /// </summary>
+    private static bool EnsureDevice(string? adapterName)
     {
         bool same = adapterName == null ||
             string.Equals(AdapterName, adapterName, StringComparison.OrdinalIgnoreCase);
@@ -232,24 +289,6 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             _context = context;
             AdapterName = adapterName ?? "Auto (adapter hardware predefinito)";
 
-            width = Math.Max(1, width);
-            height = Math.Max(1, height);
-            var desc = new SwapChainDescription1
-            {
-                Width = (uint)width,
-                Height = (uint)height,
-                Format = DxgiFormat.R8G8B8A8_UNorm,
-                BufferCount = 2,
-                BufferUsage = Usage.RenderTargetOutput,
-                SampleDescription = new SampleDescription(1, 0),
-                Scaling = Scaling.Stretch,
-                SwapEffect = SwapEffect.FlipSequential,
-                AlphaMode = AlphaMode.Ignore,
-            };
-            var fullscreen = new SwapChainFullscreenDescription { Windowed = true };
-            step = "IDXGIFactory2.CreateSwapChainForHwnd";
-            _swapChain = factory.CreateSwapChainForHwnd(_device, hwnd, desc, fullscreen);
-
             step = "D3DCompiler.Compile (shader)";
             ReadOnlyMemory<byte> vsCode = Compiler.Compile(VsSource, "VS", "mandelbrot-vs", "vs_5_0");
             ReadOnlyMemory<byte> psCode = Compiler.Compile(PsSource, "PS", "mandelbrot-ps", "ps_5_0");
@@ -267,8 +306,6 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
                 ResourceUsage.Dynamic,
                 CpuAccessFlags.Write);
 
-            step = "CreateViews (render target)";
-            CreateViews(width, height);
             return true;
         }
         catch (Exception ex)
@@ -294,14 +331,6 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         if (!IsReady) return;
         width = Math.Max(1, width);
         height = Math.Max(1, height);
-        if (_benchmarking)
-        {
-            // Durante il benchmark la misura usa la griglia di campioni fissa:
-            // ignora i resize del pannello ma ricorda le nuove dimensioni da ripristinare.
-            _preBenchWidth = width;
-            _preBenchHeight = height;
-            return;
-        }
         if (width == _backWidth && height == _backHeight) return;
         _rtv?.Dispose();
         _rtv = null;
@@ -332,7 +361,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     }
 
     /// <summary>
-    /// Pipeline comune a tutti i frame (Render, RenderBenchmark, RenderPreviewToBitmap):
+    /// Pipeline comune a tutti i frame (Render, benchmark offscreen, RenderPreviewToBitmap):
     /// costanti, shader, render target, viewport e draw del triangolo fullscreen.
     /// </summary>
     private static void DrawFrame(DxParams pars, ID3D11RenderTargetView rtv, ID3D11PixelShader ps, int width, int height)
@@ -358,36 +387,69 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     }
 
     /// <summary>
-    /// Prepara il benchmark: ingrandisce la swapchain alla griglia dei campioni
-    /// elementari (es. 960x540 AA8 = 7680x4320), senza media dei campioni.
+    /// Prepara il benchmark offscreen: render target in memoria della GPU alle
+    /// dimensioni della griglia dei campioni elementari (es. 960x540 AA8 =
+    /// 7680x4320, ~132 MB in R8G8B8A8) più un anello di event query per rilevare
+    /// il completamento reale dei frame. Niente swapchain, niente Present.
     /// </summary>
-    /// <param name="width">Larghezza della griglia di campioni.</param>
-    /// <param name="height">Altezza della griglia di campioni.</param>
-    public static void BeginBenchmark(int width, int height)
+    public static void BeginBenchmarkOffscreen(int width, int height)
     {
-        if (!IsReady || _benchmarking) return;
-        _preBenchWidth = _backWidth;
-        _preBenchHeight = _backHeight;
-        Resize(width, height); // prima del flag: con _benchmarking=true Resize ignorerebbe la richiesta
-        _benchmarking = true;
+        if (!IsReady) throw new InvalidOperationException("DirectX non inizializzato.");
+        EndBenchmarkOffscreen();
+        width = Math.Max(1, width);
+        height = Math.Max(1, height);
+        var desc = new Texture2DDescription
+        {
+            Width = (uint)width,
+            Height = (uint)height,
+            MipLevels = 1,
+            ArraySize = 1,
+            Format = DxgiFormat.R8G8B8A8_UNorm,
+            SampleDescription = new SampleDescription(1, 0),
+            Usage = ResourceUsage.Default,
+            BindFlags = BindFlags.RenderTarget,
+            CPUAccessFlags = CpuAccessFlags.None,
+            MiscFlags = ResourceOptionFlags.None,
+        };
+        _benchTarget = _device!.CreateTexture2D(desc);
+        _benchRtv = _device.CreateRenderTargetView(_benchTarget);
+        _benchQueries = new ID3D11Query?[BenchmarkFlight];
+        for (int i = 0; i < _benchQueries.Length; i++)
+            _benchQueries[i] = _device.CreateQuery(new QueryDescription(QueryType.Event, QueryFlags.None));
+        _benchGridW = width;
+        _benchGridH = height;
     }
 
-    /// <summary>Ripristina la risoluzione della swapchain pre-benchmark.</summary>
-    public static void EndBenchmark()
+    /// <summary>Rilascia le risorse del benchmark offscreen.</summary>
+    public static void EndBenchmarkOffscreen()
     {
-        if (!IsReady || !_benchmarking) return;
-        _benchmarking = false;
-        Resize(_preBenchWidth, _preBenchHeight);
+        if (_benchQueries != null)
+        {
+            foreach (var q in _benchQueries)
+                q?.Dispose();
+            _benchQueries = Array.Empty<ID3D11Query?>();
+        }
+        _benchRtv?.Dispose(); _benchRtv = null;
+        _benchTarget?.Dispose(); _benchTarget = null;
+        // Ripristina render target e viewport della swapchain per i render successivi.
+        if (_rtv != null && _context != null)
+        {
+            _context.OMSetRenderTargets(_rtv);
+            _context.RSSetViewport(new Viewport(_backWidth, _backHeight));
+        }
     }
+
+    /// <summary>Frame in flight: quanti Draw restano accodati prima di attendere
+    /// il completamento del più vecchio (pipeline piena, throughput reale).</summary>
+    private const int BenchmarkFlight = 4;
 
     /// <summary>
-    /// Frame di benchmark: disegna con lo shader solo-iterazioni sulla griglia
-    /// dei campioni e presenta SENZA v-sync (SyncInterval 0), così la misura
-    /// riflette il reale tempo di calcolo della GPU, non il refresh del monitor.
+    /// Frame di benchmark offscreen: disegna con lo shader solo-iterazioni sulla
+    /// griglia dei campioni e accoda un evento di completamento. Nessun Present:
+    /// la misura è puro tempo di calcolo dello shader, indipendente dal monitor.
     /// </summary>
-    public static void RenderBenchmark(double centerX, double centerY, double scale, int width, int height, int maxIter)
+    private static void RenderBenchmarkOffscreen(double centerX, double centerY, double scale, int width, int height, int maxIter, ID3D11Query query)
     {
-        if (!IsReady) return;
         var pars = new DxParams
         {
             Cx = (float)centerX,
@@ -399,28 +461,84 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             MaxIter = maxIter,
             Aa = 1,
         };
-        DrawFrame(pars, _rtv!, _benchPs!, width, height);
-        _swapChain!.Present(0, PresentFlags.None);
+        DrawFrame(pars, _benchRtv!, _benchPs!, width, height);
+        _context!.End(query);
     }
 
     /// <summary>
-    /// Loop di misura standard: rende frame solo-iterazioni sulla griglia dei campioni
-    /// per il budget indicato (Present(0), senza v-sync) e ritorna i secondi effettivi
-    /// e il numero di frame completati. Condiviso dal benchmark GUI e da `--bench-dx`.
+    /// Loop di misura standard offscreen: rende frame solo-iterazioni sulla griglia
+    /// dei campioni per il budget indicato e ritorna i secondi effettivi e il numero
+    /// di frame davvero completati dalla GPU (event query). Condiviso dal benchmark
+    /// GUI e da `--bench-dx`. Senza Present: DWM e copia inter-GPU esclusi.
     /// </summary>
-    /// <param name="tick">Callback opzionale (frames, secondi) dopo ogni frame.</param>
-    public static (double Seconds, int Frames) RunBenchmarkFrames(double centerX, double centerY, double scale, int gridW, int gridH, int maxIter, TimeSpan budget, Action<int, double>? tick, CancellationToken ct)
+    /// <param name="tick">Callback opzionale (frames completati, secondi) periodica.</param>
+    public static (double Seconds, int Frames) RunBenchmarkFramesOffscreen(double centerX, double centerY, double scale, int gridW, int gridH, int maxIter, TimeSpan budget, Action<int, double>? tick, CancellationToken ct)
     {
+        if (_benchRtv == null || _benchQueries.Length == 0)
+            throw new InvalidOperationException("Benchmark offscreen non preparato (BeginBenchmarkOffscreen).");
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        int frames = 0;
+        int submitted = 0, completed = 0;
+        double completedSeconds = 0;
+        double lastTick = 0;
+        var pending = new Queue<(ID3D11Query Query, int Seq)>();
+
         while (sw.Elapsed < budget)
         {
             ct.ThrowIfCancellationRequested();
-            RenderBenchmark(centerX, centerY, scale, gridW, gridH, maxIter);
-            frames++;
-            tick?.Invoke(frames, sw.Elapsed.TotalSeconds);
+            while (pending.Count >= BenchmarkFlight)
+                DrainOne(pending, sw, ref completed, ref completedSeconds, ct);
+            var query = _benchQueries[submitted % _benchQueries.Length]!;
+            RenderBenchmarkOffscreen(centerX, centerY, scale, gridW, gridH, maxIter, query);
+            pending.Enqueue((query, submitted));
+            submitted++;
+            DrainReady(pending, sw, ref completed, ref completedSeconds);
+            if (sw.Elapsed.TotalSeconds - lastTick >= 0.5)
+            {
+                tick?.Invoke(completed, sw.Elapsed.TotalSeconds);
+                lastTick = sw.Elapsed.TotalSeconds;
+            }
         }
-        return (sw.Elapsed.TotalSeconds, frames);
+
+        // Svuota la coda: i frame accodati ma non ancora completati contano,
+        // il tempo si ferma al completamento dell'ultimo.
+        _context!.Flush();
+        while (pending.Count > 0)
+            DrainOne(pending, sw, ref completed, ref completedSeconds, ct);
+        tick?.Invoke(completed, completedSeconds);
+        return (completedSeconds > 0 ? completedSeconds : sw.Elapsed.TotalSeconds, completed);
+    }
+
+    /// <summary>
+    /// True se l'event query è scattata (la GPU ha superato l'`End` corrispondente).
+    /// Con pData NULL, `GetData` fa solo il check di stato: S_OK = pronta, S_FALSE
+    /// = ancora in coda; con `DoNotFlush` non invia lavoro accodato alla GPU.
+    /// </summary>
+    private static bool QuerySignaled(ID3D11Query query, AsyncGetDataFlags flags) =>
+        _context!.GetData(query, IntPtr.Zero, 0, flags) == SharpGen.Runtime.Result.Ok;
+
+    /// <summary>Conta i frame la cui event query è già scattata (senza flush).</summary>
+    private static void DrainReady(Queue<(ID3D11Query Query, int Seq)> pending,
+        System.Diagnostics.Stopwatch sw, ref int completed, ref double completedSeconds)
+    {
+        while (pending.Count > 0 && QuerySignaled(pending.Peek().Query, AsyncGetDataFlags.DoNotFlush))
+        {
+            pending.Dequeue();
+            completed++;
+            completedSeconds = sw.Elapsed.TotalSeconds;
+        }
+    }
+
+    /// <summary>Attende il frame più vecchio della coda (bloccante, interrompibile).</summary>
+    private static void DrainOne(Queue<(ID3D11Query Query, int Seq)> pending,
+        System.Diagnostics.Stopwatch sw, ref int completed, ref double completedSeconds, CancellationToken ct)
+    {
+        var (query, _) = pending.Dequeue();
+        // Poll con flush: la GPU avanza mentre la CPU attende (GetData bloccante
+        // nativo non accetterebbe il CancellationToken).
+        while (!QuerySignaled(query, AsyncGetDataFlags.None))
+            ct.ThrowIfCancellationRequested();
+        completed++;
+        completedSeconds = sw.Elapsed.TotalSeconds;
     }
 
     /// <summary>Nome compresso per la UI e lo storico: "NVIDIA GeForce RTX 5070 Ti"
@@ -471,9 +589,13 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
 
             var bmp = ReadTextureToBitmap(target, width, height);
 
-            // Ripristina render target e viewport della swapchain per i render successivi.
-            _context.OMSetRenderTargets(_rtv!);
-            _context.RSSetViewport(new Viewport(_backWidth, _backHeight));
+            // Ripristina render target e viewport della swapchain per i render successivi
+            // (se c'è una swapchain: in headless non esiste).
+            if (_rtv != null)
+            {
+                _context.OMSetRenderTargets(_rtv);
+                _context.RSSetViewport(new Viewport(_backWidth, _backHeight));
+            }
             return bmp;
         }
         catch
@@ -526,6 +648,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
 
     public static void Dispose()
     {
+        EndBenchmarkOffscreen();
         _cbuffer?.Dispose(); _cbuffer = null;
         _benchPs?.Dispose(); _benchPs = null;
         _ps?.Dispose(); _ps = null;

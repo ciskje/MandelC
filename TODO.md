@@ -2,6 +2,20 @@
 
 Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
 
+- [ ] Pubblicazione v2.5.22 + commit — `pending`
+
+- [ ] Upgrade a .NET 10 LTS (piano pronto, da eseguire: SDK side-by-side, retarget, riverifica motori+bench, bump v2.6.0) — `pending`
+
+- [x] Audit aggiornamenti sicuri (SDK/runtime/NuGet): tutto già all'ultimo stabile, nessun cambio — `completed`
+
+- [x] v2.5.22: AppStarting (freccia+clessidra) al posto di Wait dove l'UI resta interattiva — `completed`
+
+- [x] v2.5.21: Cursore wait non visibile durante i render lunghi se il mouse è sull'immagine (pictureBox fuori dalla lista di SetBusyCursor) — `completed`
+
+- [x] v2.5.20: Benchmark DirectX offscreen senza Present (headless + event query) così le schede senza monitor non pagano la copia inter-GPU — `completed`
+
+- [x] v2.5.19: Test CUDA (8sx3) e inserimento risultati negli storici del benchmark — `completed`
+
 - [x] v2.5.18: Triplo test DirectX per ogni scheda (3×8 s, best per scheda) via `--bench-dx` e storico per scheda nel grafico benchmark — `completed`
 
 - [x] v2.5.17: DXGI: AdapterNames restituiva elenco vuoto (overflow su GPU >4GB via PointerUSize→uint); elencare davvero le schede DirectX — `completed`

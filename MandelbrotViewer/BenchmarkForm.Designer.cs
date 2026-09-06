@@ -67,7 +67,7 @@ partial class BenchmarkForm
 
         // chartPanel
         this.chartPanel.Dock = DockStyle.Bottom;
-        this.chartPanel.Height = 148;
+        this.chartPanel.Height = 205;
         this.chartPanel.Padding = new Padding(12, 0, 12, 4);
         this.chartPanel.BackColor = System.Drawing.Color.White;
         this.chartPanel.Paint += new PaintEventHandler(this.ChartPanel_Paint);
@@ -99,7 +99,7 @@ partial class BenchmarkForm
 
         // BenchmarkForm
         this.AutoScaleMode = AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(520, 590);
+        this.ClientSize = new System.Drawing.Size(520, 647);
         this.Controls.Add(this.lblResult);
         this.Controls.Add(this.lblDetail);
         this.Controls.Add(this.lblInfo);

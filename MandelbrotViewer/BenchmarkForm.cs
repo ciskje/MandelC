@@ -43,7 +43,7 @@ public partial class BenchmarkForm : Form
         lblInfo.Text = $"Motore: {RenderEngineInfo.DisplayName(_engine)}{note}\n" +
             $"Zona {BW}x{BH} {BAA}x AA = {BW * BAA}x{BH * BAA} campioni elementari senza media, " +
             $"{BMaxIter} iterazioni max, scala {BScale}, precisione {precision} — " +
-            $"durata minima {Budget.TotalSeconds:F0} secondi (DirectX senza v-sync).";
+            $"durata minima {Budget.TotalSeconds:F0} secondi (DirectX offscreen, senza Present).";
         lblResult.Text = "—";
         chartPanel.Invalidate();
     }
@@ -178,7 +178,7 @@ public partial class BenchmarkForm : Form
     private void ChartPanel_Paint(object? sender, PaintEventArgs e)
     {
         e.Graphics.Clear(chartPanel.BackColor);
-        float left = 108;
+        float left = 132;
         float right = 56;
         float top = 22;
         float bottom = 24;
@@ -200,14 +200,18 @@ public partial class BenchmarkForm : Form
         using var rightAligned = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
 
         // Riferimenti storici, misurati con il test standardizzato (best di 3 run da
-        // 8 s per scheda; rinnovabili con `--bench-dx`). Unità: MPixel/s.
+        // 8 s per scheda: DirectX offscreen con `--bench-dx`, CUDA con `--bench-cuda`
+        // in float 32-bit e double 64-bit). Unità: MPixel/s.
         (string Label, double Value, Brush Brush)[] bars =
         [
             ("Risultato", _measuredMpixel, actualBrush),
-            ("CUDA 5070 Ti", 5940.0, cudaBrush),
-            ("DirectX 5070 Ti", 5715.7, dxBrush),
-            ("DirectX 4070 SUPER", 1655.7, dxBrush),
-            ("DirectX AMD Radeon", 113.3, dxBrush),
+            ("CUDA 5070 Ti 32-bit", 5653.6, cudaBrush),
+            ("CUDA 4070 SUPER 32-bit", 4667.8, cudaBrush),
+            ("CUDA 5070 Ti 64-bit", 140.7, cudaBrush),
+            ("CUDA 4070 S. 64-bit", 110.3, cudaBrush),
+            ("DirectX 5070 Ti", 5780.7, dxBrush),
+            ("DirectX 4070 SUPER", 4441.6, dxBrush),
+            ("DirectX AMD Radeon", 102.2, dxBrush),
             ("CPU", 30.0, cpuBrush),
         ];
         double maximum = bars.Max(b => b.Value) * 1.15;
@@ -264,21 +268,23 @@ public partial class BenchmarkForm : Form
     }
 
     /// <summary>
-    /// Benchmark DirectX standardizzato: rende la griglia dei campioni elementari
-    /// (960x540 AA8x = 7680x4320 pixel) con lo shader solo-iterazioni, senza media
-    /// dei campioni e senza v-sync (Present(0)). Il lavoro per frame è quindi
-    /// identico a quello dei benchmark CUDA e CPU.
+    /// Benchmark DirectX standardizzato offscreen: rende la griglia dei campioni
+    /// elementari (960x540 AA8x = 7680x4320 pixel) con lo shader solo-iterazioni su
+    /// una render target in memoria, senza media dei campioni e senza Present.
+    /// Il completamento dei frame è rilevato con event query: il lavoro per frame
+    /// è quindi identico a quello dei benchmark CUDA e CPU, e DWM/copia inter-GPU
+    /// non falsano le schede senza monitor.
     /// </summary>
     private static async Task<(double Seconds, int Frames)> BenchmarkDirectX(IProgress<BenchmarkProgress> progress, CancellationToken ct)
     {
         int gridW = BW * BAA;
         int gridH = BH * BAA;
-        DxMandelbrot.BeginBenchmark(gridW, gridH);
+        DxMandelbrot.BeginBenchmarkOffscreen(gridW, gridH);
         try
         {
             double lastReport = 0;
             var (seconds, frames) = await Task.Run(() =>
-                DxMandelbrot.RunBenchmarkFrames(BCx, BCy, BScale, gridW, gridH, BMaxIter, Budget,
+                DxMandelbrot.RunBenchmarkFramesOffscreen(BCx, BCy, BScale, gridW, gridH, BMaxIter, Budget,
                     (f, elapsed) =>
                     {
                         if (elapsed - lastReport >= BenchmarkProgress.ReportInterval.TotalSeconds)
@@ -292,7 +298,7 @@ public partial class BenchmarkForm : Form
         }
         finally
         {
-            DxMandelbrot.EndBenchmark();
+            DxMandelbrot.EndBenchmarkOffscreen();
         }
     }
 

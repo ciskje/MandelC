@@ -97,30 +97,17 @@ internal static class Diagnostics
     /// indicata): per scheda esegue <paramref name="runs"/> run del benchmark
     /// standardizzato e stampa i valori in MPixel/s con il migliore — la misura
     /// usata per lo storico del grafico benchmark (nome compresso).
-    /// Usa una piccola finestra VISIBILE: con Present(0) su una finestra nascosta
-    /// il compositor potrebbe saltare il lavoro GPU e falsare la misura.
+    /// Offscreen senza finestra né Present (headless): solo shader + event query,
+    /// così DWM e copia inter-GPU non falsano le schede senza monitor.
     /// </summary>
     public static void BenchDx(string? adapterName, int runs, TimeSpan budget)
     {
         int gridW = BenchmarkStandard.Width * BenchmarkStandard.Aa;
         int gridH = BenchmarkStandard.Height * BenchmarkStandard.Aa;
-        Console.WriteLine($"Benchmark DirectX standardizzato: {runs} run da {budget.TotalSeconds:0} s per scheda, " +
+        Console.WriteLine($"Benchmark DirectX standardizzato (offscreen, senza Present): {runs} run da {budget.TotalSeconds:0} s per scheda, " +
             $"zona {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
             $"(griglia {gridW}x{gridH}, {BenchmarkStandard.PixelsPerFrame / 1e6:0.##} MPixel/frame), " +
-            $"{BenchmarkStandard.MaxIter} iter, solo iterazioni, senza v-sync.");
-
-        using var f = new Form
-        {
-            ShowInTaskbar = false,
-            StartPosition = FormStartPosition.Manual,
-            Bounds = new Rectangle(SystemInformation.VirtualScreen.Width - 280,
-                                   SystemInformation.VirtualScreen.Height - 170, 230, 110),
-            Text = "MandelC# --bench-dx",
-            FormBorderStyle = FormBorderStyle.FixedToolWindow,
-            TopMost = true,
-        };
-        f.Show();
-        var handle = f.Handle;
+            $"{BenchmarkStandard.MaxIter} iter, solo iterazioni, completamento via event query.");
 
         IReadOnlyList<string> schede = adapterName != null
             ? new[] { adapterName }
@@ -138,7 +125,7 @@ internal static class Diagnostics
             string shortName = DxMandelbrot.ShortAdapterName(scheda);
             Console.WriteLine();
             Console.WriteLine($"=== {shortName} ===");
-            if (!DxMandelbrot.TryInitialize(handle, 320, 240, scheda))
+            if (!DxMandelbrot.TryInitializeHeadless(scheda))
             {
                 Console.WriteLine("  init fallita: " + DxMandelbrot.LastError);
                 continue;
@@ -147,12 +134,12 @@ internal static class Diagnostics
             double best = 0;
             try
             {
-                DxMandelbrot.BeginBenchmark(gridW, gridH);
+                DxMandelbrot.BeginBenchmarkOffscreen(gridW, gridH);
                 for (int r = 1; r <= runs; r++)
                 {
                     try
                     {
-                        var (seconds, frames) = DxMandelbrot.RunBenchmarkFrames(
+                        var (seconds, frames) = DxMandelbrot.RunBenchmarkFramesOffscreen(
                             BenchmarkStandard.CenterX, BenchmarkStandard.CenterY, BenchmarkStandard.Scale,
                             gridW, gridH, BenchmarkStandard.MaxIter, budget, null, CancellationToken.None);
                         double mps = BenchmarkStandard.PixelsPerSecond(frames, seconds) / 1e6;
@@ -167,7 +154,7 @@ internal static class Diagnostics
             }
             finally
             {
-                DxMandelbrot.EndBenchmark();
+                DxMandelbrot.EndBenchmarkOffscreen();
                 DxMandelbrot.Dispose();
             }
 
@@ -186,5 +173,83 @@ internal static class Diagnostics
         Console.WriteLine("=== Riepilogo (best per scheda, MPixel/s) ===");
         foreach (var (shortName, best) in migliori)
             Console.WriteLine($"  {shortName}: {best:0.#}");
+    }
+
+    /// <summary>
+    /// Triplo test standard su ogni device CUDA disponibile (o solo su quello
+    /// indicato): per device esegue <paramref name="runs"/> run del benchmark
+    /// standardizzato in float 32-bit e in double 64-bit e stampa i valori in
+    /// MPixel/s con il migliore — la misura usata per lo storico del grafico
+    /// benchmark. Analogo di <see cref="BenchDx"/> per il motore CUDA.
+    /// </summary>
+    public static void BenchCuda(string? deviceName, int runs, TimeSpan budget)
+    {
+        Console.WriteLine($"Benchmark CUDA standardizzato: {runs} run da {budget.TotalSeconds:0} s per device, " +
+            $"zona {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
+            $"({BenchmarkStandard.PixelsPerFrame / 1e6:0.##} MPixel/frame), " +
+            $"{BenchmarkStandard.MaxIter} iter, solo iterazioni (float 32-bit + double 64-bit).");
+
+        IReadOnlyList<string> devices = deviceName != null
+            ? new[] { deviceName }
+            : GpuMandelbrot.DeviceNames();
+        if (devices.Count == 0)
+        {
+            Console.WriteLine("Nessun device CUDA disponibile. (" + GpuMandelbrot.LastError + ")");
+            return;
+        }
+
+        var migliori = new List<(string Short, double Best32, double Best64)>();
+        foreach (string device in devices)
+        {
+            string shortName = device.Replace("NVIDIA GeForce ", "").Trim();
+            Console.WriteLine();
+            Console.WriteLine($"=== {shortName} ===");
+            if (!GpuMandelbrot.TryInitialize(device))
+            {
+                Console.WriteLine("  init fallita: " + GpuMandelbrot.LastError);
+                continue;
+            }
+
+            double best32 = 0, best64 = 0;
+            foreach (bool useDouble in new[] { false, true })
+            {
+                string tag = useDouble ? "64-bit" : "32-bit";
+                for (int r = 1; r <= runs; r++)
+                {
+                    try
+                    {
+                        var (_, seconds, frames) = GpuMandelbrot.BenchmarkGpu(
+                            BenchmarkStandard.CenterX, BenchmarkStandard.CenterY, BenchmarkStandard.Scale,
+                            BenchmarkStandard.Width, BenchmarkStandard.Height, BenchmarkStandard.MaxIter,
+                            BenchmarkStandard.Aa, useDouble, budget, null, CancellationToken.None);
+                        double mps = BenchmarkStandard.PixelsPerSecond(frames, seconds) / 1e6;
+                        if (useDouble) best64 = Math.Max(best64, mps);
+                        else best32 = Math.Max(best32, mps);
+                        Console.WriteLine($"  {tag} run {r}: {frames} frame in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"  {tag} run {r} fallito: {ex.GetType().Name}: {ex.Message}");
+                    }
+                }
+            }
+            GpuMandelbrot.Dispose();
+
+            if (best32 > 0 || best64 > 0)
+            {
+                migliori.Add((shortName, best32, best64));
+                Console.WriteLine($"  MIGLIORE 32-bit: {best32:0.#} MPixel/s");
+                Console.WriteLine($"  MIGLIORE 64-bit: {best64:0.#} MPixel/s");
+            }
+            else
+            {
+                Console.WriteLine("  nessuna misura valida");
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("=== Riepilogo (best per device, MPixel/s) ===");
+        foreach (var (shortName, best32, best64) in migliori)
+            Console.WriteLine($"  {shortName}: 32-bit {best32:0.#} | 64-bit {best64:0.#}");
     }
 }

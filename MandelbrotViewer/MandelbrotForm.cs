@@ -166,17 +166,22 @@ public partial class MandelbrotForm : Form
     }
 
     /// <summary>
-    /// Imposta (o ripristina) il cursore "atteso" sia sulla form sia sui controlli di
-    /// input: così resta visibile anche se il mouse è sopra un controllo (es. il
-    /// dropdown AA) che altrimenti mostrerebbe il proprio cursore.
+    /// Imposta (o ripristina) il cursore di occupato su form e tutti i discendenti
+    /// (ricorsivo: copre anche pictureBox, menu e stato). È AppStarting
+    /// (freccia+clessidra) e non Wait perché durante il render async l'UI resta
+    /// interattiva (pan/zoom annullano e rilanciano il calcolo); `UseWaitCursor`
+    /// non si può usare perché forza la clessidra piena.
     /// </summary>
     private void SetBusyCursor(bool busy)
     {
-        var cursor = busy ? Cursors.WaitCursor : Cursors.Default;
-        Cursor = cursor;
-        foreach (Control ctl in new Control[] { cmbAA, cmbPalette, numIter, chkIterAuto, cmbGpu, radPrec32, radPrec64,
-                                               radioCpu, radioCuda, radioDx, btnReset, btnBenchmark })
-            ctl.Cursor = cursor;
+        ApplyCursorRecursive(this, busy ? Cursors.AppStarting : Cursors.Default);
+    }
+
+    private static void ApplyCursorRecursive(Control root, Cursor cursor)
+    {
+        root.Cursor = cursor;
+        foreach (Control child in root.Controls)
+            ApplyCursorRecursive(child, cursor);
     }
 
     /// <summary>Ingrandisce il bitmap di anteprima a piena risoluzione (bilineare).</summary>
