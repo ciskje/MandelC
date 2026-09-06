@@ -163,7 +163,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         return names;
     }
 
-    /// <param name="adapterName">Scheda da usare (nome DXGI); null = auto (più memoria dedicata).</param>
+    /// <param name="adapterName">Scheda da usare (nome DXGI esatto); null = adapter hardware predefinito.
+    /// Con una scheda richiesta, il device viene creato esplicitamente sull'adapter scelto.</param>
     public static bool TryInitialize(IntPtr hwnd, int width, int height, string? adapterName = null)
     {
         bool same = adapterName == null ||
@@ -177,22 +178,46 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         string step = "inizio";
         try
         {
-            step = "D3D11CreateDevice (adapter hardware predefinito)";
+            step = "DXGI.CreateDXGIFactory2";
+            using IDXGIFactory2 factory = DXGI.CreateDXGIFactory2<IDXGIFactory2>(false);
+
+            // Se l'utente ha scelto una scheda, trova l'adapter DXGI corrispondente
+            // e passalo esplicito a D3D11CreateDevice (con DriverType.Unknown, come
+            // richiesto quando si passa un adapter); altrimenti adapter predefinito.
+            IDXGIAdapter? chosen = null;
+            if (adapterName != null)
+            {
+                step = "ricerca dell'adapter DXGI richiesto";
+                for (uint i = 0; i < 32; i++)
+                {
+                    if (factory.EnumAdapters(i, out IDXGIAdapter adapter).Failure) break;
+                    if (string.Equals(adapter.Description.Description, adapterName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        chosen = adapter; // il dispose avviene dopo la creazione del device
+                        break;
+                    }
+                    adapter.Dispose();
+                }
+                if (chosen == null)
+                    throw new InvalidOperationException($"Scheda video non trovata: {adapterName}");
+            }
+
+            step = chosen != null
+                ? $"D3D11CreateDevice (adapter scelto: {adapterName})"
+                : "D3D11CreateDevice (adapter hardware predefinito)";
             var result = D3D11.D3D11CreateDevice(
-                null, DriverType.Hardware,
+                chosen, chosen != null ? DriverType.Unknown : DriverType.Hardware,
                 DeviceCreationFlags.BgraSupport,
                 new[] { FeatureLevel.Level_11_0, FeatureLevel.Level_10_0 },
                 out ID3D11Device device,
                 out FeatureLevel level,
                 out ID3D11DeviceContext context);
+            chosen?.Dispose(); // il device mantiene il proprio riferimento all'adapter
             if (result.Failure)
                 throw new InvalidOperationException($"D3D11CreateDevice fallito (HRESULT 0x{result.Code:X8})");
             _device = device;
             _context = context;
             AdapterName = adapterName ?? "Auto (adapter hardware predefinito)";
-
-            step = "DXGI.CreateDXGIFactory2";
-            using IDXGIFactory2 factory = DXGI.CreateDXGIFactory2<IDXGIFactory2>(false);
 
             width = Math.Max(1, width);
             height = Math.Max(1, height);

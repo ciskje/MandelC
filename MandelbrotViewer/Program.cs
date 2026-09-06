@@ -8,10 +8,10 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
-        // Diagnostica senza UI: MandelbrotViewer --diag-dx | --diag-gpu (vedi Diagnostics.cs).
+        // Diagnostica senza UI: MandelbrotViewer --diag-dx [nome scheda] | --diag-gpu (vedi Diagnostics.cs).
         if (args.Length > 0 && args[0] == "--diag-dx")
         {
-            Diagnostics.DiagDx();
+            Diagnostics.DiagDx(args.Length > 1 ? args[1] : null);
             return;
         }
         if (args.Length > 0 && args[0] == "--diag-gpu")

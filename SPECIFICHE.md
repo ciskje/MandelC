@@ -90,6 +90,16 @@ frame, `TotalIters` = 0 come per DirectX); rinominato l'handler del menu "Salva
 immagine" in `SaveImageItem_Click`; rimossi wrapper `RenderGpu`, doppio dispose
 del bitmap precedente, usings ridondanti e commenti obsoleti (`RenderEngine.cs`).
 
+Fix v2.5.16: il dropdown GPU mostrava le schede DirectX ma `TryInitialize`
+creava sempre il device sull'adapter predefinito (`D3D11CreateDevice` con
+adapter null): la scelta non aveva alcun effetto. Ora con una scheda richiesta
+si enumera l'adapter DXGI per nome dallo stesso factory della swapchain e il
+device viene creato su quell'adapter con `DriverType.Unknown` (obbligatorio
+quando si passa un adapter); il motivo dell'eventuale fallimento finisce in
+`LastError` con lo step esatto ("Scheda video non trovata: …" se il nome non
+corrisponde). `Diagnostics.DiagDx` accetta il nome scheda come secondo
+argomento CLI per verificarla senza UI (`--diag-dx "Nome Scheda"`).
+
 
 
 Ottimizzazione v2.3.6: il render CUDA riusa i buffer device e host tra frame;

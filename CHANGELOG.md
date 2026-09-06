@@ -2,6 +2,17 @@
 
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
+- **v2.5.16** — Fix: il dropdown GPU non applicava la scheda DirectX scelta:
+  `TryInitialize` creava sempre il device sull'adapter predefinito
+  (`D3D11CreateDevice(null, DriverType.Hardware)`). Ora la scheda richiesta viene
+  cercata per nome tra gli adapter DXGI dello stesso factory della swapchain e
+  passata esplicitamente a `D3D11CreateDevice` con `DriverType.Unknown`
+  (obbligatorio quando si passa un adapter); nome inesistente → errore chiaro in
+  `LastError` ("Scheda video non trovata: …"). `--diag-dx` accetta il nome
+  scheda come argomento per il test senza UI. File: `DxMandelbrot.cs`,
+  `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`,
+  `.csproj`.
+
 - **v2.5.15** — Refactor di riordino e pulizia (nessun cambiamento funzionale):
   palette/gradienti estratti in `Palette.cs` (`PaletteColors`, fonte unica per
   CPU/DirectX; CUDA li riceve via `GpuPaletteParams`) con commenti di

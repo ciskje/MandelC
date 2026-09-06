@@ -7,13 +7,13 @@ namespace MandelbrotViewer;
 /// </summary>
 internal static class Diagnostics
 {
-    public static void DiagDx()
+    public static void DiagDx(string? adapterName = null)
     {
         Console.WriteLine("Schede DXGI: " + string.Join(", ", DxMandelbrot.AdapterNames()));
         using var f = new Form { ShowInTaskbar = false, WindowState = FormWindowState.Minimized, Opacity = 0 };
         f.CreateControl();
         var handle = f.Handle; // forza creazione handle nativo
-        bool ok = DxMandelbrot.TryInitialize(handle, 800, 600);
+        bool ok = DxMandelbrot.TryInitialize(handle, 800, 600, adapterName);
         Console.WriteLine("IsReady: " + ok);
         Console.WriteLine("AdapterName: " + DxMandelbrot.AdapterName);
         Console.WriteLine("LastError: " + DxMandelbrot.LastError);
