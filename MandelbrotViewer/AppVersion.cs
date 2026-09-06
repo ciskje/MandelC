@@ -8,8 +8,8 @@ namespace MandelbrotViewer;
 public static class AppVersion
 {
     public const int Major = 2;
-    public const int Minor = 5;
-    public const int Patch = 22;
+    public const int Minor = 14;
+    public const int Patch = 0;
 
     public static string Full => $"{Major}.{Minor}.{Patch}";
 

@@ -5,9 +5,9 @@ namespace MandelbrotViewer;
 public partial class MandelbrotForm : Form
 {
     // Vista iniziale: tutto l'insieme (re in [-2.5, 1], im in [-1.2, 1.2]).
-    private const double StartCenterX = -0.5;
-    private const double StartCenterY = 0.0;
-    private const double StartScale = 3.2; // larghezza in unità complesse
+    internal const double StartCenterX = -0.5;
+    internal const double StartCenterY = 0.0;
+    internal const double StartScale = 3.2; // larghezza in unità complesse
 
     private double _centerX = StartCenterX;
     private double _centerY = StartCenterY;
@@ -29,6 +29,18 @@ public partial class MandelbrotForm : Form
     private bool _dragging;
     private MouseButtons _dragButton;
     private Point _downPos;   // dove è stato premuto il pulsante
+    private readonly Stack<ViewZone> _backZones = new();   // cronologia: viste precedenti
+    private readonly Stack<ViewZone> _forwardZones = new(); // cronologia: viste successive
+    private ViewZone? _dragStartZone; // vista a inizio trascinamento (per la cronologia)
+    private ToolStripMenuItem _backItem = null!;
+    private ToolStripMenuItem _forwardItem = null!;
+    private ToolStripMenuItem _favoritesMenu = null!;
+    private ToolStripMenuItem _removeFavMenu = null!;
+    private ToolStripMenuItem _juliaItem = null!;
+    private bool _julia; // modalità Julia: c fissata, z(0) = punto del pixel
+    private double _jcx = DefaultJcx, _jcy = DefaultJcy;
+    private const double DefaultJcx = -0.7;
+    private const double DefaultJcy = 0.27015;
     private Point _lastPos;   // ultima posizione durante il trascinamento
     private bool _moved;      // true se superata la soglia di trascinamento
     private int _lastPanTick; // Environment.TickCount dell'ultimo render di pan
@@ -37,6 +49,7 @@ public partial class MandelbrotForm : Form
     {
         InitializeComponent();
         Text += $" v{AppVersion.Display}";
+        Program.ApplyIcon(this);
 
         _resizeTimer = new System.Windows.Forms.Timer { Interval = 300 };
         _resizeTimer.Tick += (s, e) => { _resizeTimer.Stop(); RenderAsync(); };
@@ -47,6 +60,7 @@ public partial class MandelbrotForm : Form
 
         LoadSettings();
         _suspendRender = false;
+        BuildViewMenu();
 
         Shown += async (s, e) =>
         {
@@ -141,9 +155,9 @@ public partial class MandelbrotForm : Form
         {
             var bmp = new Bitmap(w, h);
             if (useCuda)
-                gpuDouble = await Task.Run(() => GpuMandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, UseDoublePrecision, token), token);
+                gpuDouble = await Task.Run(() => GpuMandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, UseDoublePrecision, token, _jcx, _jcy, _julia), token);
             else
-                await Task.Run(() => Mandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, token), token);
+                await Task.Run(() => Mandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, token, _jcx, _jcy, _julia), token);
 
             if (preview && (bmp.Width != fullW || bmp.Height != fullH))
                 bmp = Upscale(bmp, fullW, fullH);
@@ -156,7 +170,8 @@ public partial class MandelbrotForm : Form
             old?.Dispose();
 
             string engineLabel = useCuda ? $"CUDA-{(gpuDouble ? "double" : "float")} {GpuMandelbrot.DeviceShortName}" : "CPU";
-            lblStatus.Text = $"Centro {cx:+0.000000;-0.000000} {cy:+0.000000;-0.000000}i | larghezza {scale:E2} | iter {maxIter}{(chkIterAuto.Checked ? " (auto)" : "")} | {ActivePalette}{(aa > 1 ? $" AA{aa}x" : "")} | motore {engineLabel}{(preview ? " (anteprima)" : "")}";
+            string juliaLabel = _julia ? $" | Julia c={_jcx:+0.000000;-0.000000} {_jcy:+0.000000;-0.000000}i" : "";
+            lblStatus.Text = $"Centro {cx:+0.000000;-0.000000} {cy:+0.000000;-0.000000}i | larghezza {scale:E2} | iter {maxIter}{(chkIterAuto.Checked ? " (auto)" : "")} | {ActivePalette}{(aa > 1 ? $" AA{aa}x" : "")} | motore {engineLabel}{juliaLabel}{(preview ? " (anteprima)" : "")}";
         }
         catch (OperationCanceledException) { /* rendering superato, ignora */ }
         finally
@@ -233,7 +248,7 @@ public partial class MandelbrotForm : Form
             DxMandelbrot.Resize(dxPanel.Width, dxPanel.Height);
             if (!_dxDirty) return;
             _dxDirty = false;
-            DxMandelbrot.Render(_centerX, _centerY, _scale, dxPanel.Width, dxPanel.Height, MaxIter, AaFactor, ActivePalette);
+            DxMandelbrot.Render(_centerX, _centerY, _scale, dxPanel.Width, dxPanel.Height, MaxIter, AaFactor, ActivePalette, _jcx, _jcy, _julia);
             UpdateDxStatus();
         }
         catch (Exception ex)
@@ -245,7 +260,8 @@ public partial class MandelbrotForm : Form
     private void UpdateDxStatus()
     {
         string warn = GpuMandelbrot.WantsDouble(_scale) ? " [oltre float!]" : "";
-        lblStatus.Text = $"Centro {_centerX:+0.000000;-0.000000} {_centerY:+0.000000;-0.000000}i | larghezza {_scale:E2} | iter {MaxIter}{(chkIterAuto.Checked ? " (auto)" : "")} | {ActivePalette} | motore DirectX (float){warn}";
+        string juliaLabel = _julia ? $" | Julia c={_jcx:+0.000000;-0.000000} {_jcy:+0.000000;-0.000000}i" : "";
+        lblStatus.Text = $"Centro {_centerX:+0.000000;-0.000000} {_centerY:+0.000000;-0.000000}i | larghezza {_scale:E2} | iter {MaxIter}{(chkIterAuto.Checked ? " (auto)" : "")} | {ActivePalette} | motore DirectX (float){warn}{juliaLabel}";
     }
 
     private void FallbackToCpu(string reason)
@@ -276,6 +292,7 @@ public partial class MandelbrotForm : Form
     private void ZoomAt(Point p, double factor)
     {
         // Zoom centrato sul punto del mouse (factor < 1 = avvicina).
+        PushHistory();
         var (cx, cy) = PixelToComplex(p);
         _centerX = cx + (_centerX - cx) * factor;
         _centerY = cy + (_centerY - cy) * factor;
@@ -297,6 +314,9 @@ public partial class MandelbrotForm : Form
 
     private void Reset()
     {
+        PushHistory();
+        _jcx = DefaultJcx; // reset anche la c di Julia (la modalità resta)
+        _jcy = DefaultJcy;
         _centerX = StartCenterX;
         _centerY = StartCenterY;
         _scale = StartScale;
@@ -336,8 +356,10 @@ public partial class MandelbrotForm : Form
 
     // ---------- Zone (salvataggio/caricamento vista in JSON) ----------
 
-    /// <summary>Vista salvata: centro, larghezza complessa e iterazioni.</summary>
-    private sealed record ViewZone(double CenterX, double CenterY, double Scale, int MaxIter);
+    /// <summary>Vista salvata: centro, larghezza complessa, iterazioni e modalità Julia
+    /// (i campi Julia hanno default: i file vecchi si caricano come Mandelbrot).</summary>
+    private sealed record ViewZone(double CenterX, double CenterY, double Scale, int MaxIter,
+        bool Julia = false, double Jcx = DefaultJcx, double Jcy = DefaultJcy);
 
     private void SaveZone()
     {
@@ -362,28 +384,281 @@ public partial class MandelbrotForm : Form
             DefaultExt = "json"
         };
         if (dlg.ShowDialog() != DialogResult.OK) return;
+        string json;
         try
         {
-            string json = File.ReadAllText(dlg.FileName);
-            var zone = JsonSerializer.Deserialize<ViewZone>(json);
-            if (zone == null || !double.IsFinite(zone.CenterX) || !double.IsFinite(zone.CenterY)
-                || !double.IsFinite(zone.Scale) || zone.Scale <= 0)
-            {
-                throw new InvalidDataException("Il file non contiene una zona valida.");
-            }
-            _centerX = zone.CenterX;
-            _centerY = zone.CenterY;
-            _scale = zone.Scale;
-            chkIterAuto.Checked = false; // la zona salva iterazioni esplicite
-            numIter.Value = Math.Clamp(zone.MaxIter, (int)numIter.Minimum, (int)numIter.Maximum);
-            InvalidateView();
-            lblStatus.Text = $"Zona caricata da {dlg.FileName}";
+            json = File.ReadAllText(dlg.FileName);
         }
-        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, $"Impossibile caricare la zona:\n{ex.Message}",
-                "Carica zona", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            WarnZone("Carica zona", ex.Message);
+            return;
         }
+        if (!TryParseZone(json, out var zone, out string error) || zone == null)
+        {
+            WarnZone("Carica zona", error);
+            return;
+        }
+        PushHistory();
+        ApplyZone(zone);
+        lblStatus.Text = $"Zona caricata da {dlg.FileName}";
+    }
+
+    private static bool TryParseZone(string json, out ViewZone? zone, out string error)
+    {
+        zone = null;
+        error = "";
+        try
+        {
+            zone = JsonSerializer.Deserialize<ViewZone>(json);
+        }
+        catch (JsonException ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+        if (zone == null || !double.IsFinite(zone.CenterX) || !double.IsFinite(zone.CenterY)
+            || !double.IsFinite(zone.Scale) || zone.Scale <= 0)
+        {
+            error = "Il file non contiene una zona valida.";
+            return false;
+        }
+        return true;
+    }
+
+    private void WarnZone(string title, string message) =>
+        MessageBox.Show(this, $"Impossibile caricare la zona:\n{message}",
+            title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+    /// <summary>Applica una zona (cronologia, preferiti, file): iterazioni esplicite.</summary>
+    private void ApplyZone(ViewZone zone)
+    {
+        _centerX = zone.CenterX;
+        _centerY = zone.CenterY;
+        _scale = zone.Scale;
+        _julia = zone.Julia;
+        _jcx = zone.Jcx;
+        _jcy = zone.Jcy;
+        _juliaItem.Checked = _julia;
+        chkIterAuto.Checked = false; // la zona salva iterazioni esplicite
+        numIter.Value = Math.Clamp(zone.MaxIter, (int)numIter.Minimum, (int)numIter.Maximum);
+        InvalidateView();
+    }
+
+    // ---------- Cronologia e preferiti ----------
+
+    private ViewZone CurrentZone() => new(_centerX, _centerY, _scale, MaxIter, _julia, _jcx, _jcy);
+
+    /// <summary>Registra la vista corrente prima di un cambio committed (cap 200).</summary>
+    private void PushHistory()
+    {
+        _backZones.Push(CurrentZone());
+        _forwardZones.Clear();
+        while (_backZones.Count > 200)
+        {
+            var arr = _backZones.ToArray();
+            _backZones.Clear();
+            foreach (var z in arr[..^1].Reverse())
+                _backZones.Push(z);
+        }
+        UpdateHistoryMenu();
+    }
+
+    private void GoBack()
+    {
+        if (_backZones.Count == 0) return;
+        _forwardZones.Push(CurrentZone());
+        ApplyZone(_backZones.Pop());
+        UpdateHistoryMenu();
+    }
+
+    private void GoForward()
+    {
+        if (_forwardZones.Count == 0) return;
+        _backZones.Push(CurrentZone());
+        ApplyZone(_forwardZones.Pop());
+        UpdateHistoryMenu();
+    }
+
+    /// <summary>Commuta la modalità Julia (CheckOnClick ha già aggiornato il check).</summary>
+    private void ToggleJulia()
+    {
+        PushHistory();
+        _julia = _juliaItem.Checked;
+        InvalidateView();
+    }
+
+    private void UpdateHistoryMenu()
+    {
+        if (_backItem == null) return;
+        _backItem.Enabled = _backZones.Count > 0;
+        _forwardItem.Enabled = _forwardZones.Count > 0;
+    }
+
+    private static string ZonesDir => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "MandelbrotViewer", "zone");
+
+    /// <summary>Menu Vista: cronologia + preferiti (costruito in codice perché
+    /// l'elenco preferiti è dinamico).</summary>
+    private void BuildViewMenu()
+    {
+        var vista = new ToolStripMenuItem("&Vista");
+        _backItem = new ToolStripMenuItem("Indietro", null, (s, e) => GoBack())
+        {
+            ShortcutKeys = Keys.Alt | Keys.Left,
+            ToolTipText = "Torna alla vista precedente",
+        };
+        _forwardItem = new ToolStripMenuItem("Avanti", null, (s, e) => GoForward())
+        {
+            ShortcutKeys = Keys.Alt | Keys.Right,
+            ToolTipText = "Torna alla vista successiva",
+        };
+        _juliaItem = new ToolStripMenuItem("Modalità &Julia", null, (s, e) => ToggleJulia())
+        {
+            ShortcutKeys = Keys.Control | Keys.J,
+            ToolTipText = "Insieme di Julia con c fissata (click = fissa c, resto invariato)",
+            Checked = _julia,
+            CheckOnClick = true,
+        };
+        var addFav = new ToolStripMenuItem("Salva zona preferita…", null, (s, e) => SaveFavorite())
+        {
+            ShortcutKeys = Keys.Control | Keys.D,
+            ToolTipText = "Salva la vista corrente tra i preferiti (file JSON)",
+        };
+        _favoritesMenu = new ToolStripMenuItem("Zone preferite")
+        {
+            ToolTipText = "Vai a una zona preferita salvata",
+        };
+        _favoritesMenu.DropDownOpening += (s, e) => RebuildFavoritesMenu();
+        _removeFavMenu = new ToolStripMenuItem("Elimina preferita")
+        {
+            ToolTipText = "Elimina un file di zona preferita",
+        };
+        _removeFavMenu.DropDownOpening += (s, e) => RebuildRemoveFavMenu();
+        vista.DropDownItems.AddRange(new ToolStripItem[] {
+            _backItem, _forwardItem, new ToolStripSeparator(),
+            _juliaItem, new ToolStripSeparator(),
+            addFav, _favoritesMenu, _removeFavMenu });
+        menuStrip.Items.Insert(1, vista);
+        UpdateHistoryMenu();
+    }
+
+    private void SaveFavorite()
+    {
+        try
+        {
+            Directory.CreateDirectory(ZonesDir);
+            using var dlg = new SaveFileDialog
+            {
+                Filter = "Zona Mandelbrot (*.json)|*.json",
+                DefaultExt = "json",
+                InitialDirectory = ZonesDir,
+                FileName = "preferita.json",
+            };
+            if (dlg.ShowDialog() != DialogResult.OK) return;
+            if (!Path.GetFullPath(dlg.FileName).StartsWith(
+                    Path.GetFullPath(ZonesDir), StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(this, "Scegli una cartella dentro:\n" + ZonesDir,
+                    "Zona preferita", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            string json = JsonSerializer.Serialize(CurrentZone(),
+                new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(dlg.FileName, json);
+            lblStatus.Text = $"Preferita salvata: {Path.GetFileName(dlg.FileName)}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, $"Impossibile salvare la preferita:\n{ex.Message}",
+                "Zona preferita", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private static string[] FavoriteFiles()
+    {
+        try
+        {
+            if (!Directory.Exists(ZonesDir)) return Array.Empty<string>();
+            return Directory.GetFiles(ZonesDir, "*.json")
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private void RebuildFavoritesMenu()
+    {
+        _favoritesMenu.DropDownItems.Clear();
+        string[] files = FavoriteFiles();
+        if (files.Length == 0)
+        {
+            _favoritesMenu.DropDownItems.Add(new ToolStripMenuItem("(nessuna)") { Enabled = false });
+            return;
+        }
+        foreach (string file in files)
+        {
+            string name = Path.GetFileNameWithoutExtension(file);
+            var item = new ToolStripMenuItem(name, null, (s, e) => LoadFavoriteFile(file))
+            {
+                ToolTipText = file,
+            };
+            _favoritesMenu.DropDownItems.Add(item);
+        }
+    }
+
+    private void RebuildRemoveFavMenu()
+    {
+        _removeFavMenu.DropDownItems.Clear();
+        string[] files = FavoriteFiles();
+        if (files.Length == 0)
+        {
+            _removeFavMenu.DropDownItems.Add(new ToolStripMenuItem("(nessuna)") { Enabled = false });
+            return;
+        }
+        foreach (string file in files)
+        {
+            string name = Path.GetFileNameWithoutExtension(file);
+            string captured = file;
+            _removeFavMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (s, e) =>
+            {
+                try
+                {
+                    File.Delete(captured);
+                    lblStatus.Text = $"Preferita eliminata: {name}";
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    MessageBox.Show(this, $"Impossibile eliminare:\n{ex.Message}",
+                        "Zona preferita", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }));
+        }
+    }
+
+    private void LoadFavoriteFile(string path)
+    {
+        string json;
+        try
+        {
+            json = File.ReadAllText(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            WarnZone("Zona preferita", ex.Message);
+            return;
+        }
+        if (!TryParseZone(json, out var zone, out string error) || zone == null)
+        {
+            WarnZone("Zona preferita", error);
+            return;
+        }
+        PushHistory();
+        ApplyZone(zone);
+        lblStatus.Text = $"Preferita: {Path.GetFileNameWithoutExtension(path)}";
     }
 
     private void ShowAbout()
@@ -396,8 +671,10 @@ public partial class MandelbrotForm : Form
             "Click destro: allontana 2x sul punto\n" +
             "Rotella: zoom sul cursore\n" +
             "Trascinamento: sposta la vista\n" +
-            "R: reset | S: salva PNG | +/-: iterazioni\n" +
-            "Palette: Fuoco, Ghiaccio o Termico dal menu a tendina\n" +
+            "R: reset | S: salva PNG | +/-: iterazioni | Frecce: sposta\n" +
+            "Alt+Left/Right: cronologia viste | Menu Vista: zone preferite (Ctrl+D)\n" +
+            "Ctrl+J: modalità Julia (click = fissa c, zoom/pan invariati)\n" +
+            "Palette dal menu a tendina (Fuoco, Ghiaccio, Termico, Oceano, Viola, Deserto, Foresta)\n" +
             "Iterazioni Auto: checkbox, crescono con l'ingrandimento\n" +
             "AA: 1x off, 2x/4x/8x con media dei pixel vicini\n" +
             "Motori: CPU, CUDA (compute) o DirectX (realtime, float)\n" +
@@ -423,6 +700,9 @@ public partial class MandelbrotForm : Form
         cmbPalette.SelectedIndex = Math.Clamp(_settings.Palette, 0, cmbPalette.Items.Count - 1);
         cmbAA.SelectedIndex = Math.Clamp(_settings.AaIndex, 0, cmbAA.Items.Count - 1);
         radPrec32.Checked = _settings.Single; // 32-bit se Single, altrimenti resta 64-bit
+        _julia = _settings.Julia;
+        _jcx = double.IsFinite(_settings.Jcx) ? _settings.Jcx : DefaultJcx;
+        _jcy = double.IsFinite(_settings.Jcy) ? _settings.Jcy : DefaultJcy;
         _gpuSelection = string.IsNullOrEmpty(_settings.Gpu) ? null : _settings.Gpu;
 
         var r = new Rectangle(_settings.WinX, _settings.WinY, _settings.WinW, _settings.WinH);
@@ -444,6 +724,9 @@ public partial class MandelbrotForm : Form
             _settings.Palette = cmbPalette.SelectedIndex;
             _settings.AaIndex = cmbAA.SelectedIndex;
             _settings.Single = radPrec32.Checked; // true = 32-bit (float)
+            _settings.Julia = _julia;
+            _settings.Jcx = _jcx;
+            _settings.Jcy = _jcy;
             _settings.Engine = _engine.ToString();
             _settings.Gpu = _gpuSelection ?? "";
             _settings.WinX = r.X;
@@ -464,6 +747,22 @@ public partial class MandelbrotForm : Form
     private void BtnReset_Click(object? sender, EventArgs e) => Reset();
 
     private void SaveImageItem_Click(object? sender, EventArgs e) => SavePng(); // menu File → "Salva immagine..." (Ctrl+Shift+S)
+
+    private void ExportItem_Click(object? sender, EventArgs e)
+    {
+        bool useCuda = _engine == RenderEngine.Cuda && GpuMandelbrot.IsReady;
+        using var dlg = new ExportForm(_centerX, _centerY, _scale, MaxIter, ActivePalette,
+            AaFactor, _engine, useCuda, UseDoublePrecision, ActiveViewSize, _julia, _jcx, _jcy);
+        dlg.ShowDialog(this);
+    }
+
+    private void VideoItem_Click(object? sender, EventArgs e)
+    {
+        bool useCuda = _engine == RenderEngine.Cuda && GpuMandelbrot.IsReady;
+        using var dlg = new ZoomVideoForm(_centerX, _centerY, _scale, ActivePalette, AaFactor,
+            _engine, useCuda, UseDoublePrecision, ActiveViewSize, _julia, _jcx, _jcy);
+        dlg.ShowDialog(this);
+    }
 
     private void SaveZoneItem_Click(object? sender, EventArgs e) => SaveZone();
 
@@ -659,6 +958,7 @@ public partial class MandelbrotForm : Form
             _dragButton = e.Button;
             _downPos = _lastPos = e.Location;
             _moved = false;
+            _dragStartZone = CurrentZone();
         }
     }
 
@@ -687,14 +987,26 @@ public partial class MandelbrotForm : Form
 
         if (!_moved)
         {
-            // Click senza trascinamento = zoom centrato sul punto.
-            if (e.Button == MouseButtons.Left)
+            // Click senza trascinamento: in Julia fissa c sul punto, altrimenti zoom.
+            if (_julia && e.Button == MouseButtons.Left)
+            {
+                PushHistory();
+                (_jcx, _jcy) = PixelToComplex(e.Location);
+                InvalidateView();
+            }
+            else if (e.Button == MouseButtons.Left)
                 ZoomAt(e.Location, 0.5); // avvicina 2x
             else
                 ZoomAt(e.Location, 2.0); // allontana 2x
         }
         else
         {
+            if (_dragStartZone != null)
+            {
+                _backZones.Push(_dragStartZone); // il pan è committed: si può tornare indietro
+                _forwardZones.Clear();
+                UpdateHistoryMenu();
+            }
             InvalidateView(); // assicura il disegno della posizione finale del pan
         }
     }
@@ -726,6 +1038,20 @@ public partial class MandelbrotForm : Form
             numIter.Value = Math.Min(numIter.Maximum, numIter.Value + 50);
         else if (e.KeyCode == Keys.Subtract || e.KeyCode == Keys.OemMinus)
             numIter.Value = Math.Max(numIter.Minimum, numIter.Value - 50);
+        else if (e.KeyCode is Keys.Left or Keys.Right or Keys.Up or Keys.Down)
+        {
+            // Pan da tastiera (non quando si regola il numero iterazioni, che usa
+            // già le frecce su/giù): 1/10 della vista, Shift = passo fine 1/100.
+            if (numIter.Focused) return;
+            PushHistory();
+            double step = (e.Shift ? 0.01 : 0.1) * _scale;
+            if (e.KeyCode == Keys.Left) _centerX -= step;
+            else if (e.KeyCode == Keys.Right) _centerX += step;
+            else if (e.KeyCode == Keys.Up) _centerY -= step;
+            else _centerY += step;
+            e.Handled = true;
+            InvalidateView();
+        }
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

@@ -100,7 +100,7 @@ internal static class Diagnostics
     /// Offscreen senza finestra né Present (headless): solo shader + event query,
     /// così DWM e copia inter-GPU non falsano le schede senza monitor.
     /// </summary>
-    public static void BenchDx(string? adapterName, int runs, TimeSpan budget)
+    public static void BenchDx(string? adapterName, int runs, TimeSpan budget, string? csvPath = null)
     {
         int gridW = BenchmarkStandard.Width * BenchmarkStandard.Aa;
         int gridH = BenchmarkStandard.Height * BenchmarkStandard.Aa;
@@ -145,6 +145,7 @@ internal static class Diagnostics
                         double mps = BenchmarkStandard.PixelsPerSecond(frames, seconds) / 1e6;
                         best = Math.Max(best, mps);
                         Console.WriteLine($"  run {r}: {frames} frame in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
+                        WriteCsvRow(csvPath, "DirectX", shortName, "float", r, frames, seconds, mps);
                     }
                     catch (Exception ex)
                     {
@@ -182,7 +183,7 @@ internal static class Diagnostics
     /// MPixel/s con il migliore — la misura usata per lo storico del grafico
     /// benchmark. Analogo di <see cref="BenchDx"/> per il motore CUDA.
     /// </summary>
-    public static void BenchCuda(string? deviceName, int runs, TimeSpan budget)
+    public static void BenchCuda(string? deviceName, int runs, TimeSpan budget, string? csvPath = null)
     {
         Console.WriteLine($"Benchmark CUDA standardizzato: {runs} run da {budget.TotalSeconds:0} s per device, " +
             $"zona {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
@@ -226,6 +227,7 @@ internal static class Diagnostics
                         if (useDouble) best64 = Math.Max(best64, mps);
                         else best32 = Math.Max(best32, mps);
                         Console.WriteLine($"  {tag} run {r}: {frames} frame in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
+                        WriteCsvRow(csvPath, "CUDA", shortName, tag, r, frames, seconds, mps);
                     }
                     catch (Exception ex)
                     {
@@ -251,5 +253,80 @@ internal static class Diagnostics
         Console.WriteLine("=== Riepilogo (best per device, MPixel/s) ===");
         foreach (var (shortName, best32, best64) in migliori)
             Console.WriteLine($"  {shortName}: 32-bit {best32:0.#} | 64-bit {best64:0.#}");
+    }
+
+    /// <summary>Nome modello della CPU (da registro, senza suffissi), es.
+    /// "AMD Ryzen 9 9900X" o "Intel Core i7-14700K".</summary>
+    public static string CpuName()
+    {
+        try
+        {
+            string full = (Microsoft.Win32.Registry.GetValue(
+                @"HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\CentralProcessor\0",
+                "ProcessorNameString", "") as string ?? "").Trim();
+            if (full.Length == 0) return "CPU";
+            int at = full.IndexOf(" @ ", StringComparison.Ordinal);
+            if (at > 0) full = full[..at];
+            return full.Replace("(R)", "").Replace("(TM)", "")
+                .Replace(" Processor", "").Replace(" 12-Core", "").Replace(" 16-Core", "")
+                .Replace(" 8-Core", "").Replace(" 6-Core", "").Replace(" 24-Core", "")
+                .Replace(" 32-Core", "").Replace("  ", " ").Trim();
+        }
+        catch
+        {
+            return "CPU";
+        }
+    }
+
+    /// <summary>
+    /// Triplo test standard sulla CPU: esegue <paramref name="runs"/> run del
+    /// benchmark standardizzato (`Mandelbrot.BenchmarkCpu`, double) e stampa i
+    /// valori in MPixel/s con il migliore — la misura usata per lo storico CPU
+    /// del grafico benchmark (con nome modello).
+    /// </summary>
+    public static void BenchCpu(int runs, TimeSpan budget, string? csvPath = null)
+    {
+        Console.WriteLine($"Benchmark CPU standardizzato ({CpuName()}): {runs} run da {budget.TotalSeconds:0} s, " +
+            $"zona {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
+            $"({BenchmarkStandard.PixelsPerFrame / 1e6:0.##} MPixel/frame), " +
+            $"{BenchmarkStandard.MaxIter} iter, double, solo iterazioni.");
+
+        double best = 0;
+        for (int r = 1; r <= runs; r++)
+        {
+            try
+            {
+                var (_, seconds, frames) = Mandelbrot.BenchmarkCpu(
+                    BenchmarkStandard.CenterX, BenchmarkStandard.CenterY, BenchmarkStandard.Scale,
+                    BenchmarkStandard.Width, BenchmarkStandard.Height, BenchmarkStandard.MaxIter,
+                    BenchmarkStandard.Aa, budget, null, CancellationToken.None);
+                double mps = BenchmarkStandard.PixelsPerSecond(frames, seconds) / 1e6;
+                best = Math.Max(best, mps);
+                Console.WriteLine($"  run {r}: {frames} frame in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
+                WriteCsvRow(csvPath, "CPU", CpuName(), "double", r, frames, seconds, mps);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  run {r} fallito: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"=== Riepilogo (best, MPixel/s): {CpuName()}: {best:0.#} ===");
+    }
+
+    /// <summary>Scrive una riga CSV se richiesto (errori non fatali: avviso e via).</summary>
+    private static void WriteCsvRow(string? csvPath, string engine, string device, string precision,
+        int run, int frames, double seconds, double mps)
+    {
+        if (csvPath == null) return;
+        try
+        {
+            BenchmarkCsv.AppendRow(csvPath, engine, device, precision, run, frames, seconds, mps);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  CSV non scritto ({csvPath}): {ex.Message}");
+        }
     }
 }

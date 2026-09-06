@@ -24,10 +24,13 @@ public partial class BenchmarkForm : Form
     private CancellationTokenSource? _cts;
     private bool _running;
     private double _measuredMpixel;
+    private int _lastFrames;
+    private double _lastSeconds;
 
     public BenchmarkForm(RenderEngine engine, bool useDouble)
     {
         InitializeComponent();
+        Program.ApplyIcon(this);
 
         _useCuda = engine == RenderEngine.Cuda && GpuMandelbrot.IsReady;
         _useDirectX = engine == RenderEngine.DirectX && DxMandelbrot.IsReady;
@@ -144,6 +147,9 @@ public partial class BenchmarkForm : Form
             }
 
             _measuredMpixel = PixelsPerSecond(frames, seconds) / 1e6;
+            _lastFrames = frames;
+            _lastSeconds = seconds;
+            btnCsv.Enabled = true;
             lblResult.Text = FormatPixels(_measuredMpixel * 1e6);
             lblDetail.Text = _useDirectX
                 ? $"{frames} frame ({frames / seconds:F1} frame/s) {BW}x{BH} AA{BAA}x in {seconds:F1} s"
@@ -200,8 +206,8 @@ public partial class BenchmarkForm : Form
         using var rightAligned = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
 
         // Riferimenti storici, misurati con il test standardizzato (best di 3 run da
-        // 8 s per scheda: DirectX offscreen con `--bench-dx`, CUDA con `--bench-cuda`
-        // in float 32-bit e double 64-bit). Unità: MPixel/s.
+        // 8 s: DirectX offscreen con `--bench-dx`, CUDA con `--bench-cuda` in float
+        // 32-bit e double 64-bit, CPU double con `--bench-cpu`). Unità: MPixel/s.
         (string Label, double Value, Brush Brush)[] bars =
         [
             ("Risultato", _measuredMpixel, actualBrush),
@@ -212,7 +218,7 @@ public partial class BenchmarkForm : Form
             ("DirectX 5070 Ti", 5780.7, dxBrush),
             ("DirectX 4070 SUPER", 4441.6, dxBrush),
             ("DirectX AMD Radeon", 102.2, dxBrush),
-            ("CPU", 30.0, cpuBrush),
+            ("CPU 9900X", 27.8, cpuBrush),
         ];
         double maximum = bars.Max(b => b.Value) * 1.15;
 
@@ -243,6 +249,38 @@ public partial class BenchmarkForm : Form
     }
 
     private void BtnClose_Click(object? sender, EventArgs e) => Close();
+
+    /// <summary>Accoda il risultato misurato a un CSV (una riga per misura).</summary>
+    private void BtnCsv_Click(object? sender, EventArgs e)
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Filter = "CSV (*.csv)|*.csv",
+            FileName = "benchmark.csv",
+            OverwritePrompt = false,
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+        try
+        {
+            var (engine, device, precision) = LastResultId();
+            BenchmarkCsv.AppendRow(dlg.FileName, engine, device, precision,
+                run: 1, _lastFrames, _lastSeconds, _measuredMpixel);
+            lblLive.Text = $"CSV: riga accodata a {Path.GetFileName(dlg.FileName)}";
+        }
+        catch (Exception ex)
+        {
+            lblLive.Text = $"CSV fallito: {ex.Message}";
+        }
+    }
+
+    private (string Engine, string Device, string Precision) LastResultId()
+    {
+        if (_useCuda)
+            return ("CUDA", GpuMandelbrot.DeviceShortName, _useDouble ? "64-bit" : "32-bit");
+        if (_useDirectX)
+            return ("DirectX", DxMandelbrot.ShortAdapterName(DxMandelbrot.AdapterName), "float");
+        return ("CPU", Diagnostics.CpuName(), "double");
+    }
 
     /// <summary>
     /// Primo frame della zona di benchmark (960x540, AA1x) reso visibile per i

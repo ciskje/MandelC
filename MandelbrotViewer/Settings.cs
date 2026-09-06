@@ -17,6 +17,12 @@ public sealed class AppSettings
     public string Gpu { get; set; } = "";
     /// <summary>Precisione CUDA: true = single 32-bit (float), false = double 64-bit (default).</summary>
     public bool Single { get; set; }
+    /// <summary>Modalità Julia attiva.</summary>
+    public bool Julia { get; set; }
+    /// <summary>Costante c di Julia (parte reale).</summary>
+    public double Jcx { get; set; } = -0.7;
+    /// <summary>Costante c di Julia (parte immaginaria).</summary>
+    public double Jcy { get; set; } = 0.27015;
     public int WinX { get; set; }
     public int WinY { get; set; }
     public int WinW { get; set; }

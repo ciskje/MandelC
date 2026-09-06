@@ -1,11 +1,16 @@
 namespace MandelbrotViewer;
 
-/// <summary>Palette di colori disponibili nel visualizzatore.</summary>
+/// <summary>Palette di colori disponibili nel visualizzatore (l'ordine è
+/// l'indice del dropdown ed è persistito in settings.json: aggiungere solo in coda).</summary>
 public enum Palette
 {
     Fuoco,
     Ghiaccio,
-    Termico
+    Termico,
+    Oceano,
+    Viola,
+    Deserto,
+    Foresta
 }
 
 /// <summary>
@@ -46,11 +51,51 @@ internal static class PaletteColors
         (1.00, 252, 250, 180),
     ];
 
+    private static readonly (double T, byte R, byte G, byte B)[] OceanStops =
+    [
+        (0.00, 0, 0, 0),
+        (0.25, 0, 40, 95),
+        (0.50, 0, 120, 175),
+        (0.75, 85, 200, 225),
+        (1.00, 235, 250, 255),
+    ];
+
+    private static readonly (double T, byte R, byte G, byte B)[] VioletStops =
+    [
+        (0.00, 0, 0, 0),
+        (0.25, 48, 0, 95),
+        (0.50, 125, 20, 175),
+        (0.75, 205, 85, 220),
+        (1.00, 245, 220, 255),
+    ];
+
+    private static readonly (double T, byte R, byte G, byte B)[] DesertStops =
+    [
+        (0.00, 0, 0, 0),
+        (0.25, 95, 50, 10),
+        (0.50, 185, 110, 40),
+        (0.75, 235, 190, 110),
+        (1.00, 255, 245, 220),
+    ];
+
+    private static readonly (double T, byte R, byte G, byte B)[] ForestStops =
+    [
+        (0.00, 0, 0, 0),
+        (0.25, 0, 70, 20),
+        (0.50, 20, 150, 60),
+        (0.75, 140, 230, 120),
+        (1.00, 240, 255, 220),
+    ];
+
     /// <summary>Gradienti (t, r, g, b) della palette (5 stop da t=0 a t=1).</summary>
     internal static (double T, byte R, byte G, byte B)[] GetStops(Palette palette) => palette switch
     {
         Palette.Ghiaccio => IceStops,
         Palette.Termico => ThermalStops,
+        Palette.Oceano => OceanStops,
+        Palette.Viola => VioletStops,
+        Palette.Deserto => DesertStops,
+        Palette.Foresta => ForestStops,
         _ => FireStops,
     };
 

@@ -6,6 +6,7 @@ internal sealed class LogForm : Form
     public LogForm(string text)
     {
         Text = "Log / Diagnostica";
+        Program.ApplyIcon(this);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         MaximizeBox = true;

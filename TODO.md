@@ -2,7 +2,26 @@
 
 Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
 
-- [ ] Pubblicazione v2.5.22 + commit — `pending`
+- [x] v2.5.23: Revisione SPECIFICHE.md su specifiche reali, pulizia note extra dagli .md — `completed`
+
+- [x] Pubblicazione v2.5.22 + commit — `completed`
+- [x] v2.13.2: Icona dell'exe e delle finestre (render Mandelbrot in .ico) — `completed`
+
+- [x] v2.14.0: Export PNG con preset, AA selezionabile e custom validato — `completed`
+- [x] Pubblicazione v2.13.1 — `completed`
+
+- [x] v2.6.0: Pan con frecce direzionali (Shift = passo fine) — `completed`
+- [x] v2.7.0: Quattro palette fisse aggiuntive — `completed`
+- [x] v2.8.0: --bench-cpu con nome modello CPU negli storici — `completed`
+- [x] v2.9.0: Export CSV dei risultati benchmark — `completed`
+- [x] v2.10.0: Cronologia zone (avanti/indietro) + preferiti nominati — `completed`
+- [x] v2.11.0: Export PNG ad alta risoluzione — `completed`
+- [x] v2.12.0: Modalità Julia — `completed`
+- [x] v2.13.1: Hang export video + direzione invertita + centro proporzionale allo zoom + transizione ease-out — `completed`
+
+- [x] Installazione ffmpeg 7.1 in %USERPROFILE%\ffmpeg + PATH utente (via imageio-ffmpeg/PyPI: gyan.dev andava a 100 KB/s) — `completed`
+
+- [x] v2.13.0: Video zoom MP4 via ffmpeg — `completed`
 
 - [ ] Upgrade a .NET 10 LTS (piano pronto, da eseguire: SDK side-by-side, retarget, riverifica motori+bench, bump v2.6.0) — `pending`
 

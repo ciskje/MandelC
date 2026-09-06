@@ -17,8 +17,11 @@ public readonly struct GpuViewParams
     public readonly int H;
     public readonly int MaxIter;
     public readonly int Supersample;
+    public readonly int JuliaOn;
+    public readonly double Jcx;
+    public readonly double Jcy;
 
-    public GpuViewParams(double centerX, double centerY, double pixelSize, double topY, int w, int h, int maxIter, int supersample = 1)
+    public GpuViewParams(double centerX, double centerY, double pixelSize, double topY, int w, int h, int maxIter, int supersample = 1, int juliaOn = 0, double jcx = 0, double jcy = 0)
     {
         CenterX = centerX;
         CenterY = centerY;
@@ -28,6 +31,9 @@ public readonly struct GpuViewParams
         H = h;
         MaxIter = maxIter;
         Supersample = supersample;
+        JuliaOn = juliaOn;
+        Jcx = jcx;
+        Jcy = jcy;
     }
 }
 
@@ -175,7 +181,10 @@ internal static class GpuMandelbrot
     /// <summary>Calcola il frame su GPU (lancio kernel + ricopia in RAM).</summary>
     /// <param name="supersample">Antialias: risoluzione k volte maggiore (1 = nessuno).</param>
     /// <param name="useDouble">True per il kernel double 64-bit, false per single 32-bit (float).</param>
-    public static bool Render(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette, int supersample, bool useDouble, CancellationToken ct)
+    /// <param name="juliaCx">Costante c (parte reale) in modalità Julia.</param>
+    /// <param name="juliaCy">Costante c (parte immaginaria) in modalità Julia.</param>
+    /// <param name="julia">True = insieme di Julia con c fissata, false = Mandelbrot.</param>
+    public static bool Render(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette, int supersample, bool useDouble, CancellationToken ct, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         lock (RenderGate)
         {
@@ -185,7 +194,8 @@ internal static class GpuMandelbrot
             int bigH = bmp.Height * k;
             double pixelSize = scale / bigW;
             double topY = centerY - (bigH * 0.5) * pixelSize;
-            var view = new GpuViewParams(centerX, centerY, pixelSize, topY, bmp.Width, bmp.Height, maxIter, k);
+            var view = new GpuViewParams(centerX, centerY, pixelSize, topY, bmp.Width, bmp.Height, maxIter, k,
+                julia ? 1 : 0, juliaCx, juliaCy);
             var paletteParams = new GpuPaletteParams(PaletteColors.GetStops(palette));
             int count = bmp.Width * bmp.Height;
             if (_renderCount != count)
@@ -344,14 +354,18 @@ internal static class GpuMandelbrot
         {
             for (int sx = 0; sx < k; sx++)
             {
-                float cx = (float)p.CenterX + (x * k + sx - p.W * k * 0.5f) * pixel;
-                float cy = (float)p.TopY + (y * k + sy) * pixel;
-                float zx = 0, zy = 0, zx2 = 0, zy2 = 0;
+                float px = (float)p.CenterX + (x * k + sx - p.W * k * 0.5f) * pixel;
+                float py = (float)p.TopY + (y * k + sy) * pixel;
+                // Julia: z(0) = punto del pixel, c = costante; Mandelbrot: z(0) = 0, c = pixel.
+                float zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
+                float ccx = p.JuliaOn != 0 ? (float)p.Jcx : px;
+                float ccy = p.JuliaOn != 0 ? (float)p.Jcy : py;
+                float zx2 = zx * zx, zy2 = zy * zy;
                 int iter = 0;
                 while (iter < p.MaxIter && zx2 + zy2 <= 4f)
                 {
-                    zy = 2 * zx * zy + cy;
-                    zx = zx2 - zy2 + cx;
+                    zy = 2 * zx * zy + ccy;
+                    zx = zx2 - zy2 + ccx;
                     zx2 = zx * zx;
                     zy2 = zy * zy;
                     ++iter;
@@ -382,14 +396,18 @@ internal static class GpuMandelbrot
         {
             for (int sx = 0; sx < k; sx++)
             {
-                double cx = p.CenterX + (x * k + sx - p.W * k * 0.5) * p.PixelSize;
-                double cy = p.TopY + (y * k + sy) * p.PixelSize;
-                double zx = 0, zy = 0, zx2 = 0, zy2 = 0;
+                double px = p.CenterX + (x * k + sx - p.W * k * 0.5) * p.PixelSize;
+                double py = p.TopY + (y * k + sy) * p.PixelSize;
+                // Julia: z(0) = punto del pixel, c = costante; Mandelbrot: z(0) = 0, c = pixel.
+                double zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
+                double ccx = p.JuliaOn != 0 ? p.Jcx : px;
+                double ccy = p.JuliaOn != 0 ? p.Jcy : py;
+                double zx2 = zx * zx, zy2 = zy * zy;
                 int iter = 0;
                 while (iter < p.MaxIter && zx2 + zy2 <= 4.0)
                 {
-                    zy = 2 * zx * zy + cy;
-                    zx = zx2 - zy2 + cx;
+                    zy = 2 * zx * zy + ccy;
+                    zx = zx2 - zy2 + ccx;
                     zx2 = zx * zx;
                     zy2 = zy * zy;
                     ++iter;

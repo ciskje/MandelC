@@ -28,6 +28,7 @@ cbuffer Params : register(b0)
 {
     float cx; float cy; float scale; float aspect;
     float invW; float invH; int maxIter; int aa;
+    float jcx; float jcy; int julia; int jpad;
     float3 stops[5];
 };
 
@@ -50,13 +51,15 @@ float4 PS(float4 pos : SV_Position) : SV_Target
         {
             float2 sub = (float2((float)jx, (float)jy) + 0.5) / (float)n - 0.5;
             float2 p = pos.xy + sub;
-            float2 c = float2(cx + (p.x * invW - 0.5) * scale,
-                              cy + (p.y * invH - 0.5) * scale * aspect);
-            float2 z = 0.0;
+            float2 px = float2(cx + (p.x * invW - 0.5) * scale,
+                               cy + (p.y * invH - 0.5) * scale * aspect);
+            // Julia: z(0) = punto del pixel, c = costante; Mandelbrot: z(0) = 0, c = pixel.
+            float2 z = julia != 0 ? px : 0.0;
+            float2 cc = julia != 0 ? float2(jcx, jcy) : px;
             int iter = 0;
             while (iter < maxIter && dot(z, z) <= 4.0)
             {
-                z = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+                z = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + cc;
                 iter++;
             }
             float3 col = 0.0;
@@ -115,6 +118,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         public float Cx, Cy, Scale, Aspect;
         public float InvW, InvH;
         public int MaxIter, Aa;
+        public float JuliaCx, JuliaCy;
+        public int JuliaOn, JuliaPad;
         public DxStop S0, S1, S2, S3, S4;
     }
 
@@ -339,7 +344,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     }
 
     /// <summary>Costruisce i parametri di un frame colorato (con gli stop della palette).</summary>
-    private static DxParams BuildParams(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette)
+    private static DxParams BuildParams(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         var stops = PaletteColors.GetStops(palette);
         return new DxParams
@@ -352,6 +357,9 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             InvH = 1f / Math.Max(1, height),
             MaxIter = maxIter,
             Aa = Math.Max(1, aa),
+            JuliaCx = (float)juliaCx,
+            JuliaCy = (float)juliaCy,
+            JuliaOn = julia ? 1 : 0,
             S0 = ToStop(stops[0]),
             S1 = ToStop(stops[1]),
             S2 = ToStop(stops[2]),
@@ -379,10 +387,10 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         _context.Draw(3, 0);
     }
 
-    public static void Render(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette)
+    public static void Render(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         if (!IsReady) return;
-        DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette), _rtv!, _ps!, width, height);
+        DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette, juliaCx, juliaCy, julia), _rtv!, _ps!, width, height);
         _swapChain!.Present(0, PresentFlags.None);
     }
 
@@ -562,7 +570,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     /// swapchain e lo restituisce come Bitmap: la preview del benchmark per il
     /// motore DirectX (senza presentare nulla sulla finestra principale).
     /// </summary>
-    public static Bitmap? RenderPreviewToBitmap(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette)
+    public static Bitmap? RenderPreviewToBitmap(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         if (!IsReady || _context is null) return null;
         try
@@ -585,7 +593,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             using ID3D11Texture2D target = _device!.CreateTexture2D(desc);
             using ID3D11RenderTargetView rtv = _device.CreateRenderTargetView(target);
 
-            DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette), rtv, _ps!, width, height);
+            DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette, juliaCx, juliaCy, julia), rtv, _ps!, width, height);
 
             var bmp = ReadTextureToBitmap(target, width, height);
 

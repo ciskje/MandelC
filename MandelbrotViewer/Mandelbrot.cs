@@ -3,8 +3,9 @@ using System.Drawing.Imaging;
 namespace MandelbrotViewer;
 
 /// <summary>
-/// Logica di calcolo dell'insieme di Mandelbrot con smooth coloring.
-/// z(n+1) = z(n)^2 + c, con z(0) = 0. Se |z| > 2 entro maxIter, c è fuori.
+/// Logica di calcolo dell'insieme di Mandelbrot (e Julia) con smooth coloring.
+/// Mandelbrot: z(n+1) = z(n)^2 + c, con z(0) = 0. Se |z| > 2 entro maxIter, c è fuori.
+/// Julia: stessa iterazione ma z(0) = punto del pixel e c = costante fissata.
 /// </summary>
 public static class Mandelbrot
 {
@@ -20,7 +21,10 @@ public static class Mandelbrot
     /// <param name="supersample">Antialias: fattore k, calcola a risoluzione k volte
     /// maggiore e media ogni blocco kxk (1 = nessun antialias).</param>
     /// <param name="ct">Token per cancellare un rendering obsoleto.</param>
-    public static void Render(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette, int supersample, CancellationToken ct)
+    /// <param name="juliaCx">Costante c (parte reale) in modalità Julia.</param>
+    /// <param name="juliaCy">Costante c (parte immaginaria) in modalità Julia.</param>
+    /// <param name="julia">True = insieme di Julia con c fissata, false = Mandelbrot.</param>
+    public static void Render(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette, int supersample, CancellationToken ct, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         int w = bmp.Width;
         int h = bmp.Height;
@@ -43,19 +47,21 @@ public static class Mandelbrot
 
             Parallel.For(0, bigH, new ParallelOptions { CancellationToken = ct }, by =>
             {
-                double cy = topY + by * pixelSize;
+                double py = topY + by * pixelSize;
                 for (int bx = 0; bx < bigW; bx++)
                 {
-                    double cx = centerX + (bx - bigW * 0.5) * pixelSize;
+                    double px = centerX + (bx - bigW * 0.5) * pixelSize;
 
-                    double zx = 0, zy = 0;
-                    double zx2 = 0, zy2 = 0;
+                    // Julia: z(0) = punto del pixel, c = costante; Mandelbrot: z(0) = 0, c = pixel.
+                    double zx = julia ? px : 0, zy = julia ? py : 0;
+                    double ccx = julia ? juliaCx : px, ccy = julia ? juliaCy : py;
+                    double zx2 = zx * zx, zy2 = zy * zy;
                     int iter = 0;
 
                     while (iter < maxIter && zx2 + zy2 <= 4.0)
                     {
-                        zy = 2.0 * zx * zy + cy;
-                        zx = zx2 - zy2 + cx;
+                        zy = 2.0 * zx * zy + ccy;
+                        zx = zx2 - zy2 + ccx;
                         zx2 = zx * zx;
                         zy2 = zy * zy;
                         iter++;

@@ -11,6 +11,7 @@ partial class BenchmarkForm
     private Label lblLive = null!;
     private Button btnStart = null!;
     private Button btnClose = null!;
+    private Button btnCsv = null!;
     private PictureBox previewBox = null!;
 
     protected override void Dispose(bool disposing)
@@ -33,6 +34,7 @@ partial class BenchmarkForm
         this.lblLive = new Label();
         this.btnStart = new Button();
         this.btnClose = new Button();
+        this.btnCsv = new Button();
         this.previewBox = new PictureBox();
 
         this.bottomPanel.SuspendLayout();
@@ -79,6 +81,7 @@ partial class BenchmarkForm
         this.bottomPanel.Controls.Add(this.lblLive);
         this.bottomPanel.Controls.Add(this.btnStart);
         this.bottomPanel.Controls.Add(this.btnClose);
+        this.bottomPanel.Controls.Add(this.btnCsv);
         // lblLive
         this.lblLive.Dock = DockStyle.Fill;
         this.lblLive.Text = "";
@@ -96,6 +99,13 @@ partial class BenchmarkForm
         this.btnClose.Text = "Chiudi";
         this.btnClose.DialogResult = DialogResult.Cancel;
         this.btnClose.Click += new EventHandler(this.BtnClose_Click);
+
+        // btnCsv
+        this.btnCsv.Dock = DockStyle.Right;
+        this.btnCsv.Width = 90;
+        this.btnCsv.Text = "CSV…";
+        this.btnCsv.Enabled = false;
+        this.btnCsv.Click += new EventHandler(this.BtnCsv_Click);
 
         // BenchmarkForm
         this.AutoScaleMode = AutoScaleMode.Font;

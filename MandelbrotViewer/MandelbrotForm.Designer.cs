@@ -36,6 +36,8 @@
     private ToolStripMenuItem saveZoneItem = null!;
     private ToolStripSeparator fileSeparator = null!;
     private ToolStripMenuItem saveImageItem = null!;
+    private ToolStripMenuItem exportItem = null!;
+    private ToolStripMenuItem videoItem = null!;
     private ToolStripSeparator fileSeparator2 = null!;
     private ToolStripMenuItem benchmarkItem = null!;
     private ToolStripSeparator fileSeparator3 = null!;
@@ -91,6 +93,8 @@
         this.saveZoneItem = new ToolStripMenuItem();
         this.fileSeparator = new ToolStripSeparator();
         this.saveImageItem = new ToolStripMenuItem();
+        this.exportItem = new ToolStripMenuItem();
+        this.videoItem = new ToolStripMenuItem();
         this.fileSeparator2 = new ToolStripSeparator();
         this.benchmarkItem = new ToolStripMenuItem();
         this.fileSeparator3 = new ToolStripSeparator();
@@ -198,7 +202,7 @@
         this.cmbPalette.Anchor = AnchorStyles.None;
         this.cmbPalette.Width = 110;
         this.cmbPalette.DropDownStyle = ComboBoxStyle.DropDownList;
-        this.cmbPalette.Items.AddRange(new object[] { "Fuoco", "Ghiaccio", "Termico" });
+        this.cmbPalette.Items.AddRange(new object[] { "Fuoco", "Ghiaccio", "Termico", "Oceano", "Viola", "Deserto", "Foresta" });
         this.cmbPalette.SelectedIndex = 0;
         this.cmbPalette.SelectedIndexChanged += new EventHandler(this.CmbPalette_SelectedIndexChanged);
 
@@ -301,7 +305,7 @@
         this.lblStatus.TextAlign = ContentAlignment.MiddleLeft;
 
         // statusHelp
-        this.statusHelp.Text = "Click sx/dx: zoom | Rotella: zoom | Trascina: sposta | R: reset | S: salva";
+        this.statusHelp.Text = "Click sx/dx: zoom | Rotella: zoom | Trascina/frecce: sposta | R: reset | S: salva";
         this.statusHelp.ForeColor = System.Drawing.Color.Gray;
         this.statusHelp.Font = new System.Drawing.Font("Segoe UI", 8f);
 
@@ -335,7 +339,7 @@
         this.fileMenu.Text = "&File";
         this.fileMenu.DropDownItems.AddRange(new ToolStripItem[] {
             this.loadZoneItem, this.saveZoneItem, this.fileSeparator,
-            this.saveImageItem, this.fileSeparator2, this.benchmarkItem,
+            this.saveImageItem, this.exportItem, this.videoItem, this.fileSeparator2, this.benchmarkItem,
             this.fileSeparator3, this.exitItem });
 
         // loadZoneItem
@@ -352,6 +356,16 @@
         this.saveImageItem.Text = "Salva immagine con &nome...";
         this.saveImageItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.S;
         this.saveImageItem.Click += new EventHandler(this.SaveImageItem_Click);
+
+        // exportItem
+        this.exportItem.Text = "Esporta PNG ad alta &risoluzione...";
+        this.exportItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.E;
+        this.exportItem.Click += new EventHandler(this.ExportItem_Click);
+
+        // videoItem
+        this.videoItem.Text = "Esporta &video zoom...";
+        this.videoItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.V;
+        this.videoItem.Click += new EventHandler(this.VideoItem_Click);
 
         // benchmarkItem
         this.benchmarkItem.Text = "Bench&mark...";
@@ -381,7 +395,7 @@
         this.toolTip.SetToolTip(this.btnBenchmark, "Apri il benchmark standard (Ctrl+B)");
         this.toolTip.SetToolTip(this.numIter, "Numero massimo di iterazioni per pixel (tasti +/-)");
         this.toolTip.SetToolTip(this.chkIterAuto, "Iterazioni automatiche: crescono con l'ingrandimento");
-        this.toolTip.SetToolTip(this.cmbPalette, "Palette colori del frattale (Fuoco, Ghiaccio, Termico)");
+        this.toolTip.SetToolTip(this.cmbPalette, "Palette colori del frattale (Fuoco, Ghiaccio, Termico, Oceano, Viola, Deserto, Foresta)");
         this.toolTip.SetToolTip(this.cmbAA, "Antialiasing: 1x disattivato, 2x/4x/8x media dei pixel vicini");
         this.toolTip.SetToolTip(this.cmbGpu, "Scheda video da usare (Auto = la più potente)");
         this.toolTip.SetToolTip(this.radPrec32, "Precisione CUDA 32-bit (float): più veloce, meno precisa. Ignorata con CPU/DirectX.");
@@ -393,6 +407,8 @@
         this.loadZoneItem.ToolTipText = "Ricarica la vista salvata in un file JSON (Ctrl+O)";
         this.saveZoneItem.ToolTipText = "Salva la vista corrente (centro, scala, iterazioni) in un file JSON (Ctrl+S)";
         this.saveImageItem.ToolTipText = "Salva l'immagine corrente come PNG (Ctrl+Shift+S)";
+        this.exportItem.ToolTipText = "Rende la vista a risoluzione scelta e salva il PNG (Ctrl+Shift+E)";
+        this.videoItem.ToolTipText = "Video MP4 dello zoom dall'insieme alla vista (Ctrl+Shift+V, serve ffmpeg)";
         this.benchmarkItem.ToolTipText = "Benchmark standard: 8 s ad alte iterazioni (Ctrl+B)";
         this.aboutItem.ToolTipText = "Informazioni su MandelC# (F1)";
 
