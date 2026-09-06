@@ -1,8 +1,8 @@
 namespace MandelbrotViewer;
 
 /// <summary>
-/// Motore di rendering del frattale. Roadmap: `Cuda` (v1.4, ILGPU) e `DirectX`
-/// (v2.0, shader realtime); per ora solo `Cpu` è disponibile.
+/// Motore di rendering del frattale: `Cpu` (multicore), `Cuda` (v1.4, ILGPU)
+/// e `DirectX` (v2.0, shader realtime).
 /// </summary>
 public enum RenderEngine
 {

@@ -77,6 +77,19 @@ diversi, a parità di formato il guadagno è ~+25%; il kernel Mandelbrot non
 usa tensor core. Atteso sul benchmark di questa app ~+20-25%; raster gaming
 (relative performance TechPowerUp) ~+37% perché lì contano anche ROP (96 vs
 80) e fillrate.
+Refactor v2.5.15 (nessun cambiamento funzionale): palette e gradienti spostati
+da `Mandelbrot.cs` in `Palette.cs` (`PaletteColors`: fonte unica degli stop per
+CPU/DirectX, ricevuti da CUDA tramite `GpuPaletteParams`) con commenti di
+allineamento nelle tre implementazioni della colorazione (CPU/CUDA/HLSL);
+`BenchmarkProgress` in file proprio; diagnostica CLI `--diag-dx`/`--diag-gpu`
+spostata da `Program.cs` a `Diagnostics.cs`; in `DxMandelbrot.cs` estratti
+`BuildParams`/`DrawFrame` condivisi da Render/RenderBenchmark/
+RenderPreviewToBitmap, indentazione sistemata e `System.Drawing.Bitmap` →
+`Bitmap`; rimossa la variabile `total` morta nel benchmark CUDA (il metro è a
+frame, `TotalIters` = 0 come per DirectX); rinominato l'handler del menu "Salva
+immagine" in `SaveImageItem_Click`; rimossi wrapper `RenderGpu`, doppio dispose
+del bitmap precedente, usings ridondanti e commenti obsoleti (`RenderEngine.cs`).
+
 
 
 Ottimizzazione v2.3.6: il render CUDA riusa i buffer device e host tra frame;

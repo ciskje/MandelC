@@ -351,7 +351,7 @@
         // saveImageItem
         this.saveImageItem.Text = "Salva immagine con &nome...";
         this.saveImageItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.S;
-        this.saveImageItem.Click += new EventHandler(this.BtnSave_Click);
+        this.saveImageItem.Click += new EventHandler(this.SaveImageItem_Click);
 
         // benchmarkItem
         this.benchmarkItem.Text = "Bench&mark...";

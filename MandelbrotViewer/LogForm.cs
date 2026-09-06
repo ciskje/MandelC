@@ -1,6 +1,3 @@
-using System.Drawing;
-using System.Windows.Forms;
-
 namespace MandelbrotViewer;
 
 /// <summary>Dialog di sola lettura per il log/diagnostica, con pulsante per copiare negli appunti.</summary>

@@ -2,6 +2,8 @@
 
 Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
 
+- [x] v2.5.15: Revisione e pulizia del codice (codice morto, deduplicazione, riordino file) — `completed`
+
 - [x] v2.5.14: Confronto teorico prestazioni RTX 4070 SUPER vs RTX 5070 Ti (tensor, memoria, FP32/FP64) — `completed`
 
 
@@ -34,7 +36,7 @@ Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed
 - [x] v2.3.4: DirectX: log con lo step esatto che fallisce; swapchain FlipDiscard→FlipSequential + SampleDescription esplicito — `completed`
 - [x] v2.3.3: voce di menù Aiuto → "Mostra log / diagnostica..." con stato motori (DirectX/CUDA), schede, errori e impostazioni — `completed`
 - [x] v2.3.2: all'avvio, se un motore GPU (DirectX/CUDA) non è disponibile, mostrare il motivo nella barra di stato — `completed`
-- [ ] DirectX: verificare dal log lo step esatto dopo FlipSequential; se ancora fallisce, valutare render su texture + blit a bitmap (fallback) — `pending`
+- [x] DirectX: verificare dal log lo step esatto dopo FlipSequential; se ancora fallisce, valutare render su texture + blit a bitmap (fallback) — `cancelled` (obsoleto: DirectX operativo in modo stabile dalla v2.3.5)
 - [x] v2.3.1: nascondere il dropdown GPU (e la label) quando è selezionato il motore CPU — `completed`
 - [x] v2.3: radio "32"/"64" per la precisione del motore CUDA (float/double) — `completed`
 - [x] v2.2: ToolTip sui controlli e sulle voci del menu che ne spiegano la funzione — `completed`

@@ -186,7 +186,7 @@ internal static class GpuMandelbrot
             double pixelSize = scale / bigW;
             double topY = centerY - (bigH * 0.5) * pixelSize;
             var view = new GpuViewParams(centerX, centerY, pixelSize, topY, bmp.Width, bmp.Height, maxIter, k);
-            var paletteParams = new GpuPaletteParams(Mandelbrot.GetStops(palette));
+            var paletteParams = new GpuPaletteParams(PaletteColors.GetStops(palette));
             int count = bmp.Width * bmp.Height;
             if (_renderCount != count)
             {
@@ -236,7 +236,6 @@ internal static class GpuMandelbrot
         using var itersBuffer = accelerator.Allocate1D<int>(count);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        long total = 0;
         int frames = 0;
         bool first = true;
         TimeSpan lastReport = TimeSpan.Zero;
@@ -250,14 +249,14 @@ internal static class GpuMandelbrot
             frames++;
             if (first || sw.Elapsed - lastReport >= BenchmarkProgress.ReportInterval)
             {
-                progress?.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, total, frames));
+                progress?.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));
                 lastReport = sw.Elapsed;
                 first = false;
             }
         }
 
-        progress?.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, total, frames));
-        return (total, sw.Elapsed.TotalSeconds, frames);
+        progress?.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));
+        return (0, sw.Elapsed.TotalSeconds, frames);
     }
 
     public static void Dispose()
@@ -312,6 +311,11 @@ internal static class GpuMandelbrot
         iters[index] = iter;
     }
 
+    /// <summary>
+    /// Interpolazione della palette nel kernel CUDA: deve restare allineata con
+    /// PaletteColors.ColorFor (CPU) e con la funzione Graded dello shader HLSL
+    /// (DxMandelbrot.cs): stessi 5 stop e stessa mappatura t = iter/maxIter * 1.35 + 0.03.
+    /// </summary>
     private static int ColorFromIterations(float iterations, int maxIter, GpuPaletteParams p)
     {
         float t = iterations / (maxIter > 0 ? maxIter : 1) * 1.35f + 0.03f;

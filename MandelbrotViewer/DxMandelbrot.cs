@@ -64,6 +64,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
             {
                 float mod2 = max(dot(z, z), 4.0);
                 float smoothIterations = (float)iter + 1.0 - log(log(sqrt(mod2))) / log(2.0);
+                // Mappatura allineata con PaletteColors (CPU) e GpuMandelbrot.ColorFromIterations (CUDA).
                 float t = saturate(smoothIterations / (float)maxIter * 1.35 + 0.03);
                 col = Graded(t);
             }
@@ -150,8 +151,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
                 if (factory.EnumAdapters(i, out IDXGIAdapter adapter).Failure) break;
                 using (adapter)
                 {
-                if (adapter.Description.DedicatedVideoMemory > 0)
-                    names.Add(adapter.Description.Description);
+                    if (adapter.Description.DedicatedVideoMemory > 0)
+                        names.Add(adapter.Description.Description);
                 }
             }
         }
@@ -193,22 +194,22 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             step = "DXGI.CreateDXGIFactory2";
             using IDXGIFactory2 factory = DXGI.CreateDXGIFactory2<IDXGIFactory2>(false);
 
-                width = Math.Max(1, width);
-                height = Math.Max(1, height);
-                var desc = new SwapChainDescription1
-                {
-                    Width = (uint)width,
-                    Height = (uint)height,
-                    Format = DxgiFormat.R8G8B8A8_UNorm,
-                    BufferCount = 2,
-                    BufferUsage = Usage.RenderTargetOutput,
-                    SampleDescription = new SampleDescription(1, 0),
-                    Scaling = Scaling.Stretch,
-                    SwapEffect = SwapEffect.FlipSequential,
-                    AlphaMode = AlphaMode.Ignore,
-                };
-                var fullscreen = new SwapChainFullscreenDescription { Windowed = true };
-                step = "IDXGIFactory2.CreateSwapChainForHwnd";
+            width = Math.Max(1, width);
+            height = Math.Max(1, height);
+            var desc = new SwapChainDescription1
+            {
+                Width = (uint)width,
+                Height = (uint)height,
+                Format = DxgiFormat.R8G8B8A8_UNorm,
+                BufferCount = 2,
+                BufferUsage = Usage.RenderTargetOutput,
+                SampleDescription = new SampleDescription(1, 0),
+                Scaling = Scaling.Stretch,
+                SwapEffect = SwapEffect.FlipSequential,
+                AlphaMode = AlphaMode.Ignore,
+            };
+            var fullscreen = new SwapChainFullscreenDescription { Windowed = true };
+            step = "IDXGIFactory2.CreateSwapChainForHwnd";
             _swapChain = factory.CreateSwapChainForHwnd(_device, hwnd, desc, fullscreen);
 
             step = "D3DCompiler.Compile (shader)";
@@ -270,11 +271,11 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         CreateViews(width, height);
     }
 
-    public static void Render(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette)
+    /// <summary>Costruisce i parametri di un frame colorato (con gli stop della palette).</summary>
+    private static DxParams BuildParams(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette)
     {
-        if (!IsReady) return;
-        var stops = Mandelbrot.GetStops(palette);
-        var pars = new DxParams
+        var stops = PaletteColors.GetStops(palette);
+        return new DxParams
         {
             Cx = (float)centerX,
             Cy = (float)centerY,
@@ -290,17 +291,31 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             S3 = ToStop(stops[3]),
             S4 = ToStop(stops[4]),
         };
+    }
 
+    /// <summary>
+    /// Pipeline comune a tutti i frame (Render, RenderBenchmark, RenderPreviewToBitmap):
+    /// costanti, shader, render target, viewport e draw del triangolo fullscreen.
+    /// </summary>
+    private static void DrawFrame(DxParams pars, ID3D11RenderTargetView rtv, ID3D11PixelShader ps, int width, int height)
+    {
         MappedSubresource mapped = _context!.Map(_cbuffer!, 0, MapMode.WriteDiscard);
         mapped.AsSpan<DxParams>(1)[0] = pars;
         _context.Unmap(_cbuffer!, 0);
 
-        _context.OMSetRenderTargets(_rtv!);
+        _context.OMSetRenderTargets(rtv);
         _context.VSSetShader(_vs);
-        _context.PSSetShader(_ps);
+        _context.PSSetShader(ps);
         _context.PSSetConstantBuffer(0, _cbuffer!);
         _context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
+        _context.RSSetViewport(new Viewport(width, height));
         _context.Draw(3, 0);
+    }
+
+    public static void Render(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette)
+    {
+        if (!IsReady) return;
+        DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette), _rtv!, _ps!, width, height);
         _swapChain!.Present(0, PresentFlags.None);
     }
 
@@ -340,21 +355,13 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             Cx = (float)centerX,
             Cy = (float)centerY,
             Scale = (float)scale,
-            Aspect = (float)height / Math.Max(1,width),
-            InvW = 1f / Math.Max(1,width),
-            InvH = 1f / Math.Max(1,height),
+            Aspect = (float)height / Math.Max(1, width),
+            InvW = 1f / Math.Max(1, width),
+            InvH = 1f / Math.Max(1, height),
             MaxIter = maxIter,
             Aa = 1,
         };
-        MappedSubresource mapped = _context!.Map(_cbuffer!, 0, MapMode.WriteDiscard);
-        mapped.AsSpan<DxParams>(1)[0] = pars;
-        _context.Unmap(_cbuffer!, 0);
-        _context.OMSetRenderTargets(_rtv!);
-        _context.VSSetShader(_vs);
-        _context.PSSetShader(_benchPs!);
-        _context.PSSetConstantBuffer(0, _cbuffer!);
-        _context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
-        _context.Draw(3, 0);
+        DrawFrame(pars, _rtv!, _benchPs!, width, height);
         _swapChain!.Present(0, PresentFlags.None);
     }
 
@@ -362,7 +369,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         new() { R = s.R / 255f, G = s.G / 255f, B = s.B / 255f };
 
     /// <summary>Cattura il backbuffer in un Bitmap (per Salva PNG).</summary>
-    public static System.Drawing.Bitmap Capture()
+    public static Bitmap Capture()
     {
         if (!IsReady) throw new InvalidOperationException("DirectX non inizializzato.");
         using ID3D11Texture2D backbuffer = _swapChain!.GetBuffer<ID3D11Texture2D>(0);
@@ -374,9 +381,9 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     /// swapchain e lo restituisce come Bitmap: la preview del benchmark per il
     /// motore DirectX (senza presentare nulla sulla finestra principale).
     /// </summary>
-    public static System.Drawing.Bitmap? RenderPreviewToBitmap(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette)
+    public static Bitmap? RenderPreviewToBitmap(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette)
     {
-        if (!IsReady) return null;
+        if (!IsReady || _context is null) return null;
         try
         {
             var desc = new Texture2DDescription
@@ -397,34 +404,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             using ID3D11Texture2D target = _device!.CreateTexture2D(desc);
             using ID3D11RenderTargetView rtv = _device.CreateRenderTargetView(target);
 
-            var stops = Mandelbrot.GetStops(palette);
-            var pars = new DxParams
-            {
-                Cx = (float)centerX,
-                Cy = (float)centerY,
-                Scale = (float)scale,
-                Aspect = (float)height / Math.Max(1, width),
-                InvW = 1f / Math.Max(1, width),
-                InvH = 1f / Math.Max(1, height),
-                MaxIter = maxIter,
-                Aa = Math.Max(1, aa),
-                S0 = ToStop(stops[0]),
-                S1 = ToStop(stops[1]),
-                S2 = ToStop(stops[2]),
-                S3 = ToStop(stops[3]),
-                S4 = ToStop(stops[4]),
-            };
-            MappedSubresource mapped = _context!.Map(_cbuffer!, 0, MapMode.WriteDiscard);
-            mapped.AsSpan<DxParams>(1)[0] = pars;
-            _context.Unmap(_cbuffer!, 0);
-
-            _context.VSSetShader(_vs);
-            _context.PSSetShader(_ps);
-            _context.PSSetConstantBuffer(0, _cbuffer!);
-            _context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
-            _context.RSSetViewport(new Viewport(width, height));
-            _context.OMSetRenderTargets(rtv);
-            _context.Draw(3, 0);
+            DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette), rtv, _ps!, width, height);
 
             var bmp = ReadTextureToBitmap(target, width, height);
 
@@ -440,7 +420,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     }
 
     /// <summary>Copia il contenuto di una texture in un Bitmap (per cattura/anteprima).</summary>
-    private static System.Drawing.Bitmap ReadTextureToBitmap(ID3D11Texture2D source, int width, int height)
+    private static Bitmap ReadTextureToBitmap(ID3D11Texture2D source, int width, int height)
     {
         Texture2DDescription stg = source.Description;
         stg.Usage = ResourceUsage.Staging;
@@ -453,7 +433,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         MappedSubresource mapped = _context.Map(staging, 0, MapMode.Read);
         try
         {
-            var bmp = new System.Drawing.Bitmap(
+            var bmp = new Bitmap(
                 width, height,
                 System.Drawing.Imaging.PixelFormat.Format32bppArgb);
             var rect = new System.Drawing.Rectangle(0, 0, width, height);

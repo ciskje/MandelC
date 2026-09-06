@@ -141,7 +141,7 @@ public partial class MandelbrotForm : Form
         {
             var bmp = new Bitmap(w, h);
             if (useCuda)
-                gpuDouble = await Task.Run(() => RenderGpu(bmp, cx, cy, scale, maxIter, palette, aa, UseDoublePrecision, token), token);
+                gpuDouble = await Task.Run(() => GpuMandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, UseDoublePrecision, token), token);
             else
                 await Task.Run(() => Mandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, token), token);
 
@@ -152,7 +152,6 @@ public partial class MandelbrotForm : Form
 
             var old = _fractal;
             _fractal = bmp;
-            pictureBox.Image?.Dispose();
             pictureBox.Image = _fractal;
             old?.Dispose();
 
@@ -173,11 +172,11 @@ public partial class MandelbrotForm : Form
     /// </summary>
     private void SetBusyCursor(bool busy)
     {
-        Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
-        Cursor c = busy ? Cursors.WaitCursor : Cursors.Default;
+        var cursor = busy ? Cursors.WaitCursor : Cursors.Default;
+        Cursor = cursor;
         foreach (Control ctl in new Control[] { cmbAA, cmbPalette, numIter, chkIterAuto, cmbGpu, radPrec32, radPrec64,
                                                radioCpu, radioCuda, radioDx, btnReset, btnBenchmark })
-            ctl.Cursor = c;
+            ctl.Cursor = cursor;
     }
 
     /// <summary>Ingrandisce il bitmap di anteprima a piena risoluzione (bilineare).</summary>
@@ -191,12 +190,6 @@ public partial class MandelbrotForm : Form
         }
         small.Dispose();
         return up;
-    }
-
-    /// <summary>Render su GPU: frame CUDA + colorazione palette. Ritorna la precisione usata.</summary>
-    private static bool RenderGpu(Bitmap bmp, double cx, double cy, double scale, int maxIter, Palette palette, int aa, bool useDouble, CancellationToken token)
-    {
-        return GpuMandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, useDouble, token);
     }
 
     /// <summary>Ridisegna: realtime se motore DirectX, altrimenti render bitmap (eventuale anteprima).</summary>
@@ -465,7 +458,7 @@ public partial class MandelbrotForm : Form
 
     private void BtnReset_Click(object? sender, EventArgs e) => Reset();
 
-    private void BtnSave_Click(object? sender, EventArgs e) => SavePng();
+    private void SaveImageItem_Click(object? sender, EventArgs e) => SavePng(); // menu File → "Salva immagine..." (Ctrl+Shift+S)
 
     private void SaveZoneItem_Click(object? sender, EventArgs e) => SaveZone();
 

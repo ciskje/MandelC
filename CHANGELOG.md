@@ -2,6 +2,23 @@
 
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
+- **v2.5.15** — Refactor di riordino e pulizia (nessun cambiamento funzionale):
+  palette/gradienti estratti in `Palette.cs` (`PaletteColors`, fonte unica per
+  CPU/DirectX; CUDA li riceve via `GpuPaletteParams`) con commenti di
+  allineamento tra le tre implementazioni della colorazione (CPU/CUDA/HLSL);
+  `BenchmarkProgress` in file proprio; diagnostica CLI `--diag-dx`/`--diag-gpu`
+  spostata da `Program.cs` a `Diagnostics.cs`; in `DxMandelbrot.cs` estratti
+  `BuildParams`/`DrawFrame` condivisi da Render/RenderBenchmark/
+  RenderPreviewToBitmap, indentazione uniformata e `System.Drawing.Bitmap` →
+  `Bitmap`; rimosso il campo `total` morto nel benchmark CUDA (il metro è a
+  frame, `TotalIters` = 0 come per DirectX); handler del menu "Salva immagine"
+  rinominato `SaveImageItem_Click`; rimossi wrapper `RenderGpu`, doppio dispose
+  del bitmap, usings ridondanti e commenti obsoleti. File: `Palette.cs`,
+  `BenchmarkProgress.cs`, `Diagnostics.cs` (nuovi), `Program.cs`,
+  `Mandelbrot.cs`, `GpuMandelbrot.cs`, `DxMandelbrot.cs`, `MandelbrotForm.cs`,
+  `MandelbrotForm.Designer.cs`, `RenderEngine.cs`, `LogForm.cs`, `AppVersion.cs`,
+  `.csproj`, `TODO.md`, `SPECIFICHE.md`.
+
 
 - **v2.5.14** — Nota documentale: confronto teorico RTX 4070 SUPER vs RTX 5070 Ti.
   FP32 35,5 → 43,9 TFLOPS (+24%), FP64 0,55 → 0,69 TFLOPS (+24%), memoria
