@@ -115,7 +115,8 @@ public static class Mandelbrot
     {
         if (iter >= maxIter)
             return unchecked((int)0xFF000000); // dentro -> nero
-        return ColorFor(iter, maxIter, palette);
+        double smoothIterations = iter + 1.0 - Math.Log(Math.Log(Math.Sqrt(Math.Max(mod2, 4.0)))) / Math.Log(2.0);
+        return ColorFor(smoothIterations, maxIter, palette);
     }
 
     // Gradiente (t, r, g, b) per ogni palette. t = iterazioni / maxIter.
@@ -244,5 +245,5 @@ public static class Mandelbrot
 public record struct BenchmarkProgress(double ElapsedSeconds, long TotalIters, int Frames)
 {
     /// <summary>Intervallo minimo tra due aggiornamenti UI (ogni Invoke ruba tempo al test).</summary>
-    public static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(3);
+    public static readonly TimeSpan ReportInterval = TimeSpan.FromSeconds(1);
 }

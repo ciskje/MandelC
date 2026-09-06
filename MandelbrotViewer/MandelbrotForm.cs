@@ -520,8 +520,28 @@ public partial class MandelbrotForm : Form
 
     private void BenchmarkItem_Click(object? sender, EventArgs e)
     {
-        using var dlg = new BenchmarkForm(_engine, UseDoublePrecision);
-        dlg.ShowDialog(this);
+        bool pauseDirectX = _engine == RenderEngine.DirectX && DxMandelbrot.IsReady;
+        if (pauseDirectX)
+        {
+            _dxTimer.Stop();
+            // Durante il benchmark la swapchain mostra il frame grigio dei campioni:
+            // nasconde il pannello DX per non confondere la vista principale.
+            dxPanel.Visible = false;
+        }
+        try
+        {
+            using var dlg = new BenchmarkForm(_engine, UseDoublePrecision);
+            dlg.ShowDialog(this);
+        }
+        finally
+        {
+            if (pauseDirectX)
+            {
+                dxPanel.Visible = true;
+                _dxDirty = true;
+                _dxTimer.Start();
+            }
+        }
     }
 
     private void NumIter_ValueChanged(object? sender, EventArgs e)

@@ -62,7 +62,9 @@ float4 PS(float4 pos : SV_Position) : SV_Target
             float3 col = 0.0;
             if (iter < maxIter)
             {
-                float t = saturate((float)iter / (float)maxIter * 1.35 + 0.03);
+                float mod2 = max(dot(z, z), 4.0);
+                float smoothIterations = (float)iter + 1.0 - log(log(sqrt(mod2))) / log(2.0);
+                float t = saturate(smoothIterations / (float)maxIter * 1.35 + 0.03);
                 col = Graded(t);
             }
             acc += col;
@@ -70,6 +72,35 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     }
     return float4(acc / (float)(n * n), 1.0);
 }";
+
+    /// <summary>
+    /// Shader benchmark: soltanto il conteggio iterazioni del frattale, senza
+    /// colorazione, senza smooth e senza media dei campioni. Ogni pixel della
+    /// griglia è un campione elementare: identico al lavoro dei kernel CUDA/CPU.
+    /// </summary>
+    private const string BenchPsSource = @"
+cbuffer Params : register(b0)
+{
+    float cx; float cy; float scale; float aspect;
+    float invW; float invH; int maxIter; int aa;
+};
+
+float4 BenchPS(float4 pos : SV_Position) : SV_Target
+{
+    float2 c = float2(cx + (pos.x * invW - 0.5) * scale,
+                        cy + (pos.y * invH - 0.5) * scale * aspect);
+    float2 z = 0.0;
+    int iter = 0;
+    while (iter < maxIter && dot(z, z) <= 4.0)
+    {
+        z = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+        iter++;
+    }
+    // L'uscita dipende dalle iterazioni: il compilatore non può eliminare il loop.
+    float v = iter >= maxIter ? 0.0 : frac(float(iter) * 0.125);
+    return float4(v, v, v, 1.0);
+}
+";
 
     [StructLayout(LayoutKind.Sequential)]
     private struct DxStop
@@ -93,7 +124,14 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     private static ID3D11VertexShader? _vs;
     private static ID3D11PixelShader? _ps;
     private static ID3D11Buffer? _cbuffer;
+    private static ID3D11PixelShader? _benchPs;
     private static int _backWidth, _backHeight;
+
+    // Stato del benchmark: la swapchain viene ingrandita alla griglia di campioni
+    // (es. 7680x4320) e ripristinata alla fine; nel frattempo i resize del pannello
+    // vengono ricordati ma non applicati.
+    private static bool _benchmarking;
+    private static int _preBenchWidth, _preBenchHeight;
 
     public static bool IsReady => _device != null;
     public static string LastError { get; private set; } = "";
@@ -179,6 +217,10 @@ float4 PS(float4 pos : SV_Position) : SV_Target
             _vs = _device.CreateVertexShader(vsCode.Span);
             _ps = _device.CreatePixelShader(psCode.Span);
 
+            step = "D3DCompiler.Compile (shader benchmark)";
+            ReadOnlyMemory<byte> benchCode = Compiler.Compile(BenchPsSource, "BenchPS", "mandelbrot-bench-ps", "ps_5_0");
+            _benchPs = _device.CreatePixelShader(benchCode.Span);
+
             step = "CreateBuffer (constant buffer)";
             _cbuffer = _device.CreateBuffer(
                 (uint)Marshal.SizeOf<DxParams>(),
@@ -213,6 +255,14 @@ float4 PS(float4 pos : SV_Position) : SV_Target
         if (!IsReady) return;
         width = Math.Max(1, width);
         height = Math.Max(1, height);
+        if (_benchmarking)
+        {
+            // Durante il benchmark la misura usa la griglia di campioni fissa:
+            // ignora i resize del pannello ma ricorda le nuove dimensioni da ripristinare.
+            _preBenchWidth = width;
+            _preBenchHeight = height;
+            return;
+        }
         if (width == _backWidth && height == _backHeight) return;
         _rtv?.Dispose();
         _rtv = null;
@@ -251,7 +301,61 @@ float4 PS(float4 pos : SV_Position) : SV_Target
         _context.PSSetConstantBuffer(0, _cbuffer!);
         _context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
         _context.Draw(3, 0);
-        _swapChain!.Present(1, PresentFlags.None);
+        _swapChain!.Present(0, PresentFlags.None);
+    }
+
+    /// <summary>
+    /// Prepara il benchmark: ingrandisce la swapchain alla griglia dei campioni
+    /// elementari (es. 960x540 AA8 = 7680x4320), senza media dei campioni.
+    /// </summary>
+    /// <param name="width">Larghezza della griglia di campioni.</param>
+    /// <param name="height">Altezza della griglia di campioni.</param>
+    public static void BeginBenchmark(int width, int height)
+    {
+        if (!IsReady || _benchmarking) return;
+        _preBenchWidth = _backWidth;
+        _preBenchHeight = _backHeight;
+        Resize(width, height); // prima del flag: con _benchmarking=true Resize ignorerebbe la richiesta
+        _benchmarking = true;
+    }
+
+    /// <summary>Ripristina la risoluzione della swapchain pre-benchmark.</summary>
+    public static void EndBenchmark()
+    {
+        if (!IsReady || !_benchmarking) return;
+        _benchmarking = false;
+        Resize(_preBenchWidth, _preBenchHeight);
+    }
+
+    /// <summary>
+    /// Frame di benchmark: disegna con lo shader solo-iterazioni sulla griglia
+    /// dei campioni e presenta SENZA v-sync (SyncInterval 0), così la misura
+    /// riflette il reale tempo di calcolo della GPU, non il refresh del monitor.
+    /// </summary>
+    public static void RenderBenchmark(double centerX, double centerY, double scale, int width, int height, int maxIter)
+    {
+        if (!IsReady) return;
+        var pars = new DxParams
+        {
+            Cx = (float)centerX,
+            Cy = (float)centerY,
+            Scale = (float)scale,
+            Aspect = (float)height / Math.Max(1,width),
+            InvW = 1f / Math.Max(1,width),
+            InvH = 1f / Math.Max(1,height),
+            MaxIter = maxIter,
+            Aa = 1,
+        };
+        MappedSubresource mapped = _context!.Map(_cbuffer!, 0, MapMode.WriteDiscard);
+        mapped.AsSpan<DxParams>(1)[0] = pars;
+        _context.Unmap(_cbuffer!, 0);
+        _context.OMSetRenderTargets(_rtv!);
+        _context.VSSetShader(_vs);
+        _context.PSSetShader(_benchPs!);
+        _context.PSSetConstantBuffer(0, _cbuffer!);
+        _context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
+        _context.Draw(3, 0);
+        _swapChain!.Present(0, PresentFlags.None);
     }
 
     private static DxStop ToStop((double T, byte R, byte G, byte B) s) =>
@@ -262,28 +366,104 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     {
         if (!IsReady) throw new InvalidOperationException("DirectX non inizializzato.");
         using ID3D11Texture2D backbuffer = _swapChain!.GetBuffer<ID3D11Texture2D>(0);
-        Texture2DDescription desc = backbuffer.Description;
-        desc.Usage = ResourceUsage.Staging;
-        desc.BindFlags = BindFlags.None;
-        desc.CPUAccessFlags = CpuAccessFlags.Read;
-        desc.MiscFlags = ResourceOptionFlags.None;
-        using ID3D11Texture2D staging = _device!.CreateTexture2D(desc);
-        _context!.CopyResource(backbuffer, staging);
+        return ReadTextureToBitmap(backbuffer, _backWidth, _backHeight);
+    }
+
+    /// <summary>
+    /// Renderizza un frame COLORATO della zona su una render-target fuori dalla
+    /// swapchain e lo restituisce come Bitmap: la preview del benchmark per il
+    /// motore DirectX (senza presentare nulla sulla finestra principale).
+    /// </summary>
+    public static System.Drawing.Bitmap? RenderPreviewToBitmap(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette)
+    {
+        if (!IsReady) return null;
+        try
+        {
+            var desc = new Texture2DDescription
+            {
+                Width = (uint)Math.Max(1, width),
+                Height = (uint)Math.Max(1, height),
+                MipLevels = 1,
+                ArraySize = 1,
+                // B8G8R8A8: stesso layout di byte di Bitmap Format32bppArgb (B,G,R,A),
+                // così i canali non risultano invertiti in lettura.
+                Format = DxgiFormat.B8G8R8A8_UNorm,
+                SampleDescription = new SampleDescription(1, 0),
+                Usage = ResourceUsage.Default,
+                BindFlags = BindFlags.RenderTarget,
+                CPUAccessFlags = CpuAccessFlags.None,
+                MiscFlags = ResourceOptionFlags.None,
+            };
+            using ID3D11Texture2D target = _device!.CreateTexture2D(desc);
+            using ID3D11RenderTargetView rtv = _device.CreateRenderTargetView(target);
+
+            var stops = Mandelbrot.GetStops(palette);
+            var pars = new DxParams
+            {
+                Cx = (float)centerX,
+                Cy = (float)centerY,
+                Scale = (float)scale,
+                Aspect = (float)height / Math.Max(1, width),
+                InvW = 1f / Math.Max(1, width),
+                InvH = 1f / Math.Max(1, height),
+                MaxIter = maxIter,
+                Aa = Math.Max(1, aa),
+                S0 = ToStop(stops[0]),
+                S1 = ToStop(stops[1]),
+                S2 = ToStop(stops[2]),
+                S3 = ToStop(stops[3]),
+                S4 = ToStop(stops[4]),
+            };
+            MappedSubresource mapped = _context!.Map(_cbuffer!, 0, MapMode.WriteDiscard);
+            mapped.AsSpan<DxParams>(1)[0] = pars;
+            _context.Unmap(_cbuffer!, 0);
+
+            _context.VSSetShader(_vs);
+            _context.PSSetShader(_ps);
+            _context.PSSetConstantBuffer(0, _cbuffer!);
+            _context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
+            _context.RSSetViewport(new Viewport(width, height));
+            _context.OMSetRenderTargets(rtv);
+            _context.Draw(3, 0);
+
+            var bmp = ReadTextureToBitmap(target, width, height);
+
+            // Ripristina render target e viewport della swapchain per i render successivi.
+            _context.OMSetRenderTargets(_rtv!);
+            _context.RSSetViewport(new Viewport(_backWidth, _backHeight));
+            return bmp;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Copia il contenuto di una texture in un Bitmap (per cattura/anteprima).</summary>
+    private static System.Drawing.Bitmap ReadTextureToBitmap(ID3D11Texture2D source, int width, int height)
+    {
+        Texture2DDescription stg = source.Description;
+        stg.Usage = ResourceUsage.Staging;
+        stg.BindFlags = BindFlags.None;
+        stg.CPUAccessFlags = CpuAccessFlags.Read;
+        stg.MiscFlags = ResourceOptionFlags.None;
+        using ID3D11Texture2D staging = _device!.CreateTexture2D(stg);
+        _context!.CopyResource(staging, source); // CopyResource(dst, src): copia la texture renderizzata nello staging
 
         MappedSubresource mapped = _context.Map(staging, 0, MapMode.Read);
         try
         {
             var bmp = new System.Drawing.Bitmap(
-                _backWidth, _backHeight,
+                width, height,
                 System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-            var rect = new System.Drawing.Rectangle(0, 0, _backWidth, _backHeight);
+            var rect = new System.Drawing.Rectangle(0, 0, width, height);
             var data = bmp.LockBits(rect, System.Drawing.Imaging.ImageLockMode.WriteOnly, bmp.PixelFormat);
             try
             {
-                int rowBytes = _backWidth * 4;
+                int rowBytes = width * 4;
                 int srcPitch = (int)mapped.RowPitch;
                 var row = new byte[rowBytes];
-                for (int y = 0; y < _backHeight; y++)
+                for (int y = 0; y < height; y++)
                 {
                     Marshal.Copy(mapped.DataPointer + y * srcPitch, row, 0, rowBytes);
                     Marshal.Copy(row, 0, data.Scan0 + y * data.Stride, rowBytes);
@@ -304,6 +484,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     public static void Dispose()
     {
         _cbuffer?.Dispose(); _cbuffer = null;
+        _benchPs?.Dispose(); _benchPs = null;
         _ps?.Dispose(); _ps = null;
         _vs?.Dispose(); _vs = null;
         _rtv?.Dispose(); _rtv = null;

@@ -2,6 +2,26 @@
 
 Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
 
+- [x] v2.5.14: Confronto teorico prestazioni RTX 4070 SUPER vs RTX 5070 Ti (tensor, memoria, FP32/FP64) — `completed`
+
+
+- [x] v2.5.13: Fix benchmark DirectX: risultati irrealistici (resize swapchain non avvenuto) e preview nera (CopyResource invertito) — `completed`
+
+- [x] v2.5.12: Preview colorata del benchmark anche per DirectX e pannello DX nascosto durante il test — `completed`
+- [x] v2.5.11: Mostrare il primo frame del benchmark anche in CUDA (e CPU) — `completed`
+- [x] v2.5.10: Standardizzare il benchmark tra i motori (960x540 AA8x senza media dei campioni, DirectX senza v-sync) — `completed`
+- [x] v2.5.9: Aggiornare i riferimenti storici del grafico benchmark — `completed`
+- [x] v2.5.8: Mostrare subito 0% e aggiornare lo stato ogni secondo — `completed`
+- [x] v2.5.7: Spostare benchmark DirectX su worker e mostrare MPixel/s intermedi — `completed`
+- [x] v2.5.6: Rendere visibili gli aggiornamenti intermedi del benchmark su tutti i motori — `completed`
+- [x] v2.5.5: Rimuovere la barra di avanzamento dal benchmark — `completed`
+- [x] v2.5.4: Mostrare percentuale, correggere asse grafico e consentire il primo ridisegno — `completed`
+- [x] v2.5.3: Sistemare valore benchmark tagliato e usare barre orizzontali — `completed`
+- [x] v2.5.2: Aggiungere launcher BAT per provare la versione corrente senza publish — `completed`
+- [x] v2.5.1: Correggere il riferimento CUDA RTX 5070 Ti nel grafico benchmark — `completed`
+- [x] v2.5.0: Avviare subito il benchmark e mostrare il grafico dei riferimenti prestazionali — `completed`
+- [x] v2.4.1: Correggere le variazioni cromatiche CUDA ad alte iterazioni — `completed`
+- [x] v2.4.0: Ripristinare lo smooth coloring coerente su CPU, CUDA e DirectX — `completed`
 - [x] v2.3.15: Rimuovere tutti i launcher `avvia.*` — `completed`
 - [x] v2.3.14: Correggere la selezione iniziale blu nella finestra log — `completed`
 - [x] v2.3.13: Schiarire la luminosità delle palette dopo la rimozione dello smooth coloring — `completed`

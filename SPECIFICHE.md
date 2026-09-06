@@ -37,6 +37,48 @@ Rendering parallelo (`Parallel.For` + `LockBits`), asincrono con cancellazione,
 anteprima in pan (1/4 risoluzione, no AA, upscale bilineare, full al rilascio),
 throttle del pan (80 ms) e anti-rimbalzo sul resize.
 
+Benchmark standardizzato (v2.5.10): tutti i motori misurano lo stesso lavoro —
+zona fissa 960x540, supersampling 8x inteso come griglia di **campioni elementari
+senza media** (7680x4320 pixel · 33,18 MPixel per frame), solo conteggio delle
+iterazioni di fuga (niente colorazione/smooth né downsampling). Il benchmark
+DirectX usa uno shader dedicato solo-iterazioni e presenta con `Present(0)`
+(senza v-sync) per non restare tappato al refresh del monitor; la swapchain è
+ingrandita temporaneamente alla griglia di campioni e ripristinata al termine.
+Il metro finale è `frame × 960 × 540 × 8 × 8 / secondi` (campioni/s), identico
+per CPU, CUDA e DirectX.
+
+Il benchmark mostra il primo frame della zona testata (v2.5.11/2.5.12: anteprima
+colorata 960x540 AA1x mostrata nel box della finestra Benchmark per tutti i
+motori: CUDA/CPU renderizzano un Bitmap col motore attivo, DirectX rende
+offscreen con lo shader normale via `RenderPreviewToBitmap`); è renderizzata
+prima del loop per non interferire con la misura. Durante il test DirectX il
+pannello DX della finestra principale viene nascosto (non mostra più il frame
+grigio dei campioni) e ripristinato alla chiusura del benchmark.
+
+Fix v2.5.13: il benchmark DirectX dava risultati irrealistici perché
+`BeginBenchmark` impostava `_benchmarking` prima di chiamare `Resize`, che con
+il flag attivo ignora la richiesta — la swapchain restava a dimensione pannello
+mentre il metro creditava 33,18 MPixel/frame (misura gonfiata ~30-40×); ora il
+resize avviene prima del flag. La preview DirectX usciva nera perché
+`ReadTextureToBitmap` invertiva gli argomenti di `CopyResource` (copiava lo
+staging vuoto sulla texture renderizzata): corretto in `CopyResource(staging,
+source)` (ripristina anche Salva PNG) e texture di preview in `B8G8R8A8_UNorm`
+per evitare canali R/B invertiti rispetto a `Format32bppArgb`.
+
+Confronto teorico (v2.5.14, fonti TechPowerUp/Wikipedia/NVIDIA): RTX 4070
+SUPER (AD104: 7168 core CUDA, 224 tensor 4ª gen, 56 RT core, boost 2,475 GHz,
+12 GB GDDR6X 192-bit, 504 GB/s, 220 W) vs RTX 5070 Ti (GB203: 8960 core CUDA,
+70 SM, 280 tensor 5ª gen, 70 RT core, boost 2,452 GHz, 16 GB GDDR7 256-bit,
+896 GB/s, 300 W). Differenze: FP32 35,5 vs 43,9 TFLOPS (+24%), FP64 0,55 vs
+0,69 TFLOPS (+24%, entrambe 1/64), banda memoria +78% ma irrilevante per il
+benchmark (scrive ~132 MB/frame, kernel compute-bound in registri), tensor
+core: AI TOPS marketing 616 (FP8 sparse) vs 1406 (FP4 sparse) — formati
+diversi, a parità di formato il guadagno è ~+25%; il kernel Mandelbrot non
+usa tensor core. Atteso sul benchmark di questa app ~+20-25%; raster gaming
+(relative performance TechPowerUp) ~+37% perché lì contano anche ROP (96 vs
+80) e fillrate.
+
+
 Ottimizzazione v2.3.6: il render CUDA riusa i buffer device e host tra frame;
 il benchmark rispetta la precisione CUDA selezionata e misura il kernel senza
 trasferire il vettore delle iterazioni alla CPU.
@@ -60,6 +102,47 @@ otto secondi e misura frame/s e pixel/s; usa CPU solo se DirectX non è pronto.
 
 Fix v2.3.13: le palette usano una curva di luminosità comune, `t × 1,35 + 0,03`,
 per compensare la rimozione dello smooth coloring e mantenere i motori coerenti.
+
+Funzionalità v2.4.0: ripristinato lo smooth coloring su CPU, CUDA float/double
+e DirectX usando il modulo finale di `z`. CUDA usa `ILGPU.Algorithms` con
+`EnableAlgorithms()` nel context builder per rendere disponibile `XMath.Log2`
+al compilatore PTX.
+
+Fix v2.4.1: il colorizer CUDA limita la coordinata della palette a `[0,1]`,
+come CPU e DirectX, evitando l'extrapolazione dei canali RGB oltre 255.
+
+Funzionalità v2.5.0: la finestra Benchmark avvia il test automaticamente in
+`Shown` e visualizza un grafico a barre con il risultato misurato e i riferimenti
+5070 Ti CUDA a 5880 MPixel/s e AMD 9900X a 80 MPixel/s.
+
+Fix v2.5.1: il riferimento della 5070 Ti CUDA nel grafico è 5880 MPixel/s.
+
+Strumento v2.5.2: `avvia.bat` esegue la versione corrente tramite `dotnet run`
+senza richiedere una nuova pubblicazione.
+
+Fix v2.5.3: il valore principale del benchmark usa una dimensione leggibile e
+il grafico prestazionale usa barre orizzontali.
+
+Fix v2.5.4: durante gli aggiornamenti del benchmark viene mostrata solo la
+percentuale di completamento; una pausa iniziale consente il primo ridisegno
+della finestra e il grafico riserva spazio alle etichette dell’asse.
+
+Fix v2.5.5: rimossa la barra di avanzamento grafica; il benchmark mostra solo
+la percentuale testuale.
+
+Fix v2.5.6: la percentuale intermedia viene aggiornata e ridisegnata su CPU,
+CUDA e DirectX; DirectX usa una callback sincrona per non posticipare il testo
+fino al completamento.
+
+Fix v2.5.7: il benchmark DirectX viene eseguito su un worker separato mentre
+il timer DirectX principale è sospeso; la UI mostra durante il test percentuale
+e MPixel/s intermedi.
+
+Fix v2.5.8: il benchmark mostra subito `0%` prima dell’avvio effettivo e aggiorna
+lo stato ogni secondo.
+
+Riferimenti storici v2.5.9: CUDA RTX 5070 Ti a 5940 MPixel/s, DirectX RTX 5070
+Ti a 1750 MPixel/s e CPU a 30 MPixel/s.
 
 Fix v2.3.14: la finestra log apre senza selezione automatica del testo e con il
 focus sul pulsante di chiusura.

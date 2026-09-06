@@ -6,11 +6,12 @@ partial class BenchmarkForm
     private Label lblInfo = null!;
     private Label lblResult = null!;
     private Label lblDetail = null!;
+    private Panel chartPanel = null!;
     private Panel bottomPanel = null!;
-    private ProgressBar progressBar = null!;
     private Label lblLive = null!;
     private Button btnStart = null!;
     private Button btnClose = null!;
+    private PictureBox previewBox = null!;
 
     protected override void Dispose(bool disposing)
     {
@@ -27,11 +28,12 @@ partial class BenchmarkForm
         this.lblInfo = new Label();
         this.lblResult = new Label();
         this.lblDetail = new Label();
+        this.chartPanel = new Panel();
         this.bottomPanel = new Panel();
-        this.progressBar = new ProgressBar();
         this.lblLive = new Label();
         this.btnStart = new Button();
         this.btnClose = new Button();
+        this.previewBox = new PictureBox();
 
         this.bottomPanel.SuspendLayout();
         this.SuspendLayout();
@@ -45,7 +47,7 @@ partial class BenchmarkForm
         // lblResult: il numero del test, in grande
         this.lblResult.Dock = DockStyle.Fill;
         this.lblResult.Text = "—";
-        this.lblResult.Font = new System.Drawing.Font("Segoe UI", 36f, System.Drawing.FontStyle.Bold);
+        this.lblResult.Font = new System.Drawing.Font("Segoe UI", 24f, System.Drawing.FontStyle.Bold);
         this.lblResult.TextAlign = ContentAlignment.MiddleCenter;
 
         // lblDetail
@@ -56,6 +58,20 @@ partial class BenchmarkForm
         this.lblDetail.ForeColor = System.Drawing.Color.DimGray;
         this.lblDetail.Font = new System.Drawing.Font("Segoe UI", 8f);
 
+        // previewBox: primo frame della zona di benchmark (per CUDA/CPU)
+        this.previewBox.Dock = DockStyle.Top;
+        this.previewBox.Height = 190;
+        this.previewBox.BackColor = System.Drawing.Color.Black;
+        this.previewBox.SizeMode = PictureBoxSizeMode.Zoom;
+        this.previewBox.Visible = false;
+
+        // chartPanel
+        this.chartPanel.Dock = DockStyle.Bottom;
+        this.chartPanel.Height = 148;
+        this.chartPanel.Padding = new Padding(12, 0, 12, 4);
+        this.chartPanel.BackColor = System.Drawing.Color.White;
+        this.chartPanel.Paint += new PaintEventHandler(this.ChartPanel_Paint);
+
         // bottomPanel
         this.bottomPanel.Dock = DockStyle.Bottom;
         this.bottomPanel.Height = 92;
@@ -63,18 +79,10 @@ partial class BenchmarkForm
         this.bottomPanel.Controls.Add(this.lblLive);
         this.bottomPanel.Controls.Add(this.btnStart);
         this.bottomPanel.Controls.Add(this.btnClose);
-        this.bottomPanel.Controls.Add(this.progressBar);
-
-        // progressBar
-        this.progressBar.Dock = DockStyle.Top;
-        this.progressBar.Height = 23;
-        this.progressBar.Minimum = 0;
-        this.progressBar.Maximum = 1000;
-
         // lblLive
         this.lblLive.Dock = DockStyle.Fill;
         this.lblLive.Text = "";
-        this.lblLive.TextAlign = ContentAlignment.MiddleLeft;
+        this.lblLive.TextAlign = ContentAlignment.MiddleCenter;
 
         // btnStart
         this.btnStart.Dock = DockStyle.Right;
@@ -91,10 +99,12 @@ partial class BenchmarkForm
 
         // BenchmarkForm
         this.AutoScaleMode = AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(520, 360);
+        this.ClientSize = new System.Drawing.Size(520, 590);
         this.Controls.Add(this.lblResult);
         this.Controls.Add(this.lblDetail);
         this.Controls.Add(this.lblInfo);
+        this.Controls.Add(this.previewBox);
+        this.Controls.Add(this.chartPanel);
         this.Controls.Add(this.bottomPanel);
         this.Text = "Benchmark";
         this.FormBorderStyle = FormBorderStyle.FixedDialog;

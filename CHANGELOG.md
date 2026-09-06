@@ -3,6 +3,91 @@
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
 
+- **v2.5.14** — Nota documentale: confronto teorico RTX 4070 SUPER vs RTX 5070 Ti.
+  FP32 35,5 → 43,9 TFLOPS (+24%), FP64 0,55 → 0,69 TFLOPS (+24%), memoria
+  504 → 896 GB/s (+78%, irrilevante per il benchmark compute-bound), tensor
+  core 224 (4ª gen) → 280 (5ª gen) ma AI TOPS di marketing su formati diversi
+  (616 FP8 sparse vs 1406 FP4 sparse; a parità di formato ~+25%). Per il
+  benchmark di questa app (solo iterazioni FP32/FP64, nessun tensor core)
+  atteso ~+20-25%; raster gaming (TechPowerUp) ~+37%. File: `SPECIFICHE.md`,
+  `TODO.md`, `AppVersion.cs`, `.csproj`.
+
+
+- **v2.5.13** — Fix benchmark DirectX: la misura dava risultati irrealistici perché
+  `BeginBenchmark` impostava il flag `_benchmarking` **prima** di chiamare `Resize`,
+  che con il flag attivo ignora la richiesta: la swapchain restava a dimensione
+  pannello (~1 MPixel/frame) mentre il metro creditava 33,18 MPixel/frame
+  (risultati ~30-40× gonfiati). Ora il resize avviene prima del flag. La preview
+  DirectX era nera perché `ReadTextureToBitmap` chiamava `CopyResource` con gli
+  argomenti invertiti (copiava lo staging vuoto sopra la texture renderizzata);
+  corretto in `CopyResource(staging, source)` (fix che ripristina anche Salva PNG)
+  e la texture di preview ora usa `B8G8R8A8_UNorm`, stesso layout di byte di
+  `Format32bppArgb`, per canali non invertiti. File: `DxMandelbrot.cs`,
+  `AppVersion.cs`, `.csproj`.
+
+
+- **v2.5.12** — Preview colorata della zona di benchmark anche per DirectX: il
+  benchmark renderizza un frame offscreen con lo shader normale (palette Fuoco) e
+  lo mostra nel box del BenchmarkForm, come per CUDA/CPU. Durante il test la
+  finestra principale non mostra più il frame grigio dei campioni: il pannello DX
+  viene nascosto e ripristinato alla chiusura. Aggiunto `DxMandelbrot.
+  RenderPreviewToBitmap` + helper `ReadTextureToBitmap` (estratto da `Capture`).
+  File: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `MandelbrotForm.cs`,
+  `AppVersion.cs`, `.csproj`.
+
+- **v2.5.11** — Il benchmark mostra il primo frame della zona testata anche per
+  CUDA e CPU: anteprima 960x540 (AA1x) renderizzata col motore attivo in un box
+  dedicato della finestra Benchmark, prima di avviare la misura. DirectX mostrava
+  già il primo frame nella swapchain. File: `BenchmarkForm.cs`,
+  `BenchmarkForm.Designer.cs`, `AppVersion.cs`, `.csproj`.
+
+- **v2.5.10** — Benchmark standardizzato tra i motori: zona 960x540 AA8x senza
+  media dei campioni (griglia di 7680x4320 campioni elementari, stesso lavoro per
+  CPU, CUDA e DirectX). Il benchmark DirectX usa uno shader solo-iterazioni e
+  presenta senza v-sync (`Present(0)`), eliminando il limite del refresh del
+  monitor che tappava la misura a ~60 fps. La swapchain viene ingrandita alla
+  griglia durante il test e ripristinata alla fine. File: `DxMandelbrot.cs`
+  (`BenchPsSource`, `BeginBenchmark`/`EndBenchmark`/`RenderBenchmark`),
+  `BenchmarkForm.cs`, `AppVersion.cs`, `.csproj`.
+
+- **v2.5.9** — Aggiornati i riferimenti storici del grafico: CUDA RTX 5070 Ti
+  5940 MPixel/s, DirectX RTX 5070 Ti 1750 MPixel/s, CPU 30 MPixel/s.
+
+- **v2.5.8** — Il benchmark mostra subito `0%` e aggiorna percentuale e
+  MPixel/s ogni secondo.
+
+- **v2.5.7** — Il benchmark DirectX gira su un worker separato; la UI resta
+  responsiva e mostra gli aggiornamenti intermedi `percentuale | MPixel/s`.
+
+- **v2.5.6** — Resi visibili gli aggiornamenti intermedi della percentuale del
+  benchmark su CPU, CUDA e DirectX, incluso il repaint della label.
+
+- **v2.5.5** — Rimossa la barra di avanzamento dal benchmark; resta visibile
+  solo la percentuale testuale.
+
+- **v2.5.4** — Durante il benchmark viene mostrata solo la percentuale; aggiunto
+  tempo per il primo ridisegno e corretto lo spazio delle etichette dell’asse.
+
+- **v2.5.3** — Ridimensionato il risultato principale del benchmark e convertito
+  il grafico in barre orizzontali per evitare testo tagliato.
+
+- **v2.5.2** — Aggiunto `avvia.bat` per provare la versione corrente con
+  `dotnet run`, senza usare il publish self-contained.
+
+- **v2.5.1** — Corretto il riferimento della RTX 5070 Ti CUDA nel grafico a
+  5880 MPixel/s.
+
+- **v2.5.0** — Il benchmark parte automaticamente all’apertura e mostra un
+  grafico a barre con il risultato misurato e i riferimenti 5070 Ti CUDA (5880
+  MPixel/s) e AMD 9900X (80 MPixel/s).
+
+- **v2.4.1** — Corretto il colorizer CUDA: il valore della palette viene
+  limitato a `[0,1]`, evitando variazioni magenta ad alte iterazioni.
+
+- **v2.4.0** — Ripristinato lo smooth coloring su CPU, CUDA float/double e
+  DirectX usando il modulo finale di `z`; CUDA abilita `ILGPU.Algorithms` per
+  compilare `XMath.Log2` nei kernel.
+
 - **v2.3.15** — Rimossi i launcher `avvia.bat` e `avvia.ps1`; l'avvio avviene
   tramite il file pubblicato o i comandi .NET documentati.
 

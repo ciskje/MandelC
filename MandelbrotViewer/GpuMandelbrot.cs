@@ -1,5 +1,6 @@
 using System.Drawing.Imaging;
 using ILGPU;
+using ILGPU.Algorithms;
 using ILGPU.Runtime;
 using ILGPU.Runtime.Cuda;
 
@@ -76,7 +77,7 @@ internal static class GpuMandelbrot
     {
         try
         {
-            _context ??= Context.CreateDefault();
+            _context ??= Context.Create(builder => builder.Default().EnableAlgorithms());
             return _context.Devices
                 .Where(d => d.AcceleratorType == AcceleratorType.Cuda)
                 .Select(d => d.Name)
@@ -102,7 +103,7 @@ internal static class GpuMandelbrot
         ResetAccelerator();
         try
         {
-            _context ??= Context.CreateDefault();
+            _context ??= Context.Create(builder => builder.Default().EnableAlgorithms());
             var cudaDevices = _context.Devices
                 .Where(d => d.AcceleratorType == AcceleratorType.Cuda)
                 .ToList();
@@ -311,10 +312,10 @@ internal static class GpuMandelbrot
         iters[index] = iter;
     }
 
-    private static int ColorFromIterations(int iter, int maxIter, GpuPaletteParams p)
+    private static int ColorFromIterations(float iterations, int maxIter, GpuPaletteParams p)
     {
-        if (iter >= maxIter) return unchecked((int)0xFF000000);
-        float t = (float)iter / (maxIter > 0 ? maxIter : 1) * 1.35f + 0.03f;
+        float t = iterations / (maxIter > 0 ? maxIter : 1) * 1.35f + 0.03f;
+        t = t < 0f ? 0f : t > 1f ? 1f : t;
         float segment = t * 4f;
         int i = (int)(segment < 3f ? segment : 3f);
         float f = segment - i;
@@ -351,7 +352,12 @@ internal static class GpuMandelbrot
                     zy2 = zy * zy;
                     ++iter;
                 }
-                int color = ColorFromIterations(iter, p.MaxIter, palette);
+                float smoothIterations = iter >= p.MaxIter
+                    ? p.MaxIter
+                    : iter + 1f - XMath.Log2(0.5f * XMath.Log2(MathF.Max(zx2 + zy2, 4f)));
+                int color = iter >= p.MaxIter
+                    ? unchecked((int)0xFF000000)
+                    : ColorFromIterations(smoothIterations, p.MaxIter, palette);
                 sumR += (color >> 16) & 255;
                 sumG += (color >> 8) & 255;
                 sumB += color & 255;
@@ -384,7 +390,12 @@ internal static class GpuMandelbrot
                     zy2 = zy * zy;
                     ++iter;
                 }
-                int color = ColorFromIterations(iter, p.MaxIter, palette);
+                double smoothIterations = iter >= p.MaxIter
+                    ? p.MaxIter
+                    : iter + 1.0 - XMath.Log2(0.5 * XMath.Log2(Math.Max(zx2 + zy2, 4.0)));
+                int color = iter >= p.MaxIter
+                    ? unchecked((int)0xFF000000)
+                    : ColorFromIterations((float)smoothIterations, p.MaxIter, palette);
                 sumR += (color >> 16) & 255;
                 sumG += (color >> 8) & 255;
                 sumB += color & 255;
