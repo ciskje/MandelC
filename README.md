@@ -39,6 +39,12 @@ Interactive Mandelbrot set viewer built with C# / WinForms (.NET 8, Windows only
 - .NET 8 Desktop Runtime (or use the self-contained publish)
 - Optional: NVIDIA GPU + driver for CUDA
 
+## Download
+
+Download the latest self-contained Windows executable from the
+[GitHub Releases page](https://github.com/ciskje/MandelC/releases/latest).
+Extract `MandelbrotViewer.exe` and run it; no .NET installation is required.
+
 ## Build & Run
 
 ```powershell

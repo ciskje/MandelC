@@ -1,5 +1,6 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [ ] v2.17.6: Publish the self-contained executable in GitHub Releases and update README download instructions — pending
 - [x] v2.17.6: Sort benchmark chart results by MPixel/s descending — completed
 - [x] Update historical benchmark values in the source using the v2.17.5 protocol — completed
 - [x] v2.17.5: Align CUDA benchmark submission and timing with DirectX so GPU throughput, not per-frame synchronization, determines MPixel/s — completed
