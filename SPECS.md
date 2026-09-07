@@ -1,4 +1,4 @@
-﻿# SPECIFICHE — Mandelbrot Viewer (MandelC#)
+﻿# SPECS — Mandelbrot Viewer (MandelC#)
 
 WinForms app (.NET 8, `net8.0-windows`) that renders the Mandelbrot set
 (`z = z² + c`) with consistent smooth coloring across all engines: the tint

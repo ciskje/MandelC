@@ -6,38 +6,38 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 
 - **v2.17.2** — App icon replaced with `icon2.png`, converted to a multiresolution `.ico` 16/32/48/256. Files: `app.ico`, `AppVersion.cs`, `.csproj`.
 
-- **v2.17.1** — Window resize fix: DirectX did not redraw after resize (missing `dxPanel.Resize` handler that sets `_dxDirty`); CPU/CUDA waited for the 300 ms debounce (now `RenderAsync(preview)` immediately on each event, as DX); `pictureBox.SizeMode` from `Normal` to `Zoom` (the image scales keeping the aspect ratio during the transition). Files: `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.17.1** — Window resize fix: DirectX did not redraw after resize (missing `dxPanel.Resize` handler that sets `_dxDirty`); CPU/CUDA waited for the 300 ms debounce (now `RenderAsync(preview)` immediately on each event, as DX); `pictureBox.SizeMode` from `Normal` to `Zoom` (the image scales keeping the aspect ratio during the transition). Files: `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.17.0** — Palette color aligned to the Python reference: gamma curve `t = (nu/maxIter)^0.35` instead of the linear mapping (smooth iteration already present). Files: `Palette.cs`, `GpuMandelbrot.cs`, `DxMandelbrot.cs`.
 
-- **v2.16.0** — Main Generate menu (former File Export submenu: screenshot, zoom video) and Real Time zoom (animation on the main view from the current zone to the set, 120 frames at 30 fps, Esc to stop). Files: `MandelbrotForm.Designer.cs`, `ZoomVideoForm.cs`, `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.16.0** — Main Generate menu (former File Export submenu: screenshot, zoom video) and Real Time zoom (animation on the main view from the current zone to the set, 120 frames at 30 fps, Esc to stop). Files: `MandelbrotForm.Designer.cs`, `ZoomVideoForm.cs`, `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.10** — DX throughput fix at AA1x: event-query poll tight again (the Sleep was depressing frames from ~1 ms: 5070 Ti 67.4→292.4); anti-hang checks every 1024 polls. DX history updated. Files: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.15.10** — DX throughput fix at AA1x: event-query poll tight again (the Sleep was depressing frames from ~1 ms: 5070 Ti 67.4→292.4); anti-hang checks every 1024 polls. DX history updated. Files: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.9** — Standard benchmark at AA1x (960x540 grid): the metric stays MPixel/s and the Radeon comes back (no more TDR or iGPU skip); history recalculated via CLI: CUDA 5070 Ti 276.3/6.7 and 4070 SUPER 220.7/5.3, DirectX 5070 Ti 65.9, 4070 SUPER 56.8 and Radeon 4.8, CPU 9900X 4.8 (9 bars). Files: `BenchmarkStandard.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.15.9** — Standard benchmark at AA1x (960x540 grid): the metric stays MPixel/s and the Radeon comes back (no more TDR or iGPU skip); history recalculated via CLI: CUDA 5070 Ti 276.3/6.7 and 4070 SUPER 220.7/5.3, DirectX 5070 Ti 65.9, 4070 SUPER 56.8 and Radeon 4.8, CPU 9900X 4.8 (9 bars). Files: `BenchmarkStandard.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.8** — DX benchmark: preventive skip of cards with <1 GB dedicated (no more TDR/AMD popup), `QuerySignaled` safe on device removed (no more raw HRESULT in the log), single event log via GUI; history: DirectX 5070 Ti 436.3 + 4070 SUPER 355.2 (8 bars). Files: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.15.8** — DX benchmark: preventive skip of cards with <1 GB dedicated (no more TDR/AMD popup), `QuerySignaled` safe on device removed (no more raw HRESULT in the log), single event log via GUI; history: DirectX 5070 Ti 436.3 + 4070 SUPER 355.2 (8 bars). Files: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.7** — Log/diagnostics (Help menu): new Events log section with benchmark errors (in-memory AppLog, last 200 lines); DX errors (device removed, timeout, VRAM) and GUI errors now stay in the log. Files: `AppLog.cs`, `MandelbrotForm.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.15.7** — Log/diagnostics (Help menu): new Events log section with benchmark errors (in-memory AppLog, last 200 lines); DX errors (device removed, timeout, VRAM) and GUI errors now stay in the log. Files: `AppLog.cs`, `MandelbrotForm.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.6** — DX benchmark anti-hang: VRAM check before the AA8x grid, 60 s timeout per frame and device-removed detection in `DrainOne` (the Radeon iGPU went into TDR and hung with no errors); errors visible in GUI and `run failed` in CLI. Files: `DxMandelbrot.cs`, `Diagnostics.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.15.6** — DX benchmark anti-hang: VRAM check before the AA8x grid, 60 s timeout per frame and device-removed detection in `DrainOne` (the Radeon iGPU went into TDR and hung with no errors); errors visible in GUI and `run failed` in CLI. Files: `DxMandelbrot.cs`, `Diagnostics.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.5** — Benchmark history recalculated via CLI on the new zone (best of 3): CUDA 5070 Ti 490.7/9.0 and 4070 SUPER 384.1/7.0 (32/64-bit), DirectX 5070 Ti 483.0, CPU 9900X 6.1; removed the DirectX 4070 SUPER bars (card absent in DXGI) and AMD Radeon (bench hangs). Chart with 7 bars. Files: BenchmarkForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+- **v2.15.5** — Benchmark history recalculated via CLI on the new zone (best of 3): CUDA 5070 Ti 490.7/9.0 and 4070 SUPER 384.1/7.0 (32/64-bit), DirectX 5070 Ti 483.0, CPU 9900X 6.1; removed the DirectX 4070 SUPER bars (card absent in DXGI) and AMD Radeon (bench hangs). Chart with 7 bars. Files: BenchmarkForm.cs, TODO.md, SPECS.md, CHANGELOG.md, AppVersion.cs, .csproj.
 
-- **v2.15.4** — Benchmark: export button renamed CSV… → Export CSV and Close always on the right (dock order: Start, Export CSV, Close). Files: BenchmarkForm.Designer.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+- **v2.15.4** — Benchmark: export button renamed CSV… → Export CSV and Close always on the right (dock order: Start, Export CSV, Close). Files: BenchmarkForm.Designer.cs, TODO.md, SPECS.md, CHANGELOG.md, AppVersion.cs, .csproj.
 
-- **v2.15.3** — Benchmark: iterations no longer fixed but computed with the auto formula at the test scale (BenchmarkStandard.MaxIter => Mandelbrot.AutoIterForScale(Scale) = 10915). Files: BenchmarkStandard.cs, BenchmarkForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+- **v2.15.3** — Benchmark: iterations no longer fixed but computed with the auto formula at the test scale (BenchmarkStandard.MaxIter => Mandelbrot.AutoIterForScale(Scale) = 10915). Files: BenchmarkStandard.cs, BenchmarkForm.cs, TODO.md, SPECS.md, CHANGELOG.md, AppVersion.cs, .csproj.
 
-- **v2.15.2** — Benchmark zone: center (-0.7499302568795561, -0.015139113925433963), scale 1.0453474311811176e-04 (half 5.226737155905588e-05), 10915 iterations (= zone auto); w×h 960×540 and 8 s budget unchanged. History unchanged (referenced to the old zone). Files: BenchmarkStandard.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+- **v2.15.2** — Benchmark zone: center (-0.7499302568795561, -0.015139113925433963), scale 1.0453474311811176e-04 (half 5.226737155905588e-05), 10915 iterations (= zone auto); w×h 960×540 and 8 s budget unchanged. History unchanged (referenced to the old zone). Files: BenchmarkStandard.cs, TODO.md, SPECS.md, CHANGELOG.md, AppVersion.cs, .csproj.
 
-- **v2.15.1** — Auto iterations 2000*(1+log10(1.5/half)) (half = scale/2, clamp 50-50000) centralized in Mandelbrot.AutoIterForScale, used by view and zoom video (at benchmark scale 5e-4 it is 9556, but the benchmark stays at 5000 fixed iterations). Files: Mandelbrot.cs, MandelbrotForm.cs, ZoomVideoForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+- **v2.15.1** — Auto iterations 2000*(1+log10(1.5/half)) (half = scale/2, clamp 50-50000) centralized in Mandelbrot.AutoIterForScale, used by view and zoom video (at benchmark scale 5e-4 it is 9556, but the benchmark stays at 5000 fixed iterations). Files: Mandelbrot.cs, MandelbrotForm.cs, ZoomVideoForm.cs, TODO.md, SPECS.md, CHANGELOG.md, AppVersion.cs, .csproj.
 
 - **v2.15.0** — File → Export submenu with Screenshot (Ctrl+Shift+E: dialog
   starting from current view with free preset and AA) and Zoom video (Ctrl+Shift+V)
   with its own AA selector (As view/1x/2x/4x/8x: the video can use a different AA
   than the view); removed the individual items. Files: `MandelbrotForm.cs`,
   `MandelbrotForm.Designer.cs`, `ExportForm.cs`, `ZoomVideoForm.cs`,
-  `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`,
+  `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECS.md`,
   `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.14.1** — 2-3 base color palettes: Forest redrawn (brown and green
@@ -52,7 +52,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   view often has odd sides and libx264/yuv420p rejects them ("Could not open
   encoder" + "no packets", exit 0xDFABA7BB, reproduced) — pad to even dimensions,
   pre-flight on PNGs and more stderr lines in errors. Files: `ExportForm.cs`,
-  `ExportForm.Designer.cs`, `ZoomVideoForm.cs`, `TODO.md`, `SPECIFICHE.md`,
+  `ExportForm.Designer.cs`, `ZoomVideoForm.cs`, `TODO.md`, `SPECS.md`,
   `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.13.2** — Exe and windows icon: 256 px render of the set in
@@ -60,7 +60,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   embedded resource applied to all forms (`Program.ApplyIcon`). Files:
   `app.ico` (new), `MandelbrotViewer.csproj`, `Program.cs`,
   `MandelbrotForm.cs`, `BenchmarkForm.cs`, `ExportForm.cs`, `ZoomVideoForm.cs`,
-  `LogForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`.
+  `LogForm.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`.
 
 - **v2.13.1** — Fix hang at the end of video export: the ffmpeg encoding ran on the
   UI thread and stderr was read after `WaitForExit` — with 60+ frames the
@@ -74,7 +74,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   cubic ease-out (fast at the start, slow at the end); the video uses the selected AA
   (auto-reduced beyond 128 MPixel of samples, like the export);
   Open button for the result (MP4 with the player, PNG folder in Explorer).
-  Files: `ZoomVideoForm.cs`, `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`,
+  Files: `ZoomVideoForm.cs`, `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECS.md`,
   `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.13.0** — Zoom video MP4 (File → Ctrl+Shift+V): interpolates from the current view
@@ -84,7 +84,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   absent — leaves the PNG sequence; deterministic progress + cancel. New
   `ZoomVideoForm.cs`/`.Designer.cs`. Files: `ZoomVideoForm.cs`,
   `ZoomVideoForm.Designer.cs` (new), `MandelbrotForm.cs`,
-  `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
+  `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`,
   `AppVersion.cs`, `.csproj`.
 
 - **v2.12.0** — Julia mode (View menu, Ctrl+J): `z = z² + c` with c fixed
@@ -94,7 +94,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   (history, favorites, files) include mode and c with defaults for
   old files; benchmark always Mandelbrot; HR export follows the mode. Files:
   `Mandelbrot.cs`, `GpuMandelbrot.cs`, `DxMandelbrot.cs`, `MandelbrotForm.cs`,
-  `ExportForm.cs`, `Settings.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
+  `ExportForm.cs`, `Settings.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`,
   `AppVersion.cs`, `.csproj`.
 
 - **v2.11.0** — High-resolution PNG export (File → Ctrl+Shift+E): dialog with
@@ -103,7 +103,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   AA auto-reduced beyond 128 MPixel of samples, marquee +
   cancel, PNG save. New `ExportForm.cs`/`.Designer.cs`. Files:
   `ExportForm.cs`, `ExportForm.Designer.cs` (new), `MandelbrotForm.cs`,
-  `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
+  `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`,
   `AppVersion.cs`, `.csproj`.
 
 - **v2.10.0** — View history + favorite zones: new View menu with
@@ -112,7 +112,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   `%APPDATA%\MandelbrotViewer\zone\`), jump and delete submenus
   (rebuilt on opening, with validation like Load zone). `LoadZone`
   refactored on shared `TryParseZone`/`ApplyZone`. Files:
-  `MandelbrotForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
+  `MandelbrotForm.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`,
   `AppVersion.cs`, `.csproj`.
 
 - **v2.9.0** — CSV export of the benchmarks (one row per run: timestamp, engine,
@@ -120,33 +120,33 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   the benchmark window (queues the measurement) and `--csv file` in the
   `--bench-dx/--bench-cuda/--bench-cpu` commands. New `BenchmarkCsv.cs`. Files:
   `BenchmarkCsv.cs` (new), `BenchmarkForm.cs`, `BenchmarkForm.Designer.cs`,
-  `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
+  `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`,
   `AppVersion.cs`, `.csproj`.
 
 - **v2.8.0** — CPU benchmark from CLI (`--bench-cpu`: 3 runs of 8 s in double) and
   history with model name (`Diagnostics.CpuName` from registry, e.g. "CPU 9900X"):
   measured 27.8 MPixel/s on AMD Ryzen 9 9900X (replaces the old "CPU"
   30.0). Files: `Diagnostics.cs`, `Program.cs`, `BenchmarkForm.cs`, `TODO.md`,
-  `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+  `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.7.0** — Four fixed palettes (Ocean, Purple, Desert, Forest, 5 stops
   each like the existing ones): immediately valid on CPU, CUDA and DirectX because the
   stops are generic; enum extended only at the end so the persisted indices remain
   valid. Files: `Palette.cs`, `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`,
-  `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+  `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.6.0** — Keyboard pan with the arrow keys: 1/10 of the view per
   step (Shift = fine step 1/100); ignored when the focus is on the iterations
   count (which already uses up/down). Commands guide updated. Files:
   `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`, `TODO.md`,
-  `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+  `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.5.23** — Documentation review: `SPECIFICHE.md` rewritten on the
+- **v2.5.23** — Documentation review: `SPECS.md` rewritten on the
   actual and current specs (removed the duplicated version history, the
   hardware comparison and the obsolete notes on Present/bench window; description
   of engines, benchmark, CLI, files and technical notes verified against the code) and
   version headings restored in `CHANGELOG.md` where missing.
-  No code change. Files: `SPECIFICHE.md`, `CHANGELOG.md`, `TODO.md`,
+  No code change. Files: `SPECS.md`, `CHANGELOG.md`, `TODO.md`,
   `AppVersion.cs`, `.csproj`.
 
 - **v2.5.22** — AppStarting cursor (arrow+clock) instead of Wait during
@@ -154,14 +154,14 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   correct cursor; assigned recursively to forms and descendants (covers pictureBox,
   menu, status; `UseWaitCursor` removed because it forces the full hourglass). Wait
   remains only for the synchronous CUDA init with frozen UI. Files: `MandelbrotForm.cs`,
-  `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
+  `TODO.md`, `SPECS.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.5.21** — Wait cursor fix: during long renders (e.g. hard zone AA8x
   switching CUDA from 32 to 64 bit) the cursor stayed an arrow if the mouse was
   on the image, because `pictureBox` was not in the `SetBusyCursor` list.
   Now the form also uses `UseWaitCursor`, which covers all controls and
   surfaces (image, menu, status). Files: `MandelbrotForm.cs`, `TODO.md`,
-  `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
+  `SPECS.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.5.20** — DirectX offscreen benchmark without Present: solves the
   skewed measurement on cards without monitor (the 4070 SUPER, headless in a PCIe x4 slot,
@@ -175,7 +175,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   `TryInitializeHeadless` (CLI). GUI and CLI use the same path; DX history
   replaced with the offscreen measurements (best of 3): 5070 Ti 5780.7 (+1%),
   4070 SUPER 4441.6, AMD Radeon 102.2. Files: `DxMandelbrot.cs`, `Diagnostics.cs`,
-  `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
+  `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.5.19** — Triple CUDA test per device and updated history: new command
   `--bench-cuda [device name]` that runs 3 runs of 8 s of the standardized test
@@ -185,7 +185,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   110.3 (64-bit) — the old single reference "CUDA 5070 Ti 5940" is replaced
   by these four bars. Chart widened (9 bars: left margin and panel
   height increased). Files: `Diagnostics.cs`, `Program.cs`, `BenchmarkForm.cs`,
-  `BenchmarkForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`,
+  `BenchmarkForm.Designer.cs`, `TODO.md`, `SPECS.md`, `AppVersion.cs`,
   `.csproj`.
 
 - **v2.5.18** — Triple DirectX test per card and updated history: new command
@@ -198,9 +198,9 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   a worker thread); `DxMandelbrot.ShortAdapterName` for compressed names. In the
   benchmark chart the obsolete bar "DirectX 5070 Ti 1750" (old test
   with v-sync, not comparable) is replaced by the per-card references
-  measured now (best of 3 runs, see SPECIFICHE); axis calculated from the bars.
+  measured now (best of 3 runs, see SPECS); axis calculated from the bars.
   Files: `BenchmarkStandard.cs` (new), `DxMandelbrot.cs`, `BenchmarkForm.cs`,
-  `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`,
+  `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECS.md`, `AppVersion.cs`,
   `.csproj`.
 
 - **v2.5.17** — Fix: `AdapterNames()` always returned an empty list on
@@ -216,7 +216,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   full list (RTX 5070 Ti, AMD Radeon iGPU, RTX 4070 SUPER) and
   explicit selection working on 4070 SUPER and iGPU (`IsReady: True`, `Render: OK`).
   Files: `DxMandelbrot.cs`, `Diagnostics.cs`, `MandelbrotForm.cs`, `TODO.md`,
-  `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
+  `SPECS.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.5.16** — Fix: the GPU dropdown did not apply the chosen DirectX card:
   `TryInitialize` always created the device on the default adapter
@@ -226,7 +226,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   (mandatory when passing an adapter); nonexistent name → clear error in
   `LastError` ("Video card not found: …"). `--diag-dx` accepts the
   card name as argument for the test without UI. Files: `DxMandelbrot.cs`,
-  `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`,
+  `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECS.md`, `AppVersion.cs`,
   `.csproj`.
 
 - **v2.5.15** — Reorganization and cleanup refactor (no functional change):
@@ -244,7 +244,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   `BenchmarkProgress.cs`, `Diagnostics.cs` (new), `Program.cs`,
   `Mandelbrot.cs`, `GpuMandelbrot.cs`, `DxMandelbrot.cs`, `MandelbrotForm.cs`,
   `MandelbrotForm.Designer.cs`, `RenderEngine.cs`, `LogForm.cs`, `AppVersion.cs`,
-  `.csproj`, `TODO.md`, `SPECIFICHE.md`.
+  `.csproj`, `TODO.md`, `SPECS.md`.
 
 
 - **v2.5.14** — Documentation note: theoretical comparison RTX 4070 SUPER vs RTX 5070 Ti.
@@ -253,7 +253,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
   cores 224 (4th gen) → 280 (5th gen) but marketing AI TOPS on different formats
   (616 FP8 sparse vs 1406 FP4 sparse; at equal format ~+25%). For the
   benchmark of this app (only FP32/FP64 iterations, no tensor cores)
-  expected ~+20-25%; raster gaming (TechPowerUp) ~+37%. Files: `SPECIFICHE.md`,
+  expected ~+20-25%; raster gaming (TechPowerUp) ~+37%. Files: `SPECS.md`,
   `TODO.md`, `AppVersion.cs`, `.csproj`.
 
 
@@ -512,6 +512,6 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 - Project setup (user-level SDK; self-contained publish in `pubblicato/` so
   the Desktop Runtime doesn't need to be installed; version in source (`AppVersion.cs`
   + `<Version>` in the csproj, shown in the title); project setup (AGENTS.md,
-  TODO.md, SPECIFICHE.md, `.gitignore`, tracking in the `test/` repo).
+  TODO.md, SPECS.md, `.gitignore`, tracking in the `test/` repo).
 - Initial C# viewer (WinForms): configurable iterations,
   PNG save. Files: `Form1.*`, `Mandelbrot.cs`.

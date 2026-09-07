@@ -135,7 +135,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
 
     // Offscreen benchmark (v2.5.20): render target in the tested GPU's memory,
     // no swapchain and no Present — no DWM, no cross-GPU copy to the
-    // monitor's card (which skewed the headless cards, see SPECIFICHE).
+    // monitor's card (which skewed the headless cards, see SPECS).
     // Draw returns immediately (commands queued): frame completion is detected
     // with a ring of event queries.
     private static ID3D11Texture2D? _benchTarget;

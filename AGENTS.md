@@ -11,7 +11,7 @@ Project root: `MandelC#/`. Code: `MandelC#/MandelbrotViewer/`.
 ## Language (mandatory)
 
 All code (comments, identifiers, enum names), UI strings, documentation
-(AGENTS.md, TODO.md, CHANGELOG.md, SPECIFICHE.md), and commit messages
+(AGENTS.md, TODO.md, CHANGELOG.md, SPECS.md), and commit messages
 must be written in **English** from now on.
 
 ## Toolchain .NET
@@ -53,7 +53,7 @@ must be written in **English** from now on.
 
 1. Add the request at the top as a `pending` entry in `TODO.md`.
 2. Execute it; mark `completed` (or `cancelled`) as soon as done, no batching.
-3. Add a note in `SPECIFICHE.md` (what was done, files touched, version if bumped).
+3. Add a note in `SPECS.md` (what was done, files touched, version if bumped).
 4. Verify with build (`dotnet build`) when C# code is touched.
 
 ## Git

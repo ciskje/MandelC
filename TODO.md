@@ -25,7 +25,7 @@ Every user request becomes an entry here. Status: `pending` → `completed`/`can
 - [x] v2.15.2: Benchmark zone cx=-0.7499302568795561 cy=-0.015139113925433963 half=5.226737155905588e-05 mi=10915 — completed
 - [x] Benchmark zone (info) — completed (no code change)
 - [x] v2.15.1: Auto iteration formula 2000*(1+log10(1.5/half)) clamp 50-50000 + benchmark value — completed
-- [x] v2.5.23: SPECIFICHE.md review on actual specs, cleanup extra notes from .md — `completed`
+- [x] v2.5.23: SPECS.md review on actual specs, cleanup extra notes from .md — `completed`
 - [x] Publish v2.5.22 + commit — `completed`
 - [x] v2.13.2: Exe and window icon (Mandelbrot render in .ico) — `completed`
 - [x] v2.14.1: 2-3 base color palette (Forest brown→green) — `completed`
@@ -122,4 +122,4 @@ Every user request becomes an entry here. Status: `pending` → `completed`/`can
 - [x] Create launch script (`avvia.bat` + `avvia.ps1`) — `completed`
 - [x] Resolve .NET Desktop Runtime installation request (self-contained publish in `pubblicato/`) — `completed`
 - [x] Clarify if AGENTS.md is read on empty session — `completed`
-- [x] Project setup: git + X.Y.Z version in source + AGENTS.md + TODO.md + SPECIFICHE.md — `completed`
+- [x] Project setup: git + X.Y.Z version in source + AGENTS.md + TODO.md + SPECS.md — `completed`
