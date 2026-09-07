@@ -1,517 +1,517 @@
 ﻿# CHANGELOG — MandelC#
 
-Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
-`AGENTS.md`. La versione è mostrata nel titolo della finestra.
-- **v2.17.3** — Toolbar: sostituito `TableLayoutPanel` con due `FlowLayoutPanel` (una per riga); i controlli scorrono a sinistra senza spaziatura da colonne condivise. File: `MandelbrotForm.Designer.cs`, `AppVersion.cs`, `.csproj`.
+Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
+`AGENTS.md`. The version is shown in the window title.
+- **v2.17.3** — Toolbar: replaced `TableLayoutPanel` with two `FlowLayoutPanel` (one per row); controls scroll to the left without spacing from shared columns. Files: `MandelbrotForm.Designer.cs`, `AppVersion.cs`, `.csproj`.
 
-- **v2.17.2** — Icona applicativa sostituita con `icon2.png`, convertita in `.ico` multirisoluzione 16/32/48/256. File: `app.ico`, `AppVersion.cs`, `.csproj`.
+- **v2.17.2** — App icon replaced with `icon2.png`, converted to a multiresolution `.ico` 16/32/48/256. Files: `app.ico`, `AppVersion.cs`, `.csproj`.
 
-- **v2.17.1** — Fix resize finestra: DirectX non ridisegnava dopo il resize (mancava il handler `dxPanel.Resize` che imposta `_dxDirty`); CPU/CUDA attendevano il debounce 300 ms (ora `RenderAsync(preview)` immediato a ogni evento, come DX); `pictureBox.SizeMode` da `Normal` a `Zoom` (l'immagine scala mantenendo l'aspect ratio durante la transizione). File: `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.17.1** — Window resize fix: DirectX did not redraw after resize (missing `dxPanel.Resize` handler that sets `_dxDirty`); CPU/CUDA waited for the 300 ms debounce (now `RenderAsync(preview)` immediately on each event, as DX); `pictureBox.SizeMode` from `Normal` to `Zoom` (the image scales keeping the aspect ratio during the transition). Files: `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.17.0** — Colore palette allineato al riferimento Python: curva gamma `t = (nu/maxIter)^0.35` al posto della mappatura lineare (smooth iteration gia presente). File: `Palette.cs`, `GpuMandelbrot.cs`, `DxMandelbrot.cs`.
+- **v2.17.0** — Palette color aligned to the Python reference: gamma curve `t = (nu/maxIter)^0.35` instead of the linear mapping (smooth iteration already present). Files: `Palette.cs`, `GpuMandelbrot.cs`, `DxMandelbrot.cs`.
 
-- **v2.16.0** — Menu Genera principale (ex submenu Esporta di File: screenshot, video zoom) e zoom Real Time (animazione sulla vista principale dalla zona corrente all'insieme, 120 frame a 30 fps, Esc per fermare). File: `MandelbrotForm.Designer.cs`, `ZoomVideoForm.cs`, `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.16.0** — Main Generate menu (former File Export submenu: screenshot, zoom video) and Real Time zoom (animation on the main view from the current zone to the set, 120 frames at 30 fps, Esc to stop). Files: `MandelbrotForm.Designer.cs`, `ZoomVideoForm.cs`, `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.10** — Fix throughput DX a AA1x: poll event-query di nuovo stretto (lo Sleep/quanto deprimeva i frame da ~1 ms: 5070 Ti 67,4→292,4); controlli anti-blocco ogni 1024 poll. Storici DX aggiornati. File: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.15.10** — DX throughput fix at AA1x: event-query poll tight again (the Sleep was depressing frames from ~1 ms: 5070 Ti 67.4→292.4); anti-hang checks every 1024 polls. DX history updated. Files: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.9** — Benchmark standard a AA1x (griglia 960x540): la metrica resta MPixel/s e la Radeon rientra (niente piu TDR ne skip iGPU); storici ricalcolati via CLI: CUDA 5070 Ti 276,3/6,7 e 4070 SUPER 220,7/5,3, DirectX 5070 Ti 65,9, 4070 SUPER 56,8 e Radeon 4,8, CPU 9900X 4,8 (9 barre). File: `BenchmarkStandard.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.15.9** — Standard benchmark at AA1x (960x540 grid): the metric stays MPixel/s and the Radeon comes back (no more TDR or iGPU skip); history recalculated via CLI: CUDA 5070 Ti 276.3/6.7 and 4070 SUPER 220.7/5.3, DirectX 5070 Ti 65.9, 4070 SUPER 56.8 and Radeon 4.8, CPU 9900X 4.8 (9 bars). Files: `BenchmarkStandard.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.8** — Benchmark DX: skip preventivo schede con <1 GB dedicati (niente piu TDR/popup AMD), `QuerySignaled` sicura su device removed (niente piu HRESULT grezzo nel log), log evento unico via GUI; storici: DirectX 5070 Ti 436,3 + 4070 SUPER 355,2 (8 barre). File: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.15.8** — DX benchmark: preventive skip of cards with <1 GB dedicated (no more TDR/AMD popup), `QuerySignaled` safe on device removed (no more raw HRESULT in the log), single event log via GUI; history: DirectX 5070 Ti 436.3 + 4070 SUPER 355.2 (8 bars). Files: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.7** — Log/diagnostica (menu Aiuto): nuova sezione Log eventi con errori dei benchmark (AppLog in memoria, ultime 200 righe); gli errori DX (device removed, timeout, VRAM) e della GUI ora restano nel log. File: `AppLog.cs`, `MandelbrotForm.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.15.7** — Log/diagnostics (Help menu): new Events log section with benchmark errors (in-memory AppLog, last 200 lines); DX errors (device removed, timeout, VRAM) and GUI errors now stay in the log. Files: `AppLog.cs`, `MandelbrotForm.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.6** — Benchmark DX anti-blocco: check VRAM prima della griglia AA8x, timeout 60 s per frame e rilevazione device-removed in `DrainOne` (la Radeon iGPU andava in TDR e restava appesa senza errori); errori visibili in GUI e `run fallito` in CLI. File: `DxMandelbrot.cs`, `Diagnostics.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.15.6** — DX benchmark anti-hang: VRAM check before the AA8x grid, 60 s timeout per frame and device-removed detection in `DrainOne` (the Radeon iGPU went into TDR and hung with no errors); errors visible in GUI and `run failed` in CLI. Files: `DxMandelbrot.cs`, `Diagnostics.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.15.5** — Storici benchmark ricalcolati via CLI sulla nuova zona (best di 3): CUDA 5070 Ti 490,7/9,0 e 4070 SUPER 384,1/7,0 (32/64-bit), DirectX 5070 Ti 483,0, CPU 9900X 6,1; rimosse le barre DirectX 4070 SUPER (scheda assente in DXGI) e AMD Radeon (bench si blocca). Grafico a 7 barre. File: BenchmarkForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+- **v2.15.5** — Benchmark history recalculated via CLI on the new zone (best of 3): CUDA 5070 Ti 490.7/9.0 and 4070 SUPER 384.1/7.0 (32/64-bit), DirectX 5070 Ti 483.0, CPU 9900X 6.1; removed the DirectX 4070 SUPER bars (card absent in DXGI) and AMD Radeon (bench hangs). Chart with 7 bars. Files: BenchmarkForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
 
-- **v2.15.4** — Benchmark: pulsante export rinominato CSV… → Esporta CSV e Chiudi sempre a destra (ordine dock: Avvia, Esporta CSV, Chiudi). File: BenchmarkForm.Designer.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+- **v2.15.4** — Benchmark: export button renamed CSV… → Export CSV and Close always on the right (dock order: Start, Export CSV, Close). Files: BenchmarkForm.Designer.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
 
-- **v2.15.3** — Benchmark: iterazioni non piu fisse ma calcolate con la formula auto alla scala del test (BenchmarkStandard.MaxIter => Mandelbrot.AutoIterForScale(Scale) = 10915). File: BenchmarkStandard.cs, BenchmarkForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+- **v2.15.3** — Benchmark: iterations no longer fixed but computed with the auto formula at the test scale (BenchmarkStandard.MaxIter => Mandelbrot.AutoIterForScale(Scale) = 10915). Files: BenchmarkStandard.cs, BenchmarkForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
 
-- **v2.15.2** — Zona benchmark: centro (-0.7499302568795561, -0.015139113925433963), scala 1.0453474311811176e-04 (half 5.226737155905588e-05), 10915 iter (= auto della zona); w×h 960×540 e budget 8 s invariati. Storici invariati (riferiti alla vecchia zona). File: BenchmarkStandard.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+- **v2.15.2** — Benchmark zone: center (-0.7499302568795561, -0.015139113925433963), scale 1.0453474311811176e-04 (half 5.226737155905588e-05), 10915 iterations (= zone auto); w×h 960×540 and 8 s budget unchanged. History unchanged (referenced to the old zone). Files: BenchmarkStandard.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
 
-- **v2.15.1** — Iter auto 2000*(1+log10(1.5/half)) (half = scala/2, clamp 50-50000) centralizzata in Mandelbrot.AutoIterForScale, usata da vista e video zoom (alla scala benchmark 5e-4 vale 9556, ma il benchmark resta a 5000 iter fisse). File: Mandelbrot.cs, MandelbrotForm.cs, ZoomVideoForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+- **v2.15.1** — Auto iterations 2000*(1+log10(1.5/half)) (half = scale/2, clamp 50-50000) centralized in Mandelbrot.AutoIterForScale, used by view and zoom video (at benchmark scale 5e-4 it is 9556, but the benchmark stays at 5000 fixed iterations). Files: Mandelbrot.cs, MandelbrotForm.cs, ZoomVideoForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
 
-- **v2.15.0** — Submenu File → Esporta con Screenshot (Ctrl+Shift+E: dialog che
-  parte da Vista corrente con preset e AA liberi) e Video zoom (Ctrl+Shift+V)
-  con selettore AA proprio (Come vista/1x/2x/4x/8x: il video può usare un AA
-  diverso dalla vista); tolte le voci singole. File: `MandelbrotForm.cs`,
+- **v2.15.0** — File → Export submenu with Screenshot (Ctrl+Shift+E: dialog
+  starting from current view with free preset and AA) and Zoom video (Ctrl+Shift+V)
+  with its own AA selector (As view/1x/2x/4x/8x: the video can use a different AA
+  than the view); removed the individual items. Files: `MandelbrotForm.cs`,
   `MandelbrotForm.Designer.cs`, `ExportForm.cs`, `ZoomVideoForm.cs`,
   `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`,
   `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.14.1** — Palette a 2-3 colori base: Foresta ridisegnata (marrone e verde
-  agli estremi, interno sempre nero) e Viola con opposti vivaci magenta↔ciano;
-  le altre erano già a 2-3 tinte. Vale su tutti i motori (stop generici). File:
+- **v2.14.1** — 2-3 base color palettes: Forest redrawn (brown and green
+  at the extremes, interior always black) and Purple with vivid magenta↔cyan opposites;
+  the others were already 2-3 shades. Applies to all engines (generic stops). Files:
   `Palette.cs`, `TODO.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.14.0** — Export PNG con preset (Vista corrente, Full HD, 2K, 4K, 8K,
-  Doppio 4K 7680×2160, Personalizzata), AA selezionabile (Come vista/1x/2x/4x/8x) e
-  dimensioni custom validate (interi 320…16384, caselle attive solo su
-  Personalizzata); tetto campioni e dialog invariati. Fix encode video: la
-  vista ha spesso lati dispari e libx264/yuv420p li rifiuta ("Could not open
-  encoder" + "no packets", exit 0xDFABA7BB, riprodotto) — pad a dimensioni pari,
-  pre-flight sui PNG e più righe stderr negli errori. File: `ExportForm.cs`,
+- **v2.14.0** — PNG export with presets (Current view, Full HD, 2K, 4K, 8K,
+  Double 4K 7680×2160, Custom), selectable AA (As view/1x/2x/4x/8x) and
+  validated custom dimensions (integers 320…16384, fields active only on
+  Custom); sample cap and dialog unchanged. Video encode fix: the
+  view often has odd sides and libx264/yuv420p rejects them ("Could not open
+  encoder" + "no packets", exit 0xDFABA7BB, reproduced) — pad to even dimensions,
+  pre-flight on PNGs and more stderr lines in errors. Files: `ExportForm.cs`,
   `ExportForm.Designer.cs`, `ZoomVideoForm.cs`, `TODO.md`, `SPECIFICHE.md`,
   `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.13.2** — Icona dell'exe e delle finestre: render 256 px dell'insieme in
-  palette Fuoco, `.ico` multirisoluzione (16/32/48/256) via `ApplicationIcon` +
-  risorsa incorporata applicata a tutte le form (`Program.ApplyIcon`). File:
-  `app.ico` (nuovo), `MandelbrotViewer.csproj`, `Program.cs`,
+- **v2.13.2** — Exe and windows icon: 256 px render of the set in
+  Fire palette, multiresolution `.ico` (16/32/48/256) via `ApplicationIcon` +
+  embedded resource applied to all forms (`Program.ApplyIcon`). Files:
+  `app.ico` (new), `MandelbrotViewer.csproj`, `Program.cs`,
   `MandelbrotForm.cs`, `BenchmarkForm.cs`, `ExportForm.cs`, `ZoomVideoForm.cs`,
   `LogForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`.
 
-- **v2.13.1** — Fix hang a fine export video: la codifica ffmpeg girava sul
-  thread UI e lo stderr veniva letto dopo il `WaitForExit` — con 60+ frame il
-  pipe si riempie, ffmpeg si blocca in scrittura e l'app non torna più (file
-  presente ma UI morta; riprodotto con watchdog). Ora encode su worker, stderr
-  drenato in asincrono durante l'attesa (`BeginErrorReadLine`) e processo ucciso
-  su annullamento; direzione invertita (dalla vista corrente all'insieme, con
-  errore se si è già all'insieme invece di partire da 100x dentro); centro
-  proporzionale allo zoom e non a t (prima il punto di partenza usciva subito
-  dall'inquadratura: fino a 46x la semi-vista, ora max 0,17); transizione
-  ease-out cubica (veloce all'inizio, lento alla fine); il video usa l'AA
-  selezionato (auto-ridotto oltre 128 MPixel di campioni, come l'export);
-  tasto Apri per il risultato (MP4 col player, cartella PNG in Explorer).
-  File: `ZoomVideoForm.cs`, `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`,
+- **v2.13.1** — Fix hang at the end of video export: the ffmpeg encoding ran on the
+  UI thread and stderr was read after `WaitForExit` — with 60+ frames the
+  pipe fills up, ffmpeg blocks on write and the app never returns (file
+  present but UI dead; reproduced with a watchdog). Now encoding on worker, stderr
+  drained asynchronously during the wait (`BeginErrorReadLine`) and process killed
+  on cancel; inverted direction (from current view to the set, with
+  error if already at the set instead of starting from 100x inside); center
+  proportional to the zoom and not to t (before the starting point left the
+  frame immediately: up to 46x the half-view, now max 0.17); transition
+  cubic ease-out (fast at the start, slow at the end); the video uses the selected AA
+  (auto-reduced beyond 128 MPixel of samples, like the export);
+  Open button for the result (MP4 with the player, PNG folder in Explorer).
+  Files: `ZoomVideoForm.cs`, `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`,
   `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.13.0** — Video zoom MP4 (File → Ctrl+Shift+V): interpola dalla vista
-  corrente all'insieme completo (scala logaritmica, centro lineare, iterazioni auto per
-  frame come `AutoIter`), rende 60…480 frame a risoluzione vista e AA1x col
-  motore attivo (Julia inclusa), codifica con ffmpeg (H.264, CRF 18) o — se
-  assente — lascia la sequenza PNG; progress determinata + annullamento. Nuovi
-  `ZoomVideoForm.cs`/`.Designer.cs`. File: `ZoomVideoForm.cs`,
-  `ZoomVideoForm.Designer.cs` (nuovi), `MandelbrotForm.cs`,
+- **v2.13.0** — Zoom video MP4 (File → Ctrl+Shift+V): interpolates from the current view
+  to the complete set (logarithmic scale, linear center, auto iterations per
+  frame like `AutoIter`), renders 60…480 frames at view resolution and AA1x with
+  the active engine (Julia included), encodes with ffmpeg (H.264, CRF 18) or — if
+  absent — leaves the PNG sequence; deterministic progress + cancel. New
+  `ZoomVideoForm.cs`/`.Designer.cs`. Files: `ZoomVideoForm.cs`,
+  `ZoomVideoForm.Designer.cs` (new), `MandelbrotForm.cs`,
   `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
   `AppVersion.cs`, `.csproj`.
 
-- **v2.12.0** — Modalità Julia (menu Vista, Ctrl+J): `z = z² + c` con c fissata
-  (default −0,7 + 0,27015i, persistita in settings), click sinistro = fissa c
-  sul punto, zoom/pan/AA/palette invariati, R resetta anche c; kernel CPU, CUDA
-  float/double e shader HLSL con branch uniforme (stessa colorazione); zone
-  (cronologia, preferiti, file) includono modo e c con default per i file
-  vecchi; benchmark sempre Mandelbrot; export HR segue il modo. File:
+- **v2.12.0** — Julia mode (View menu, Ctrl+J): `z = z² + c` with c fixed
+  (default −0.7 + 0.27015i, persisted in settings), left click = fix c
+  on the point, zoom/pan/AA/palette unchanged, R also resets c; CPU, CUDA
+  float/double kernels and HLSL shader with uniform branch (same coloring); zones
+  (history, favorites, files) include mode and c with defaults for
+  old files; benchmark always Mandelbrot; HR export follows the mode. Files:
   `Mandelbrot.cs`, `GpuMandelbrot.cs`, `DxMandelbrot.cs`, `MandelbrotForm.cs`,
   `ExportForm.cs`, `Settings.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
   `AppVersion.cs`, `.csproj`.
 
-- **v2.11.0** — Export PNG ad alta risoluzione (File → Ctrl+Shift+E): dialog con
-  larghezza 320…16384 px (preset 1280…7680, altezza dall'aspect della vista),
-  render offscreen col motore attivo (CPU/CUDA/DirectX via preview offscreen),
-  AA ridotto in automatico oltre 128 MPixel di campioni, marquee +
-  annullamento, salvataggio PNG. Nuovi `ExportForm.cs`/`.Designer.cs`. File:
-  `ExportForm.cs`, `ExportForm.Designer.cs` (nuovi), `MandelbrotForm.cs`,
+- **v2.11.0** — High-resolution PNG export (File → Ctrl+Shift+E): dialog with
+  width 320…16384 px (presets 1280…7680, height from the view aspect),
+  offscreen render with the active engine (CPU/CUDA/DirectX via offscreen preview),
+  AA auto-reduced beyond 128 MPixel of samples, marquee +
+  cancel, PNG save. New `ExportForm.cs`/`.Designer.cs`. Files:
+  `ExportForm.cs`, `ExportForm.Designer.cs` (new), `MandelbrotForm.cs`,
   `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
   `AppVersion.cs`, `.csproj`.
 
-- **v2.10.0** — Cronologia viste + zone preferite: nuovo menu Vista con
-  Indietro/Avanti (Alt+Left/Right, stack in memoria cap 200, ogni zoom/pan/
-  reset/caricamento è committed), "Salva zona preferita…" (Ctrl+D, JSON in
-  `%APPDATA%\MandelbrotViewer\zone\`), sottomenu di salto ed eliminazione
-  (ricostruiti all'apertura, con validazione come Carica zona). `LoadZone`
-  rifattorizzato su `TryParseZone`/`ApplyZone` condivisi. File:
+- **v2.10.0** — View history + favorite zones: new View menu with
+  Back/Forward (Alt+Left/Right, in-memory stack cap 200, every zoom/pan/
+  reset/load is committed), "Save favorite zone…" (Ctrl+D, JSON in
+  `%APPDATA%\MandelbrotViewer\zone\`), jump and delete submenus
+  (rebuilt on opening, with validation like Load zone). `LoadZone`
+  refactored on shared `TryParseZone`/`ApplyZone`. Files:
   `MandelbrotForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
   `AppVersion.cs`, `.csproj`.
 
-- **v2.9.0** — Export CSV dei benchmark (una riga per run: timestamp, motore,
-  device, precisione, run, frame, secondi, MPixel/s): pulsante "CSV…" nella
-  finestra benchmark (accoda la misura) e `--csv file` nei comandi
-  `--bench-dx/--bench-cuda/--bench-cpu`. Nuovo `BenchmarkCsv.cs`. File:
-  `BenchmarkCsv.cs` (nuovo), `BenchmarkForm.cs`, `BenchmarkForm.Designer.cs`,
+- **v2.9.0** — CSV export of the benchmarks (one row per run: timestamp, engine,
+  device, precision, run, frames, seconds, MPixel/s): "CSV…" button in
+  the benchmark window (queues the measurement) and `--csv file` in the
+  `--bench-dx/--bench-cuda/--bench-cpu` commands. New `BenchmarkCsv.cs`. Files:
+  `BenchmarkCsv.cs` (new), `BenchmarkForm.cs`, `BenchmarkForm.Designer.cs`,
   `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
   `AppVersion.cs`, `.csproj`.
 
-- **v2.8.0** — Benchmark CPU da CLI (`--bench-cpu`: 3 run da 8 s in double) e
-  storico con nome modello (`Diagnostics.CpuName` da registro, es. "CPU 9900X"):
-  misurato 27,8 MPixel/s su AMD Ryzen 9 9900X (sostituisce il vecchio "CPU"
-  30,0). File: `Diagnostics.cs`, `Program.cs`, `BenchmarkForm.cs`, `TODO.md`,
+- **v2.8.0** — CPU benchmark from CLI (`--bench-cpu`: 3 runs of 8 s in double) and
+  history with model name (`Diagnostics.CpuName` from registry, e.g. "CPU 9900X"):
+  measured 27.8 MPixel/s on AMD Ryzen 9 9900X (replaces the old "CPU"
+  30.0). Files: `Diagnostics.cs`, `Program.cs`, `BenchmarkForm.cs`, `TODO.md`,
   `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.7.0** — Quattro palette fisse (Oceano, Viola, Deserto, Foresta, 5 stop
-  ciascuna come le esistenti): valgono subito su CPU, CUDA e DirectX perché gli
-  stop sono generici; enum esteso solo in coda così gli indici persistiti restano
-  validi. File: `Palette.cs`, `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`,
+- **v2.7.0** — Four fixed palettes (Ocean, Purple, Desert, Forest, 5 stops
+  each like the existing ones): immediately valid on CPU, CUDA and DirectX because the
+  stops are generic; enum extended only at the end so the persisted indices remain
+  valid. Files: `Palette.cs`, `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`,
   `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.6.0** — Pan da tastiera con le frecce direzionali: 1/10 della vista per
-  passo (Shift = passo fine 1/100); ignorato quando il focus è sul numero
-  iterazioni (che usa già su/giù). Guida comandi aggiornata. File:
+- **v2.6.0** — Keyboard pan with the arrow keys: 1/10 of the view per
+  step (Shift = fine step 1/100); ignored when the focus is on the iterations
+  count (which already uses up/down). Commands guide updated. Files:
   `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`, `TODO.md`,
   `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.5.23** — Revisione documentazione: `SPECIFICHE.md` riscritto sulle
-  specifiche reali e attuali (via la cronistoria versioni duplicata, il
-  confronto hardware e le note obsolete su Present/finestra bench; descrizione
-  motori, benchmark, CLI, file e note tecniche verificate contro il codice) e
-  intestazioni versione ripristinate in `CHANGELOG.md` dove mancavano.
-  Nessun cambio di codice. File: `SPECIFICHE.md`, `CHANGELOG.md`, `TODO.md`,
+- **v2.5.23** — Documentation review: `SPECIFICHE.md` rewritten on the
+  actual and current specs (removed the duplicated version history, the
+  hardware comparison and the obsolete notes on Present/bench window; description
+  of engines, benchmark, CLI, files and technical notes verified against the code) and
+  version headings restored in `CHANGELOG.md` where missing.
+  No code change. Files: `SPECIFICHE.md`, `CHANGELOG.md`, `TODO.md`,
   `AppVersion.cs`, `.csproj`.
 
-- **v2.5.22** — Cursore AppStarting (freccia+clessidra) invece di Wait durante i
-  render: il calcolo è async e l'UI resta interattiva, quindi è il cursore
-  corretto; assegnato in ricorsione a form e discendenti (copre pictureBox,
-  menu, stato; `UseWaitCursor` rimosso perché forza la clessidra piena). Resta
-  Wait solo per l'init CUDA sincrona a UI congelata. File: `MandelbrotForm.cs`,
+- **v2.5.22** — AppStarting cursor (arrow+clock) instead of Wait during
+  renders: the computation is async and the UI stays interactive, so it is the
+  correct cursor; assigned recursively to forms and descendants (covers pictureBox,
+  menu, status; `UseWaitCursor` removed because it forces the full hourglass). Wait
+  remains only for the synchronous CUDA init with frozen UI. Files: `MandelbrotForm.cs`,
   `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.5.21** — Fix cursore wait: durante i render lunghi (es. zona difficile AA8x
-  passando CUDA da 32 a 64 bit) il cursore restava freccia se il mouse era
-  sull'immagine, perché `pictureBox` non era nella lista di `SetBusyCursor`.
-  Ora la form usa anche `UseWaitCursor`, che copre tutti i controlli e le
-  superfici (immagine, menu, stato). File: `MandelbrotForm.cs`, `TODO.md`,
+- **v2.5.21** — Wait cursor fix: during long renders (e.g. hard zone AA8x
+  switching CUDA from 32 to 64 bit) the cursor stayed an arrow if the mouse was
+  on the image, because `pictureBox` was not in the `SetBusyCursor` list.
+  Now the form also uses `UseWaitCursor`, which covers all controls and
+  surfaces (image, menu, status). Files: `MandelbrotForm.cs`, `TODO.md`,
   `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.5.20** — Benchmark DirectX offscreen senza Present: risolve la misura
-  falsata sulle schede senza monitor (la 4070 SUPER, headless su slot PCIe x4,
-  pagava la copia di 132 MB/frame verso la 5070 Ti del display: 1655 → 4441
-  MPixel/s, ~2,7×). Il test rende su render target in memoria (headless, senza
-  finestra né DWM) e conta i frame davvero completati con un anello di event
-  query (`QueryType.Event`, `GetData` con pData NULL: S_OK = pronta). Dettaglio
-  Vortice: l'overload `GetData(async, flags)` restituisce sempre un DataStream
-  non-null, per lo status serve l'overload raw (S_OK vs S_FALSE). Creazione
-  device/shader estratta in `EnsureDevice`, riusata da `TryInitialize` (GUI) e
-  `TryInitializeHeadless` (CLI). GUI e CLI usano lo stesso percorso; storici DX
-  sostituiti con le misure offscreen (best di 3): 5070 Ti 5780,7 (+1%),
-  4070 SUPER 4441,6, AMD Radeon 102,2. File: `DxMandelbrot.cs`, `Diagnostics.cs`,
+- **v2.5.20** — DirectX offscreen benchmark without Present: solves the
+  skewed measurement on cards without monitor (the 4070 SUPER, headless in a PCIe x4 slot,
+  was paying the 132 MB/frame copy toward the 5070 Ti of the display: 1655 → 4441
+  MPixel/s, ~2.7×). The test renders on an in-memory render target (headless, without
+  window nor DWM) and counts the frames actually completed with a ring of event
+  queries (`QueryType.Event`, `GetData` with pData NULL: S_OK = ready). Vortice detail:
+  the `GetData(async, flags)` overload always returns a non-null DataStream,
+  for the status the raw overload is needed (S_OK vs S_FALSE). Device/shader
+  creation extracted to `EnsureDevice`, reused by `TryInitialize` (GUI) and
+  `TryInitializeHeadless` (CLI). GUI and CLI use the same path; DX history
+  replaced with the offscreen measurements (best of 3): 5070 Ti 5780.7 (+1%),
+  4070 SUPER 4441.6, AMD Radeon 102.2. Files: `DxMandelbrot.cs`, `Diagnostics.cs`,
   `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.5.19** — Triplo test CUDA per device e storici aggiornati: nuovo comando
-  `--bench-cuda [nome device]` che esegue 3 run da 8 s del test standardizzato
-  su ogni device CUDA in float 32-bit e double 64-bit e stampa i valori in
-  MPixel/s con il migliore (analogo di `--bench-dx`). Misurato ora (best di 3):
-  RTX 5070 Ti 5653,6 (32-bit) / 140,7 (64-bit), RTX 4070 SUPER 4667,8 (32-bit) /
-  110,3 (64-bit) — il vecchio riferimento unico "CUDA 5070 Ti 5940" è sostituito
-  da queste quattro barre. Grafico allargato (9 barre: margine sinistro e altezza
-  pannello aumentati). File: `Diagnostics.cs`, `Program.cs`, `BenchmarkForm.cs`,
+- **v2.5.19** — Triple CUDA test per device and updated history: new command
+  `--bench-cuda [device name]` that runs 3 runs of 8 s of the standardized test
+  on each CUDA device in float 32-bit and double 64-bit and prints the values in
+  MPixel/s with the best (analog of `--bench-dx`). Measured now (best of 3):
+  RTX 5070 Ti 5653.6 (32-bit) / 140.7 (64-bit), RTX 4070 SUPER 4667.8 (32-bit) /
+  110.3 (64-bit) — the old single reference "CUDA 5070 Ti 5940" is replaced
+  by these four bars. Chart widened (9 bars: left margin and panel
+  height increased). Files: `Diagnostics.cs`, `Program.cs`, `BenchmarkForm.cs`,
   `BenchmarkForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`,
   `.csproj`.
 
-- **v2.5.18** — Triplo test DirectX per scheda e storico aggiornato: nuovo comando
-  `--bench-dx [nome scheda]` che esegue 3 run da 8 s del test standardizzato su
-  ogni scheda DXGI disponibile e stampa i valori in MPixel/s con il migliore
-  (finestra visibile minima: con Present(0) su finestra nascosta il compositor
-  potrebbe saltare il lavoro GPU). Parametri del test spostati nella classe
-  condivisa `BenchmarkStandard` (usata da GUI e CLI); loop di misura estratto in
-  `DxMandelbrot.RunBenchmarkFrames` (riusato dal benchmark GUI, ora anche su
-  worker thread); `DxMandelbrot.ShortAdapterName` per i nomi compressi. Nel
-  grafico del benchmark la barra obsoleta "DirectX 5070 Ti 1750" (test vecchio
-  con v-sync, non confrontabile) è sostituita dai riferimenti per scheda
-  misurati ora (best di 3 run, vedi SPECIFICHE); asse calcolato dalle barre.
-  File: `BenchmarkStandard.cs` (nuovo), `DxMandelbrot.cs`, `BenchmarkForm.cs`,
+- **v2.5.18** — Triple DirectX test per card and updated history: new command
+  `--bench-dx [card name]` that runs 3 runs of 8 s of the standardized test on
+  each available DXGI card and prints the values in MPixel/s with the best
+  (minimum visible window: with Present(0) on a hidden window the compositor
+  may skip the GPU work). Test parameters moved to the shared class
+  `BenchmarkStandard` (used by GUI and CLI); measurement loop extracted to
+  `DxMandelbrot.RunBenchmarkFrames` (reused by the GUI benchmark, now also on
+  a worker thread); `DxMandelbrot.ShortAdapterName` for compressed names. In the
+  benchmark chart the obsolete bar "DirectX 5070 Ti 1750" (old test
+  with v-sync, not comparable) is replaced by the per-card references
+  measured now (best of 3 runs, see SPECIFICHE); axis calculated from the bars.
+  Files: `BenchmarkStandard.cs` (new), `DxMandelbrot.cs`, `BenchmarkForm.cs`,
   `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`,
   `.csproj`.
 
-- **v2.5.17** — Fix: `AdapterNames()` restituiva sempre un elenco vuoto su
-  macchine con GPU moderne (≥4 GB): `DedicatedVideoMemory` è un PointerUSize
-  (SIZE_T) e il confronto `> 0` passava per la conversione implicita a 32 bit
-  di SharpGen (`UIntPtr.ToUInt32`), che lancia OverflowException oltre i 4 GB —
-  la RTX 5070 Ti (16 GB, primo adapter) uccideva l'intera enumerazione, con
-  l'errore inghiottito dal catch (è l'"overflow del wrapper Vortice" della nota
-  v2.3.8). Ora i renderizzatori software si escludono per nome ("Microsoft
-  Basic*") e l'elenco riporta davvero le schede. `DiagDx` stampa l'enumerazione
-  dettagliata per adapter e l'eventuale errore di enumerazione; il log
-  diagnostico della GUI riporta `EnumerationError`. Verificato a runtime:
-  elenco completo (RTX 5070 Ti, AMD Radeon iGPU, RTX 4070 SUPER) e selezione
-  esplicita operativa su 4070 SUPER e iGPU (`IsReady: True`, `Render: OK`).
-  File: `DxMandelbrot.cs`, `Diagnostics.cs`, `MandelbrotForm.cs`, `TODO.md`,
+- **v2.5.17** — Fix: `AdapterNames()` always returned an empty list on
+  machines with modern GPUs (≥4 GB): `DedicatedVideoMemory` is a PointerUSize
+  (SIZE_T) and the `> 0` comparison went through the implicit 32-bit
+  conversion of SharpGen (`UIntPtr.ToUInt32`), which throws OverflowException beyond 4 GB —
+  the RTX 5070 Ti (16 GB, first adapter) was killing the entire enumeration, with
+  the error swallowed by the catch (it is the "Vortice wrapper overflow" of the
+  v2.3.8 note). Now software renderers are excluded by name ("Microsoft
+  Basic*") and the list actually reports the cards. `DiagDx` prints the
+  detailed enumeration per adapter and the eventual enumeration error; the
+  GUI diagnostic log reports `EnumerationError`. Verified at runtime:
+  full list (RTX 5070 Ti, AMD Radeon iGPU, RTX 4070 SUPER) and
+  explicit selection working on 4070 SUPER and iGPU (`IsReady: True`, `Render: OK`).
+  Files: `DxMandelbrot.cs`, `Diagnostics.cs`, `MandelbrotForm.cs`, `TODO.md`,
   `SPECIFICHE.md`, `AppVersion.cs`, `.csproj`.
 
-- **v2.5.16** — Fix: il dropdown GPU non applicava la scheda DirectX scelta:
-  `TryInitialize` creava sempre il device sull'adapter predefinito
-  (`D3D11CreateDevice(null, DriverType.Hardware)`). Ora la scheda richiesta viene
-  cercata per nome tra gli adapter DXGI dello stesso factory della swapchain e
-  passata esplicitamente a `D3D11CreateDevice` con `DriverType.Unknown`
-  (obbligatorio quando si passa un adapter); nome inesistente → errore chiaro in
-  `LastError` ("Scheda video non trovata: …"). `--diag-dx` accetta il nome
-  scheda come argomento per il test senza UI. File: `DxMandelbrot.cs`,
+- **v2.5.16** — Fix: the GPU dropdown did not apply the chosen DirectX card:
+  `TryInitialize` always created the device on the default adapter
+  (`D3D11CreateDevice(null, DriverType.Hardware)`). Now the requested card is
+  looked up by name among the DXGI adapters of the same factory as the swapchain and
+  passed explicitly to `D3D11CreateDevice` with `DriverType.Unknown`
+  (mandatory when passing an adapter); nonexistent name → clear error in
+  `LastError` ("Video card not found: …"). `--diag-dx` accepts the
+  card name as argument for the test without UI. Files: `DxMandelbrot.cs`,
   `Diagnostics.cs`, `Program.cs`, `TODO.md`, `SPECIFICHE.md`, `AppVersion.cs`,
   `.csproj`.
 
-- **v2.5.15** — Refactor di riordino e pulizia (nessun cambiamento funzionale):
-  palette/gradienti estratti in `Palette.cs` (`PaletteColors`, fonte unica per
-  CPU/DirectX; CUDA li riceve via `GpuPaletteParams`) con commenti di
-  allineamento tra le tre implementazioni della colorazione (CPU/CUDA/HLSL);
-  `BenchmarkProgress` in file proprio; diagnostica CLI `--diag-dx`/`--diag-gpu`
-  spostata da `Program.cs` a `Diagnostics.cs`; in `DxMandelbrot.cs` estratti
-  `BuildParams`/`DrawFrame` condivisi da Render/RenderBenchmark/
-  RenderPreviewToBitmap, indentazione uniformata e `System.Drawing.Bitmap` →
-  `Bitmap`; rimosso il campo `total` morto nel benchmark CUDA (il metro è a
-  frame, `TotalIters` = 0 come per DirectX); handler del menu "Salva immagine"
-  rinominato `SaveImageItem_Click`; rimossi wrapper `RenderGpu`, doppio dispose
-  del bitmap, usings ridondanti e commenti obsoleti. File: `Palette.cs`,
-  `BenchmarkProgress.cs`, `Diagnostics.cs` (nuovi), `Program.cs`,
+- **v2.5.15** — Reorganization and cleanup refactor (no functional change):
+  palettes/gradients extracted to `Palette.cs` (`PaletteColors`, single source for
+  CPU/DirectX; CUDA receives them via `GpuPaletteParams`) with alignment
+  comments between the three coloring implementations (CPU/CUDA/HLSL);
+  `BenchmarkProgress` in its own file; CLI diagnostics `--diag-dx`/`--diag-gpu`
+  moved from `Program.cs` to `Diagnostics.cs`; in `DxMandelbrot.cs` extracted
+  shared `BuildParams`/`DrawFrame` from Render/RenderBenchmark/
+  RenderPreviewToBitmap, indentation unified and `System.Drawing.Bitmap` →
+  `Bitmap`; removed the dead `total` field in the CUDA benchmark (the meter is
+  per-frame, `TotalIters` = 0 as in DirectX); "Save image" menu
+  handler renamed to `SaveImageItem_Click`; removed the `RenderGpu` wrapper, double dispose
+  of the bitmap, redundant usings and obsolete comments. Files: `Palette.cs`,
+  `BenchmarkProgress.cs`, `Diagnostics.cs` (new), `Program.cs`,
   `Mandelbrot.cs`, `GpuMandelbrot.cs`, `DxMandelbrot.cs`, `MandelbrotForm.cs`,
   `MandelbrotForm.Designer.cs`, `RenderEngine.cs`, `LogForm.cs`, `AppVersion.cs`,
   `.csproj`, `TODO.md`, `SPECIFICHE.md`.
 
 
-- **v2.5.14** — Nota documentale: confronto teorico RTX 4070 SUPER vs RTX 5070 Ti.
-  FP32 35,5 → 43,9 TFLOPS (+24%), FP64 0,55 → 0,69 TFLOPS (+24%), memoria
-  504 → 896 GB/s (+78%, irrilevante per il benchmark compute-bound), tensor
-  core 224 (4ª gen) → 280 (5ª gen) ma AI TOPS di marketing su formati diversi
-  (616 FP8 sparse vs 1406 FP4 sparse; a parità di formato ~+25%). Per il
-  benchmark di questa app (solo iterazioni FP32/FP64, nessun tensor core)
-  atteso ~+20-25%; raster gaming (TechPowerUp) ~+37%. File: `SPECIFICHE.md`,
+- **v2.5.14** — Documentation note: theoretical comparison RTX 4070 SUPER vs RTX 5070 Ti.
+  FP32 35.5 → 43.9 TFLOPS (+24%), FP64 0.55 → 0.69 TFLOPS (+24%), memory
+  504 → 896 GB/s (+78%, irrelevant for the compute-bound benchmark), tensor
+  cores 224 (4th gen) → 280 (5th gen) but marketing AI TOPS on different formats
+  (616 FP8 sparse vs 1406 FP4 sparse; at equal format ~+25%). For the
+  benchmark of this app (only FP32/FP64 iterations, no tensor cores)
+  expected ~+20-25%; raster gaming (TechPowerUp) ~+37%. Files: `SPECIFICHE.md`,
   `TODO.md`, `AppVersion.cs`, `.csproj`.
 
 
-- **v2.5.13** — Fix benchmark DirectX: la misura dava risultati irrealistici perché
-  `BeginBenchmark` impostava il flag `_benchmarking` **prima** di chiamare `Resize`,
-  che con il flag attivo ignora la richiesta: la swapchain restava a dimensione
-  pannello (~1 MPixel/frame) mentre il metro creditava 33,18 MPixel/frame
-  (risultati ~30-40× gonfiati). Ora il resize avviene prima del flag. La preview
-  DirectX era nera perché `ReadTextureToBitmap` chiamava `CopyResource` con gli
-  argomenti invertiti (copiava lo staging vuoto sopra la texture renderizzata);
-  corretto in `CopyResource(staging, source)` (fix che ripristina anche Salva PNG)
-  e la texture di preview ora usa `B8G8R8A8_UNorm`, stesso layout di byte di
-  `Format32bppArgb`, per canali non invertiti. File: `DxMandelbrot.cs`,
+- **v2.5.13** — DirectX benchmark fix: the measurement gave unrealistic results because
+  `BeginBenchmark` set the `_benchmarking` flag **before** calling `Resize`,
+  which with the flag active ignores the request: the swapchain stayed at panel size
+  (~1 MPixel/frame) while the meter credited 33.18 MPixel/frame
+  (results ~30-40× inflated). Now the resize happens before the flag. The
+  DirectX preview was black because `ReadTextureToBitmap` called `CopyResource` with
+  the arguments reversed (copying the empty staging over the rendered texture);
+  corrected to `CopyResource(staging, source)` (fix that also restores Save PNG)
+  and the preview texture now uses `B8G8R8A8_UNorm`, same byte layout as
+  `Format32bppArgb`, for non-inverted channels. Files: `DxMandelbrot.cs`,
   `AppVersion.cs`, `.csproj`.
 
 
-- **v2.5.12** — Preview colorata della zona di benchmark anche per DirectX: il
-  benchmark renderizza un frame offscreen con lo shader normale (palette Fuoco) e
-  lo mostra nel box del BenchmarkForm, come per CUDA/CPU. Durante il test la
-  finestra principale non mostra più il frame grigio dei campioni: il pannello DX
-  viene nascosto e ripristinato alla chiusura. Aggiunto `DxMandelbrot.
-  RenderPreviewToBitmap` + helper `ReadTextureToBitmap` (estratto da `Capture`).
-  File: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `MandelbrotForm.cs`,
+- **v2.5.12** — Colored preview of the benchmark zone also for DirectX: the
+  benchmark renders one offscreen frame with the normal shader (Fire palette) and
+  shows it in the BenchmarkForm box, as for CUDA/CPU. During the test the
+  main window no longer shows the gray sample frame: the DX panel
+  is hidden and restored on close. Added `DxMandelbrot.
+  RenderPreviewToBitmap` + helper `ReadTextureToBitmap` (extracted from `Capture`).
+  Files: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `MandelbrotForm.cs`,
   `AppVersion.cs`, `.csproj`.
 
-- **v2.5.11** — Il benchmark mostra il primo frame della zona testata anche per
-  CUDA e CPU: anteprima 960x540 (AA1x) renderizzata col motore attivo in un box
-  dedicato della finestra Benchmark, prima di avviare la misura. DirectX mostrava
-  già il primo frame nella swapchain. File: `BenchmarkForm.cs`,
+- **v2.5.11** — The benchmark shows the first frame of the tested zone also for
+  CUDA and CPU: 960x540 preview (AA1x) rendered with the active engine in a
+  dedicated box of the Benchmark window, before starting the measurement. DirectX already showed
+  the first frame in the swapchain. Files: `BenchmarkForm.cs`,
   `BenchmarkForm.Designer.cs`, `AppVersion.cs`, `.csproj`.
 
-- **v2.5.10** — Benchmark standardizzato tra i motori: zona 960x540 AA8x senza
-  media dei campioni (griglia di 7680x4320 campioni elementari, stesso lavoro per
-  CPU, CUDA e DirectX). Il benchmark DirectX usa uno shader solo-iterazioni e
-  presenta senza v-sync (`Present(0)`), eliminando il limite del refresh del
-  monitor che tappava la misura a ~60 fps. La swapchain viene ingrandita alla
-  griglia durante il test e ripristinata alla fine. File: `DxMandelbrot.cs`
+- **v2.5.10** — Benchmark standardized across engines: zone 960x540 AA8x without
+  sample averaging (grid of 7680x4320 elementary samples, same work for
+  CPU, CUDA and DirectX). The DirectX benchmark uses an iterations-only shader and
+  presents without v-sync (`Present(0)`), eliminating the monitor refresh limit
+  that capped the measurement at ~60 fps. The swapchain is enlarged to the
+  grid during the test and restored at the end. Files: `DxMandelbrot.cs`
   (`BenchPsSource`, `BeginBenchmark`/`EndBenchmark`/`RenderBenchmark`),
   `BenchmarkForm.cs`, `AppVersion.cs`, `.csproj`.
 
-- **v2.5.9** — Aggiornati i riferimenti storici del grafico: CUDA RTX 5070 Ti
+- **v2.5.9** — Updated the historical references of the chart: CUDA RTX 5070 Ti
   5940 MPixel/s, DirectX RTX 5070 Ti 1750 MPixel/s, CPU 30 MPixel/s.
 
-- **v2.5.8** — Il benchmark mostra subito `0%` e aggiorna percentuale e
-  MPixel/s ogni secondo.
+- **v2.5.8** — The benchmark immediately shows `0%` and updates percentage and
+  MPixel/s every second.
 
-- **v2.5.7** — Il benchmark DirectX gira su un worker separato; la UI resta
-  responsiva e mostra gli aggiornamenti intermedi `percentuale | MPixel/s`.
+- **v2.5.7** — The DirectX benchmark runs on a separate worker; the UI stays
+  responsive and shows the intermediate `percentage | MPixel/s` updates.
 
-- **v2.5.6** — Resi visibili gli aggiornamenti intermedi della percentuale del
-  benchmark su CPU, CUDA e DirectX, incluso il repaint della label.
+- **v2.5.6** — Made visible the intermediate percentage updates of the
+  benchmark on CPU, CUDA and DirectX, including the label repaint.
 
-- **v2.5.5** — Rimossa la barra di avanzamento dal benchmark; resta visibile
-  solo la percentuale testuale.
+- **v2.5.5** — Removed the progress bar from the benchmark; only the textual
+  percentage remains visible.
 
-- **v2.5.4** — Durante il benchmark viene mostrata solo la percentuale; aggiunto
-  tempo per il primo ridisegno e corretto lo spazio delle etichette dell’asse.
+- **v2.5.4** — During the benchmark only the percentage is shown; added
+  time for the first redraw and corrected the axis label spacing.
 
-- **v2.5.3** — Ridimensionato il risultato principale del benchmark e convertito
-  il grafico in barre orizzontali per evitare testo tagliato.
+- **v2.5.3** — Resized the main benchmark result and converted
+  the chart to horizontal bars to avoid truncated text.
 
-- **v2.5.2** — Aggiunto `avvia.bat` per provare la versione corrente con
-  `dotnet run`, senza usare il publish self-contained.
+- **v2.5.2** — Added `avvia.bat` to try the current version with
+  `dotnet run`, without using the self-contained publish.
 
-- **v2.5.1** — Corretto il riferimento della RTX 5070 Ti CUDA nel grafico a
+- **v2.5.1** — Corrected the RTX 5070 Ti CUDA reference in the chart to
   5880 MPixel/s.
 
-- **v2.5.0** — Il benchmark parte automaticamente all’apertura e mostra un
-  grafico a barre con il risultato misurato e i riferimenti 5070 Ti CUDA (5880
-  MPixel/s) e AMD 9900X (80 MPixel/s).
+- **v2.5.0** — The benchmark starts automatically on opening and shows a
+  bar chart with the measured result and the references 5070 Ti CUDA (5880
+  MPixel/s) and AMD 9900X (80 MPixel/s).
 
-- **v2.4.1** — Corretto il colorizer CUDA: il valore della palette viene
-  limitato a `[0,1]`, evitando variazioni magenta ad alte iterazioni.
+- **v2.4.1** — Corrected the CUDA colorizer: the palette value is
+  clamped to `[0,1]`, avoiding magenta variations at high iterations.
 
-- **v2.4.0** — Ripristinato lo smooth coloring su CPU, CUDA float/double e
-  DirectX usando il modulo finale di `z`; CUDA abilita `ILGPU.Algorithms` per
-  compilare `XMath.Log2` nei kernel.
+- **v2.4.0** — Restored smooth coloring on CPU, CUDA float/double and
+  DirectX using the final module of `z`; CUDA enables `ILGPU.Algorithms` to
+  compile `XMath.Log2` in the kernels.
 
-- **v2.3.15** — Rimossi i launcher `avvia.bat` e `avvia.ps1`; l'avvio avviene
-  tramite il file pubblicato o i comandi .NET documentati.
+- **v2.3.15** — Removed the `avvia.bat` and `avvia.ps1` launchers; the launch happens
+  via the published file or the documented .NET commands.
 
-- **v2.3.14** — La finestra log non mostra più tutto il testo selezionato in blu
-  all’apertura; il focus iniziale va al pulsante `Chiudi`.
+- **v2.3.14** — The log window no longer shows all text selected in blue
+  on opening; the initial focus goes to the `Close` button.
 
-- **v2.3.13** — Schiarite le palette con una curva comune a CPU, CUDA e
-  DirectX (`t × 1,35 + 0,03`, saturata a 1), mantenendo nero l’interno.
+- **v2.3.13** — Lightened the palettes with a common curve on CPU, CUDA and
+  DirectX (`t × 1.35 + 0.03`, saturated at 1), keeping the interior black.
 
-- **v2.3.12** — Aggiunto il benchmark reale DirectX: esegue lo shader sulla
-  swapchain e conta i frame presentati, mostrando pixel/s e frame completati.
+- **v2.3.12** — Added the real DirectX benchmark: runs the shader on the
+  swapchain and counts the presented frames, showing pixel/s and completed frames.
 
-- **v2.3.11** — Corretto il testo del benchmark: il fallback DirectX ora mostra
-  `precisione CPU`; `CUDA 32/64-bit` compare solo quando CUDA è realmente usata.
+- **v2.3.11** — Corrected the benchmark text: the DirectX fallback now shows
+  `CPU precision`; `CUDA 32/64-bit` appears only when CUDA is actually used.
 
-- **v2.3.10** — Uniformata la colorazione CPU, CUDA e DirectX: stessa mappa
-  basata sulle iterazioni e stessi stop di palette.
+- **v2.3.10** — Unified the CPU, CUDA and DirectX coloring: same map
+  based on iterations and same palette stops.
 
-- **v2.3.9** — Allineata la colorazione CUDA/DirectX sulla stessa interpolazione
-  della palette; mantenuti su GPU il calcolo e il downsampling AA. Verificati
-  entrambi i motori a runtime.
+- **v2.3.9** — Aligned the CUDA/DirectX coloring on the same
+  palette interpolation; kept the AA computation and downsampling on GPU. Verified
+  both engines at runtime.
 
-- **v2.3.8** — Corretto il kernel CUDA per la compilazione runtime ILGPU e
-  verificato il render sulla RTX 5070 Ti; DirectX ora inizializza l’adapter
-  hardware senza il marshalling difettoso della descrizione DXGI.
+- **v2.3.8** — Corrected the CUDA kernel for ILGPU runtime compilation and
+  verified the render on the RTX 5070 Ti; DirectX now initializes the
+  hardware adapter without the faulty marshalling of the DXGI description.
 
-- **v2.3.7** — Spostate su CUDA la colorazione e il downsampling AA;
-  alla CPU viene trasferito solo il bitmap finale. File: `GpuMandelbrot.cs`,
+- **v2.3.7** — Moved the coloring and AA downsampling to CUDA;
+  only the final bitmap is transferred to the CPU. Files: `GpuMandelbrot.cs`,
   `AppVersion.cs`, `.csproj`.
 
-- **v2.3.6** — Ottimizzazione render GPU e benchmark CUDA: serializzazione di
-  calcolo e colorazione per evitare race tra render cancellati; il benchmark
-  ora rispetta la precisione 32/64 selezionata e non ricopia più il buffer
-  completo alla CPU. File: `GpuMandelbrot.cs`, `BenchmarkForm.cs`,
+- **v2.3.6** — GPU render and CUDA benchmark optimization: serialization of
+  computation and coloring to avoid races between cancelled renders; the benchmark
+  now respects the selected 32/64 precision and no longer recopies
+  the full buffer to the CPU. Files: `GpuMandelbrot.cs`, `BenchmarkForm.cs`,
   `MandelbrotForm.cs`, `AppVersion.cs`, `.csproj`.
 
-- **v2.3.5** — Fix DirectX: `D3D11CreateDevice` ora usa `DriverType.Unknown`
-  quando riceve l'adapter DXGI selezionato. File: `DxMandelbrot.cs`,
+- **v2.3.5** — DirectX fix: `D3D11CreateDevice` now uses `DriverType.Unknown`
+  when it receives the selected DXGI adapter. Files: `DxMandelbrot.cs`,
   `AppVersion.cs`, `.csproj`.
 
-- **v2.3.4** — Diagnostica DirectX: log con lo step esatto che fallisce
-  l'inizializzazione (es. `[IDXGIFactory2.CreateSwapChainForHwnd] ...`); swapchain
-  cambiata da `FlipDiscard` a `FlipSequential` (più compatibile) e `SampleDescription`
-  fissato esplicito a (1,0). File: `DxMandelbrot.cs` (`TryInitialize`), `AppVersion.cs`,
+- **v2.3.4** — DirectX diagnostics: log with the exact step that fails
+  the initialization (e.g. `[IDXGIFactory2.CreateSwapChainForHwnd] ...`); swapchain
+  changed from `FlipDiscard` to `FlipSequential` (more compatible) and `SampleDescription`
+  explicitly fixed to (1,0). Files: `DxMandelbrot.cs` (`TryInitialize`), `AppVersion.cs`,
   `.csproj`.
 
-- **v2.3.3** — Voce Aiuto → log/diagnostica: una finestra di sola lettura con
-  lo stato dei motori (DirectX e CUDA: pronto, scheda in uso, ultimo errore,
-  schede disponibili), la selezione GPU, la precisione e le impostazioni
-  salvate — utile per capire perché un motore risulta disabilitato. File:
+- **v2.3.3** — Help item → log/diagnostics: a read-only window with
+  the status of the engines (DirectX and CUDA: ready, card in use, last error,
+  cards available), the GPU selection, the precision and the settings
+  saved — useful to understand why an engine is disabled. Files:
   `MandelbrotForm.cs` (`LogItem_Click`, `BuildDiagnosticLog`),
-  `MandelbrotForm.Designer.cs`, nuovo `LogForm.cs`, `AppVersion.cs`, `.csproj`.
+  `MandelbrotForm.Designer.cs`, new `LogForm.cs`, `AppVersion.cs`, `.csproj`.
 
-- **v2.3.2** — Motore GPU non disponibile: il motivo esatto (`LastError`) è ora
-  mostrato nella barra di stato invece di lasciare la radio semplicemente
-  grigia. File: `MandelbrotForm.cs` (handler `Shown`), `AppVersion.cs`, `.csproj`.
+- **v2.3.2** — GPU engine unavailable: the exact reason (`LastError`) is now
+  shown in the status bar instead of leaving the radio simply
+  gray. Files: `MandelbrotForm.cs` (`Shown` handler), `AppVersion.cs`, `.csproj`.
 
-- **v2.3.1** — Dropdown GPU nascosto (invece che disabilitato) con motore CPU:
-  la barra resta pulita e la scelta della scheda video compare solo con CUDA o
-  DirectX. File: `MandelbrotForm.cs` (`ApplyEngineVisibility`),
+- **v2.3.1** — GPU dropdown hidden (instead of disabled) with CPU engine:
+  the bar stays clean and the video card choice appears only with CUDA or
+  DirectX. Files: `MandelbrotForm.cs` (`ApplyEngineVisibility`),
   `MandelbrotForm.Designer.cs` (`lblGpu`/`cmbGpu` `Visible`), `AppVersion.cs`,
   `.csproj`.
 
-- **v2.3** — Precisione CUDA a scelta: radio 32/64 (32 = float 32-bit, più
-  veloce; 64 = double 64-bit, più preciso, predefinito). Prima la precisione era
-  decisa in automatico dalla scala (`WantsDouble`); ora è a scelta dell'utente.
-  I due radio sono abilitati solo con motore CUDA (CPU = sempre double,
-  DirectX = sempre float) e la scelta è persistita in settings.json. File:
+- **v2.3** — CUDA precision at choice: radio 32/64 (32 = float 32-bit, faster;
+  64 = double 64-bit, more precise, default). Before the precision was
+  decided automatically from the scale (`WantsDouble`); now it is at the user's choice.
+  The two radios are enabled only with CUDA engine (CPU = always double,
+  DirectX = always float) and the choice is persisted in settings.json. Files:
   `MandelbrotForm.cs`/`MandelbrotForm.Designer.cs` (`precisionPanel`,
   `radPrec32`/`radPrec64`, `UseDoublePrecision`), `GpuMandelbrot.cs`
-  (`RenderFrame` con `useDouble`), `Settings.cs` (`Single`), `AppVersion.cs`,
+  (`RenderFrame` with `useDouble`), `Settings.cs` (`Single`), `AppVersion.cs`,
   `.csproj`.
 
-- **v2.2** — ToolTip su controlli File/Aiuto (spiegano funzione e scorciatoia);
-  cursore "atteso" ora visibile anche col mouse sopra un controllo (es. il
-  dropdown AA) durante il calcolo, perché viene imposto su form e controlli di
-  input e non solo sulla form. File: `MandelbrotForm.cs` (`SetBusyCursor`,
-  `RenderAsync`), `MandelbrotForm.Designer.cs` (componente `toolTip` +
+- **v2.2** — ToolTips on File/Help controls (they explain function and shortcut);
+  the "wait" cursor now visible also with the mouse over a control (e.g. the
+  AA dropdown) during the computation, because it is imposed on the form and the input controls
+  and not only on the form. Files: `MandelbrotForm.cs` (`SetBusyCursor`,
+  `RenderAsync`), `MandelbrotForm.Designer.cs` (`toolTip` component +
   `SetToolTip`), `AppVersion.cs`, `.csproj`.
 
-- Dropdown GPU disabilitato con motore CPU (la scheda si sceglie solo con CUDA
-  o DirectX). File: `MandelbrotForm.cs` (`ApplyEngineVisibility`),
+- GPU dropdown disabled with CPU engine (the card is chosen only with CUDA
+  or DirectX). Files: `MandelbrotForm.cs` (`ApplyEngineVisibility`),
   `MandelbrotForm.Designer.cs`.
 
-- **v2.1** — Scelta della scheda video (CUDA + DirectX) da dropdown: barra
-  (Auto = scheda più potente, altrimenti la scheda nominata). Enumera l'unione
-  delle schede DirectX (DXGI) e dei device CUDA (ILGPU) e crea il
-  device/accelerator sulla scelta; la preferenza è persistita in
-  `settings.json` (`Gpu`) e applicata al cambio di motore. File:
+- **v2.1** — Choice of the video card (CUDA + DirectX) from dropdown: bar
+  (Auto = most capable card, otherwise the named card). Enumerates the union
+  of the DirectX cards (DXGI) and the CUDA devices (ILGPU) and creates the
+  device/accelerator on the choice; the preference is persisted in
+  `settings.json` (`Gpu`) and applied on engine change. Files:
   `DxMandelbrot.cs` (`AdapterNames`, `TryInitialize(..., adapterName)`),
   `GpuMandelbrot.cs` (`DeviceNames`, `TryInitialize(deviceName)`,
   `ResetAccelerator`), `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`
   (`lblGpu`, `cmbGpu`), `Settings.cs`, `AppVersion.cs`, `.csproj`.
 
-- Vista iniziale sempre dall'insieme completo (la vista precedente non è più
-  memorizzata in `settings.json`; il benchmark resta standard a 5000). File:
+- Initial view always from the full set (the previous view is no longer
+  saved in `settings.json`; the benchmark stays standard at 5000). Files:
   `MandelbrotForm.Designer.cs`, `Settings.cs`, `MandelbrotForm.cs`.
 
-- **v2.0** — Motore DirectX realtime: frattale a ogni frame (float, triangolo
-  fullscreen), loop ~60 fps con pan/zoom immediati, AA 2x/4x/8x come
-  supersampling dentro lo shader, salvataggio PNG dal backbuffer, fallback CPU
-  automatico in caso di errore. Radio DirectX abilitata all'avvio. File:
-  `DxMandelbrot.cs` (nuovo), `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`
-  (`dxPanel`, `radioDx`), `.csproj` (dipendenze Vortice 3.8.3).
+- **v2.0** — DirectX realtime engine: fractal per frame (float,
+  fullscreen triangle), ~60 fps loop with immediate pan/zoom, AA 2x/4x/8x as
+  supersampling inside the shader, PNG save from the backbuffer, automatic CPU
+  fallback on error. DirectX radio enabled at startup. Files:
+  `DxMandelbrot.cs` (new), `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`
+  (`dxPanel`, `radioDx`), `.csproj` (Vortice 3.8.3 dependencies).
 
-- Impostazioni persistite (`%APPDATA%\MandelbrotViewer\settings.json`):
-  iterazioni auto/manuale e valore, palette, AA, motore preferito, ultima vista
-  e posizione finestra; preferenza GPU rispettata all'avvio. File: `Settings.cs`
-  (nuovo), `MandelbrotForm.cs`.
+- Persisted settings (`%APPDATA%\MandelbrotViewer\settings.json`):
+  iterations auto/manual and value, palette, AA, preferred engine, last view
+  and window position; GPU preference respected at startup. Files: `Settings.cs`
+  (new), `MandelbrotForm.cs`.
 
-- Benchmark CUDA veloce: kernel solo-iterazioni (niente buffer |z|²) + buffer
-  riusati per tutti i frame (niente alloc/transfer extra). File:
+- Fast CUDA benchmark: iterations-only kernel (no |z|² buffer) + reused
+  buffers for all frames (no extra alloc/transfer). Files:
   `BenchmarkForm.cs`, `GpuMandelbrot.cs`.
 
-- Menu File → Salva immagine con nome. File: `MandelbrotForm.Designer.cs`.
+- File menu → Save image with name. Files: `MandelbrotForm.Designer.cs`.
 
-- Benchmark: aggiornamento UI limitato a ogni 3 s + report finale, così gli
-  Invoke non falsano la misura (`BenchmarkProgress.ReportInterval`). File:
+- Benchmark: UI updates limited to every 3 s + final report, so the
+  Invokes do not skew the measurement (`BenchmarkProgress.ReportInterval`). Files:
   `Mandelbrot.cs`, `GpuMandelbrot.cs`, `BenchmarkForm.cs`.
 
-- Iterazioni totali tolte dal risultato del benchmark (restano nel dettaglio);
-  `BenchmarkProgress` riporta anche i frame. File: `BenchmarkForm.cs`,
+- Total iterations removed from the benchmark result (they remain in the detail);
+  `BenchmarkProgress` also reports the frames. Files: `BenchmarkForm.cs`,
   `Mandelbrot.cs`, `GpuMandelbrot.cs`.
 
-- Benchmark standard (8 s, iterazioni max, misura iter/s del motore selezionato
-  con fallback CPU), risultato in grande (Giter/s, Miter/s…) con barra di
-  avanzamento e annullamento. File: `BenchmarkForm.cs` + `.Designer.cs` (nuovi),
+- Standard benchmark (8 s, max iterations, measurement of iter/s of the selected
+  engine with CPU fallback), result in large (Giter/s, Miter/s…) with a progress
+  bar and cancel. Files: `BenchmarkForm.cs` + `.Designer.cs` (new),
   `Mandelbrot.cs` (`BenchmarkCpu`), `GpuMandelbrot.cs` (`BenchmarkGpu`),
-  `MandelbrotForm.*` (voce menu).
+  `MandelbrotForm.*` (menu item).
 
-- Anteprima in pan (metà per lato) con upscale bilineare, render completo al
-  rilascio; stato marcato "(anteprima)". File: `MandelbrotForm.cs`
+- Preview during pan (half per side) with bilinear upscale, full render on
+  release; state marked "(preview)". Files: `MandelbrotForm.cs`
   (`RenderAsync(preview)`, `Upscale`).
 
-- Antialias con checkbox 1x/2x/4x/8x: risoluzione k volte maggiore + media RGB
-  di ogni blocco kxk (stessa logica su CPU con `AverageBlock` e su GPU);
-  iterazioni automatiche da radio a checkbox (default manuale); finestra default
-  1152x720. Verificato con smoke test (CPU 1x vs 2x, GPU 2x vs CPU 2x). File:
+- Antialias with checkbox 1x/2x/4x/8x: k times higher resolution + RGB
+  average of each kxk block (same logic on CPU with `AverageBlock` and on GPU);
+  auto iterations from radio to checkbox (default manual); default window
+  1152x720. Verified with smoke test (CPU 1x vs 2x, GPU 2x vs CPU 2x). Files:
   `Mandelbrot.cs`, `GpuMandelbrot.cs`, `MandelbrotForm.cs`,
-  `MandelbrotForm.Designer.cs`. Formula iter auto `200 + 790·log10(zoom)`
-  (~2000 a scala 1,95e-4, ~4550 a scala 1e-5).
+  `MandelbrotForm.Designer.cs`. Auto iter formula `200 + 790·log10(zoom)`
+  (~2000 at scale 1.95e-4, ~4550 at scale 1e-5).
 
-- **v1.4** — Backend CUDA con ILGPU (precisione auto per scala < 1e-3), un
-  thread per pixel, device più capiente in automatico, fallback CPU se niente
-  GPU, radio CUDA abilitata all'avvio se la GPU risponde; stato e Informazioni
-  mostrano motore/precisione/device. Refactor: `ColorFromEscape` condiviso tra
-  CPU e GPU. Verificato con smoke test su RTX 5070 Ti (iterazioni GPU == CPU).
-  Nuova formula iter auto `200 + 430·log10(zoom)` (~2000 a scala 1,95e-4); fix
-  gruppi radio Manuale/CPU (pannelli contenitore separati). File:
-  `GpuMandelbrot.cs` (nuovo), `Mandelbrot.cs`, `MandelbrotForm.cs`,
-  `MandelbrotForm.Designer.cs`, `RenderEngine.cs`, `.csproj` (dipendenza ILGPU).
+- **v1.4** — CUDA backend with ILGPU (auto precision for scale < 1e-3), one
+  thread per pixel, most capable device automatically, CPU fallback if no
+  GPU, CUDA radio enabled at startup if the GPU responds; status and About
+  show engine/precision/device. Refactor: shared `ColorFromEscape` between
+  CPU and GPU. Verified with smoke test on RTX 5070 Ti (GPU iterations == CPU).
+  New auto iter formula `200 + 430·log10(zoom)` (~2000 at scale 1.95e-4); fix
+  Manual/CPU radio groups (separate container panels). Files:
+  `GpuMandelbrot.cs` (new), `Mandelbrot.cs`, `MandelbrotForm.cs`,
+  `MandelbrotForm.Designer.cs`, `RenderEngine.cs`, `.csproj` (ILGPU dependency).
 
-- Selezione motore con radio: enum `RenderEngine` + `RenderEngineInfo`; CUDA e
-  DirectX disabilitati (roadmap v1.4/v2.0). Aiuto spostato nella `StatusStrip`,
-  finestra default 1024x680, motore attivo mostrato nello stato. File:
-  `RenderEngine.cs` (nuovo), `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`.
+- Engine selection with radios: `RenderEngine` enum + `RenderEngineInfo`; CUDA and
+  DirectX disabled (roadmap v1.4/v2.0). Help moved to the `StatusStrip`,
+  default window 1024x680, active engine shown in the status. Files:
+  `RenderEngine.cs` (new), `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`.
 
-- Rinominato `Form1` in `MandelbrotForm` (vista preservata). File:
+- Renamed `Form1` to `MandelbrotForm` (view preserved). Files:
   `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`, `Program.cs`.
-- Numero iterazioni aggiornato anche in modalità auto: mostra il valore
-  automatico usato per il render. File: `Form1.cs`.
+- Iteration count updated also in auto mode: shows the automatic
+  value used for the render. Files: `Form1.cs`.
 
-- Dropdown palette (Fuoco, Ghiaccio, Termico) con gradienti dedicati in
-  `Mandelbrot.cs` (via l'enum `Palette`); barra superiore rifatta con
-  `TableLayoutPanel` così numero iterazioni, label, radio e dropdown sono
-  allineati verticalmente; radio Auto/Manuale per le iterazioni
-  (`AutoIter = 150 + 150·log10(zoom)`, clamp 50–5000, numero disabilitato in
-  auto); stato spostato in `StatusStrip` in basso. File: `Form1.cs`,
+- Palette dropdown (Fire, Ice, Thermal) with dedicated gradients in
+  `Mandelbrot.cs` (removed the `Palette` enum); top bar rebuilt with
+  `TableLayoutPanel` so iteration count, label, radios and dropdown are
+  vertically aligned; Auto/Manual radios for the iterations
+  (`AutoIter = 150 + 150·log10(zoom)`, clamp 50–5000, count disabled in
+  auto); status moved to the `StatusStrip` at the bottom. Files: `Form1.cs`,
   `Form1.Designer.cs`, `Mandelbrot.cs`.
-- Menu File (zone JSON, immagine con nome Ctrl+Shift+S) + menu Aiuto con
-  Informazioni (versione e comandi); zoom con rotella sul cursore (focus
-  automatico al passaggio mouse); tasti singoli R/S/+/- ignorati con Ctrl/Alt
-  premuti. File: `Form1.cs` (`ViewZone`, `SaveZone`, `LoadZone`, `ShowAbout`),
+- File menu (JSON zones, named image Ctrl+Shift+S) + Help menu with
+  About (version and commands); zoom with the wheel on the cursor (automatic
+  focus on mouse hover); single keys R/S/+/- ignored with Ctrl/Alt
+  pressed. Files: `Form1.cs` (`ViewZone`, `SaveZone`, `LoadZone`, `ShowAbout`),
   `Form1.Designer.cs` (`MenuStrip`).
-- Pan con trascinamento a pulsante premuto (throttle 80 ms, soglia
-  click/trascinamento 5 px). Rimossi zoom su rettangolo e zoom con rotella.
-  File: `Form1.cs`, `Form1.Designer.cs` (testo aiuto aggiornato).
-- Setup progetto (SDK user-level; publish self-contained in `pubblicato/` così
-  non serve installare il Desktop Runtime; versione in sorgente (`AppVersion.cs`
-  + `<Version>` nel csproj, mostrata nel titolo); setup progetto (AGENTS.md,
-  TODO.md, SPECIFICHE.md, `.gitignore`, tracking nel repo `test/`).
-- Visualizzatore iniziale in C# (WinForms): iterazioni configurabili,
-  salvataggio PNG. File: `Form1.*`, `Mandelbrot.cs`.
+- Pan with dragging on button pressed (throttle 80 ms,
+  click/drag threshold 5 px). Removed zoom on rectangle and zoom with wheel.
+  Files: `Form1.cs`, `Form1.Designer.cs` (help text updated).
+- Project setup (user-level SDK; self-contained publish in `pubblicato/` so
+  the Desktop Runtime doesn't need to be installed; version in source (`AppVersion.cs`
+  + `<Version>` in the csproj, shown in the title); project setup (AGENTS.md,
+  TODO.md, SPECIFICHE.md, `.gitignore`, tracking in the `test/` repo).
+- Initial C# viewer (WinForms): configurable iterations,
+  PNG save. Files: `Form1.*`, `Mandelbrot.cs`.

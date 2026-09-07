@@ -1,30 +1,30 @@
 namespace MandelbrotViewer;
 
-/// <summary>Palette di colori disponibili nel visualizzatore (l'ordine è
-/// l'indice del dropdown ed è persistito in settings.json: aggiungere solo in coda).</summary>
+/// <summary>Color palettes available in the viewer (the order is
+/// the dropdown index and is persisted in settings.json: add only at the end).</summary>
 public enum Palette
 {
-    Fuoco,
-    Ghiaccio,
-    Termico,
-    Oceano,
-    Viola,
-    Deserto,
-    Foresta
+    Fire,
+    Ice,
+    Thermal,
+    Ocean,
+    Violet,
+    Desert,
+    Forest
 }
 
     /// <summary>
-    /// Gradienti della palette e interpolazione del colore basata sulle iterazioni.
-    /// Fonte unica degli stop per i percorsi CPU e DirectX; il kernel CUDA riceve gli
-    /// stessi stop tramite <see cref="GpuPaletteParams"/> e li interpola in
-    /// GpuMandelbrot.ColorFromIterations, DirectX nella funzione Graded dello shader
-    /// HLSL (DxMandelbrot.cs). Le tre implementazioni DEVONO restare allineate:
-    /// stessi 5 stop e stessa mappatura t = (nu/maxIter)^0.35 (gamma, come il
-    /// riferimento Python: smooth iteration + curva tonale).
+    /// Palette gradients and iteration-based color interpolation.
+    /// Single source of stops for the CPU and DirectX paths; the CUDA kernel receives the
+    /// same stops via <see cref="GpuPaletteParams"/> and interpolates them in
+    /// GpuMandelbrot.ColorFromIterations, DirectX in the Graded function of the HLSL shader
+    /// (DxMandelbrot.cs). The three implementations MUST stay aligned:
+    /// same 5 stops and same mapping t = (nu/maxIter)^0.35 (gamma, like the
+    /// Python reference: smooth iteration + tone curve).
     /// </summary>
 internal static class PaletteColors
 {
-    // Gradiente (t, r, g, b) per ogni palette. t = iterazioni / maxIter.
+    // Gradient (t, r, g, b) for each palette. t = iterations / maxIter.
     private static readonly (double T, byte R, byte G, byte B)[] FireStops =
     [
         (0.00, 0, 0, 0),
@@ -61,7 +61,7 @@ internal static class PaletteColors
         (1.00, 235, 250, 255),
     ];
 
-    // Viola: 2 colori base opposti e vivaci, magenta e ciano (l'interno resta nero).
+    // Violet: 2 opposite and vivid base colors, magenta and cyan (the inside stays black).
     private static readonly (double T, byte R, byte G, byte B)[] VioletStops =
     [
         (0.00, 60, 0, 80),
@@ -80,7 +80,7 @@ internal static class PaletteColors
         (1.00, 255, 245, 220),
     ];
 
-    // Foresta: 2 colori base, marrone e verde agli estremi (l'interno resta nero).
+    // Forest: 2 base colors, brown and green at the extremes (the inside stays black).
     private static readonly (double T, byte R, byte G, byte B)[] ForestStops =
     [
         (0.00, 55, 32, 12),
@@ -90,22 +90,22 @@ internal static class PaletteColors
         (1.00, 205, 235, 175),
     ];
 
-    /// <summary>Gradienti (t, r, g, b) della palette (5 stop da t=0 a t=1).</summary>
+    /// <summary>Gradients (t, r, g, b) of the palette (5 stops from t=0 to t=1).</summary>
     internal static (double T, byte R, byte G, byte B)[] GetStops(Palette palette) => palette switch
     {
-        Palette.Ghiaccio => IceStops,
-        Palette.Termico => ThermalStops,
-        Palette.Oceano => OceanStops,
-        Palette.Viola => VioletStops,
-        Palette.Deserto => DesertStops,
-        Palette.Foresta => ForestStops,
+        Palette.Ice => IceStops,
+        Palette.Thermal => ThermalStops,
+        Palette.Ocean => OceanStops,
+        Palette.Violet => VioletStops,
+        Palette.Desert => DesertStops,
+        Palette.Forest => ForestStops,
         _ => FireStops,
     };
 
-    /// <summary>Interpolazione del colore per il percorso CPU (allineata con
-    /// GpuMandelbrot.ColorFromIterations e con Graded nello shader HLSL).
-    /// Mappatura: t = (nu/maxIter)^0.35 (gamma, smooth iteration gia' applicata
-    /// dal chiamante).</summary>
+    /// <summary>Color interpolation for the CPU path (aligned with
+    /// GpuMandelbrot.ColorFromIterations and with Graded in the HLSL shader).
+    /// Mapping: t = (nu/maxIter)^0.35 (gamma, smooth iteration already applied
+    /// by the caller).</summary>
     internal static int ColorFor(double iterations, int maxIter, Palette palette)
     {
         double t = Math.Pow(Math.Clamp(iterations / Math.Max(1, maxIter), 0.0, 1.0), 0.35);

@@ -1,60 +1,66 @@
-# AGENTS.md — Istruzioni di progetto (MandelC#)
+# AGENTS.md — Project instructions (MandelC#)
 
-File letto automaticamente a ogni nuova sessione. Descrive toolchain, convenzioni
-e workflow obbligatorio per questo progetto.
+File automatically read at each new session. Describes toolchain, conventions
+and mandatory workflow for this project.
 
-## Progetto
+## Project
 
-Visualizzatore interattivo dell'insieme di Mandelbrot in C# / WinForms (.NET 8).
-Root del progetto: `MandelC#/`. Codice: `MandelC#/MandelbrotViewer/`.
+Interactive Mandelbrot set viewer in C# / WinForms (.NET 8).
+Project root: `MandelC#/`. Code: `MandelC#/MandelbrotViewer/`.
+
+## Language (mandatory)
+
+All code (comments, identifiers, enum names), UI strings, documentation
+(AGENTS.md, TODO.md, CHANGELOG.md, SPECIFICHE.md), and commit messages
+must be written in **English** from now on.
 
 ## Toolchain .NET
 
-- `dotnet` NON è nel PATH. SDK 8.0 installato user-level in `~\.dotnet\dotnet.exe`.
-- In PowerShell usare sempre il percorso completo:
-  `& "$env:USERPROFILE\.dotnet\dotnet.exe" <comando>`
-- Target: `net8.0-windows` + `UseWindowsForms`. Solo Windows.
-- Il percorso contiene `#`: quotare sempre i path negli script/comandi.
+- `dotnet` is NOT in PATH. SDK 8.0 installed user-level at `~\.dotnet\dotnet.exe`.
+- In PowerShell always use the full path:
+  `& "$env:USERPROFILE\.dotnet\dotnet.exe" <command>`
+- Target: `net8.0-windows` + `UseWindowsForms`. Windows only.
+- The path contains `#`: always quote paths in scripts/commands.
 
-## Comandi
+## Commands
 
 ```powershell
 # Build
 & "$env:USERPROFILE\.dotnet\dotnet.exe" build "MandelbrotViewer\MandelbrotViewer.csproj"
-# Avvio in debug
+# Debug run
 & "$env:USERPROFILE\.dotnet\dotnet.exe" run --project "MandelbrotViewer"
-# Publish self-contained (rigenera pubblicato\, ~150 MB, non richiede runtime installato)
+# Publish self-contained (regenerates pubblicato\, ~150 MB, no installed runtime required)
 & "$env:USERPROFILE\.dotnet\dotnet.exe" publish "MandelbrotViewer\MandelbrotViewer.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "pubblicato"
 ```
 
-- Lancio per l'utente finale: eseguire il file pubblicato in `pubblicato\` se presente;
-  per lo sviluppo usare il comando `dotnet run` indicato sopra.
+- End-user launch: run the published file in `pubblicato\` if present;
+  for development use the `dotnet run` command indicated above.
 
-## Versionamento (obbligatorio)
+## Versioning (mandatory)
 
-- La versione vive nel sorgente: `MandelbrotViewer/AppVersion.cs` (costanti
-  `Major`, `Minor`, `Patch`) + `<Version>` nel `.csproj`. I due devono coincidere.
-- Formato `X.Y.Z`. Nella UI si mostra `AppVersion.Display`: se `Z` è 0 si usa
-  la notazione breve `X.Y`.
-- Regole di bump a seconda dell'importanza della modifica:
-  - `Z` (patch): fix, refactor, docs, modifiche minori.
-  - `Y` (minor): nuove funzionalità compatibili.
-  - `X` (major): breaking change / riscritture.
-- Ad ogni bump: aggiornare `AppVersion.cs` + `.csproj` e aggiungere voce in
+- The version lives in the source: `MandelbrotViewer/AppVersion.cs` (constants
+  `Major`, `Minor`, `Patch`) + `<Version>` in the `.csproj`. The two must match.
+- Format `X.Y.Z`. The UI shows `AppVersion.Display`: if `Z` is 0 use the
+  short notation `X.Y`.
+- Bump rules based on the importance of the change:
+  - `Z` (patch): fixes, refactors, docs, minor changes.
+  - `Y` (minor): new backward-compatible features.
+  - `X` (major): breaking change / rewrites.
+- On each bump: update `AppVersion.cs` + `.csproj` and add an entry in
   `CHANGELOG.md`.
 
-## Workflow per ogni richiesta utente (obbligatorio)
+## Workflow for each user request (mandatory)
 
-1. Aggiungere la richiesta in cima come voce `pending` in `TODO.md`.
-2. Eseguirla; segnare `completed` (o `cancelled`) appena finita, senza batch.
-3. Aggiungere una nota in `SPECIFICHE.md` (cosa fatto, file toccati, versione se bumpata).
-4. Verificare con build (`dotnet build`) quando si tocca codice C#.
+1. Add the request at the top as a `pending` entry in `TODO.md`.
+2. Execute it; mark `completed` (or `cancelled`) as soon as done, no batching.
+3. Add a note in `SPECIFICHE.md` (what was done, files touched, version if bumped).
+4. Verify with build (`dotnet build`) when C# code is touched.
 
 ## Git
 
-- Il progetto vive nel repo `test/` (root sopra `MandelC#/`). Niente repo annidato.
-- Scope commit: solo file di `MandelC#/`. Mai committare segreti.
-- Ignorati via `MandelC#/.gitignore`: `bin/`, `obj/`, `pubblicato/` (rigenerabili).
-- Messaggi concisi in italiano che partono col numero di versione
-  (es. `v2.0.1: DirectX realtime, benchmark, ...`).
-- Commit/push solo su richiesta esplicita dell'utente.
+- The project lives in the `test/` repo (root above `MandelC#/`). No nested repo.
+- Commit scope: only files in `MandelC#/`. Never commit secrets.
+- Ignored via `MandelC#/.gitignore`: `bin/`, `obj/`, `pubblicato/` (regenerable).
+- Concise commit messages in English starting with the version number
+  (e.g. `v2.0.1: DirectX realtime, benchmark, ...`).
+- Commit/push only on explicit user request.

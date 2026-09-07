@@ -1,150 +1,150 @@
-﻿# SPECIFICHE — Visualizzatore Mandelbrot (MandelC#)
+﻿# SPECIFICHE — Mandelbrot Viewer (MandelC#)
 
-App WinForms (.NET 8, `net8.0-windows`) che renderizza l'insieme di Mandelbrot
-(`z = z² + c`) con smooth coloring coerente su tutti i motori: la tinta dipende
-dalle iterazioni di fuga smussate col modulo finale di `z`, mappate su 5 stop
-per palette con curva `t × 1,35 + 0,03` (saturata a 1, interno nero). Palette:
-Fuoco, Ghiaccio, Termico, Oceano, Viola, Deserto, Foresta (stop in
-`PaletteColors`, fonte unica per CPU e DirectX; CUDA li riceve come
+WinForms app (.NET 8, `net8.0-windows`) that renders the Mandelbrot set
+(`z = z² + c`) with consistent smooth coloring across all engines: the tint
+depends on the escape iterations smoothed with the final module of `z`, mapped
+on 5 stops per palette with curve `t × 1.35 + 0.03` (saturated at 1, interior
+black). Palettes: Fire, Ice, Thermal, Ocean, Purple, Desert, Forest (stops in
+`PaletteColors`, single source for CPU and DirectX; CUDA receives them as
 `GpuPaletteParams`).
 
-## Interazione
+## Interaction
 
-- Click sinistro/destro: zoom 2× sul punto; rotella: zoom 0,7×/1,43× sul
-  cursore; trascinamento o frecce: pan (soglia click/trascinamento 5 px,
-  throttle 80 ms, anteprima a metà risoluzione senza AA con upscale bilineare,
-  full al rilascio; frecce = 1/10 della vista, Shift = 1/100, non attive sul
-  numero iterazioni). Resize finestra: ridisegno immediato in anteprima
-  (metà risoluzione) su tutti i motori, come DirectX; `pictureBox` usa
-  `SizeMode.Zoom` per mantenere l'aspect ratio durante la transizione.
-- `R` = reset vista, `S` = salva PNG, `+`/`-` = ±50 iterazioni (50…50000).
-- Checkbox Auto: iterazioni 2000*(1+log10(1.5/half)) (half = scala/2, clamp 50-50000; ~1944 alla vista iniziale scala 9.36, 10915 alla zona benchmark); il numero mostra il valore usato pur restando disabilitato. Formula centrale in Mandelbrot.AutoIterForScale, usata anche dal video zoom. Il benchmark usa le iterazioni calcolate con la formula auto alla sua scala (10915) (BenchmarkStandard.MaxIter)
-- Dropdown AA 1x/2x/4x/8x (1x = off): supersampling k×k e media RGB (costo ~k²)
-  su CPU e CUDA; in DirectX dentro lo shader.
-- Menu File: carica/salva zona JSON (Ctrl+O / Ctrl+S: centro, scala,
-  iterazioni), salva immagine (Ctrl+Shift+S), benchmark (Ctrl+B), Esci (Alt+F4).
-- Menu Genera: screenshot PNG
-  (Ctrl+Shift+E: dialog da Vista corrente con preset Vista/Full HD/2K/4K/8K/
-  Doppio 4K/Personalizzata, dimensioni validate 320…16384, AA selezionabile,
-  render offscreen col motore attivo, AA auto-ridotto oltre 128 MPixel di
-  campioni), video zoom MP4 (Ctrl+Shift+V:
-  dalla vista corrente all'insieme (errore se si è già all'insieme; centro
-  proporzionale allo zoom così il punto di partenza resta inquadrato;
-  transizione ease-out: veloce all'inizio, lento alla fine), 60…480 frame
-  a 24/30/60 fps, AA selezionato (auto-ridotto oltre 128 MPixel di campioni),
-  iter auto per frame, ffmpeg H.264 (su worker, stderr asincrono, kill su
-  annulla, pad a dimensioni pari perché la vista ha spesso lati dispari) o
-  sequenza PNG se assente (tasto Apri per il risultato)), Torna all'insieme (RealTime) (Ctrl+Shift+R: animazione sulla vista principale dalla zona corrente all'insieme, 120 frame a 30 fps, Esc per fermare)
+- Left/right click: 2× zoom on the point; wheel: 0.7×/1.43× zoom on the
+  cursor; drag or arrow keys: pan (click/drag threshold 5 px,
+  throttle 80 ms, half-resolution preview without AA with bilinear upscale,
+  full on release; arrow keys = 1/10 of the view, Shift = 1/100, not active on
+  the iterations count). Window resize: immediate preview redraw
+  (half resolution) on all engines, as DirectX; `pictureBox` uses
+  `SizeMode.Zoom` to keep the aspect ratio during the transition.
+- `R` = reset view, `S` = save PNG, `+`/`-` = ±50 iterations (50…50000).
+- Auto checkbox: iterations 2000*(1+log10(1.5/half)) (half = scale/2, clamp 50-50000; ~1944 at the initial view scale 9.36, 10915 at the benchmark zone); the number shows the value used while staying disabled. Central formula in Mandelbrot.AutoIterForScale, also used by the zoom video. The benchmark uses the iterations computed with the auto formula at its scale (10915) (BenchmarkStandard.MaxIter)
+- AA dropdown 1x/2x/4x/8x (1x = off): supersampling k×k and RGB averaging (cost ~k²)
+  on CPU and CUDA; in DirectX inside the shader.
+- File menu: load/save zone JSON (Ctrl+O / Ctrl+S: center, scale,
+  iterations), save image (Ctrl+Shift+S), benchmark (Ctrl+B), Exit (Alt+F4).
+- Generate menu: PNG screenshot
+  (Ctrl+Shift+E: dialog from current view with View/Full HD/2K/4K/8K/
+  Double 4K/Custom presets, validated dimensions 320…16384, selectable AA,
+  offscreen render with the active engine, AA auto-reduced beyond 128 MPixel of
+  samples), zoom video MP4 (Ctrl+Shift+V:
+  from the current view to the set (error if already at the set; center
+  proportional to the zoom so the starting point stays in frame;
+  ease-out transition: fast at the start, slow at the end), 60…480 frames
+  at 24/30/60 fps, selected AA (auto-reduced beyond 128 MPixel of samples),
+  auto iterations per frame, ffmpeg H.264 (on worker, async stderr, kill on
+  cancel, pad to even dimensions because the view often has odd sides) or
+  PNG sequence if absent (Open button for the result)), Back to set (RealTime) (Ctrl+Shift+R: animation on the main view from the current zone to the set, 120 frames at 30 fps, Esc to stop)
 
-- Menu Vista: cronologia Indietro/Avanti (Alt+Left/Right, max 200 viste: ogni
-  zoom, pan, reset e caricamento è committed) e zone preferite nominate
-  (Ctrl+D, JSON in `%APPDATA%\MandelbrotViewer\zone\`, con salto ed
-  eliminazione dal sottomenu); modalità Julia (Ctrl+J, `z = z² + c` con c
-  fissata, default −0,7 + 0,27015i persistita: click = fissa c, R resetta anche
-  c; zone includono modo e c).
-- Menu Aiuto: Informazioni (versione, comandi) e log/diagnostica (stato motori,
-  schede, errori con step esatto, impostazioni, log eventi con errori dei benchmark).
-- Barra di stato: centro, larghezza, iterazioni, palette, motore (+AA/anteprima);
-  guida comandi fissa. ToolTip su controlli e voci di menu.
-- Cursore AppStarting (freccia+clessidra) durante i render async — l'UI resta
-  interattiva — assegnato in ricorsione a tutti i controlli; Wait solo per
-  l'init CUDA sincrona a UI congelata.
-- Finestra 1152×720 (posizione/dimensione persistite), versione nel titolo.
+- View menu: history Back/Forward (Alt+Left/Right, max 200 views: every
+  zoom, pan, reset and load is committed) and named favorite zones
+  (Ctrl+D, JSON in `%APPDATA%\MandelbrotViewer\zone\`, with jump and
+  delete from the submenu); Julia mode (Ctrl+J, `z = z² + c` with c
+  fixed, default −0.7 + 0.27015i persisted: click = fix c, R resets also
+  c; zones include mode and c).
+- Help menu: About (version, commands) and log/diagnostics (engine status,
+  cards, errors with exact step, settings, events log with benchmark errors).
+- Status bar: center, width, iterations, palette, engine (+AA/preview);
+  fixed commands guide. Tooltips on controls and menu items.
+- AppStarting cursor (arrow+clock) during async renders — the UI stays
+  interactive — assigned recursively to all controls; Wait only for
+  the synchronous CUDA init with frozen UI.
+- Window 1152×720 (position/size persisted), version in the title.
 
-## Motori
+## Engines
 
-- CPU (sempre disponibile): double, `Parallel.For` + `LockBits`, async con
-  cancellazione.
-- CUDA (GPU NVIDIA, altrimenti fallback CPU): kernel float 32-bit o double
-  64-bit a scelta (radio 32/64, default 64); colorazione e downsampling AA
-  calcolati sulla GPU (alla CPU arriva solo il bitmap finale); buffer device e
-  host riusati tra frame; render serializzati (`RenderGate`). CPU sempre double,
-  DirectX sempre float.
-- DirectX 11 (Vortice, float, realtime ~60 fps con timer da 16 ms, pan/zoom
-  immediati, fallback CPU in caso di errore): triangolo fullscreen + pixel
-  shader; Salva PNG dal backbuffer. Oltre scala ~1e-3 il float non basta (stato
-  "[oltre float!]"): usare CUDA double o CPU.
-- Dropdown GPU (visibile solo con motori GPU): unisce schede DXGI e device CUDA;
-  "Auto" = device CUDA più capiente / adapter DirectX predefinito; scelta
-  persistita e applicata al cambio motore. Motore non disponibile → motivo
-  mostrato in barra di stato.
+- CPU (always available): double, `Parallel.For` + `LockBits`, async with
+  cancellation.
+- CUDA (NVIDIA GPU, otherwise CPU fallback): float 32-bit or double
+  64-bit kernel at choice (radio 32/64, default 64); coloring and AA downsampling
+  computed on the GPU (only the final bitmap reaches the CPU); device and host
+  buffers reused between frames; renders serialized (`RenderGate`). CPU always double,
+  DirectX always float.
+- DirectX 11 (Vortice, float, realtime ~60 fps with a 16 ms timer, immediate
+  pan/zoom, CPU fallback on error): fullscreen triangle + pixel
+  shader; Save PNG from the backbuffer. Beyond scale ~1e-3 float is not enough (state
+  "[beyond float!]"): use CUDA double or CPU.
+- GPU dropdown (visible only with GPU engines): unifies DXGI cards and CUDA devices;
+  "Auto" = most capable CUDA device / default DirectX adapter; choice
+  persisted and applied on engine change. Engine unavailable → reason
+  shown in the status bar.
 
-## Impostazioni
+## Settings
 
-`%APPDATA%\MandelbrotViewer\settings.json`: iterazioni (auto/manuale + valore),
-palette, AA, motore, GPU, precisione CUDA, finestra. La vista NON è memorizzata
-(si parte sempre dall'insieme completo). Load tollerante, save validato
-(iterazioni clampate 50…50000).
+`%APPDATA%\MandelbrotViewer\settings.json`: iterations (auto/manual + value),
+palette, AA, engine, GPU, CUDA precision, window. The view is NOT saved
+(always start from the full set). Tolerant load, validated save
+(iterations clamped 50…50000).
 
 ## Benchmark
 
-Test standardizzato identico per i motori (`BenchmarkStandard`): zona fissa
-960×540, AA 1× inteso come griglia di campioni elementari senza media
-(960x540 = 0,52 MPixel per frame), iterazioni calcolate con la formula auto alla scala del test (10915), centro (-0.7499302568795561, -0.015139113925433963), scala 1.0453474311811176e-04 (half 5.226737155905588e-05), solo conteggio delle
-iterazioni di fuga (niente colorazione né downsampling), budget 8 s, metrica
-frame × campioni/frame / secondi.
-- CPU: accumula le iterazioni; CUDA: kernel solo-iterazioni con buffer riusati;
-  DirectX: shader solo-iterazioni su render target offscreen in memoria
-  (~2 MB), senza finestra né Present, con 4 event query in anello per contare
-  i frame davvero completati (DWM e copia inter-GPU esclusi: le schede senza
-  monitor misurano il puro shader). Anti-blocco: VRAM stimata prima dellallocazione (errore se insufficiente), timeout 60 s per frame e rilevazione device-removed: la Radeon iGPU va in TDR (frame troppo pesante a 10915 iter) e il run fallisce con errore invece di bloccarsi).
-- La finestra parte da sola, mostra l'anteprima colorata 960×540 AA1x del frame
-  (resa col motore attivo prima della misura), percentuale + MPixel/s
-  intermedi ogni secondo, risultato in grande e grafico a 9 barre (misura +
-  storici best-di-3 sulla zona corrente: CUDA 5070 Ti 276,3/6,7 e 4070 SUPER 220,7/5,3 in 32/64-bit; DirectX 5070 Ti 292,4, 4070 SUPER 239,2 e Radeon 5,1; CPU 9900X 4,8 in double) Durante il test DirectX il pannello realtime è
-  nascosto e il timer sospeso, ripristinati alla chiusura.
-- CLI: `--bench-dx [scheda]` (tutte le DXGI o una), `--bench-cuda [device]`
-  (tutti i device, 32 + 64 bit), `--bench-cpu` (con nome modello),
-  `--diag-dx [scheda]`, `--diag-gpu`; `--csv file` accoda una riga per run
-  (timestamp, motore, device, precisione, run, frame, secondi, MPixel/s),
-  come il pulsante "Esporta CSV" della finestra. Nota: gli storici sono misurati in Release (pubblicato); avvia.bat gira in Debug e in CPU rende ~2,7x meno
+Standardized test identical for the engines (`BenchmarkStandard`): fixed zone
+960×540, AA 1× meaning a grid of elementary samples without averaging
+(960x540 = 0.52 MPixel per frame), iterations computed with the auto formula at the test scale (10915), center (-0.7499302568795561, -0.015139113925433963), scale 1.0453474311811176e-04 (half 5.226737155905588e-05), only counting
+escape iterations (no coloring nor downsampling), 8 s budget, metric
+frames × samples/frame / seconds.
+- CPU: accumulates the iterations; CUDA: iterations-only kernel with reused buffers;
+  DirectX: iterations-only shader on an in-memory offscreen render target
+  (~2 MB), without window nor Present, with 4 event queries in a ring to count
+  the frames actually completed (DWM and inter-GPU copy excluded: headless cards
+  measure the pure shader). Anti-hang: VRAM estimated before allocation (error if insufficient), 60 s timeout per frame and device-removed detection: the Radeon iGPU goes into TDR (frame too heavy at 10915 iterations) and the run fails with an error instead of hanging).
+- The window opens on its own, shows the colored 960×540 AA1x preview of the frame
+  (rendered with the active engine before the measurement), percentage + MPixel/s
+  intermediate every second, result in large and a 9-bar chart (measurement +
+  best-of-3 history on the current zone: CUDA 5070 Ti 276.3/6.7 and 4070 SUPER 220.7/5.3 in 32/64-bit; DirectX 5070 Ti 292.4, 4070 SUPER 239.2 and Radeon 5.1; CPU 9900X 4.8 in double) During the DirectX test the realtime panel is
+  hidden and the timer suspended, restored on close.
+- CLI: `--bench-dx [card]` (all DXGI or one), `--bench-cuda [device]`
+  (all devices, 32 + 64 bit), `--bench-cpu` (with model name),
+  `--diag-dx [card]`, `--diag-gpu`; `--csv file` queues one row per run
+  (timestamp, engine, device, precision, run, frame, seconds, MPixel/s),
+  like the "Export CSV" button of the window. Note: the history is measured in Release (published); run.bat runs in Debug and in CPU renders ~2.7x less
 
-## File
+## Files
 
-- `MandelbrotViewer/Mandelbrot.cs` — calcolo e benchmark CPU.
-- `MandelbrotViewer/Palette.cs` — `PaletteColors` (stop/gradienti, fonte unica).
-- `MandelbrotViewer/GpuMandelbrot.cs` — backend CUDA (ILGPU 1.5.3): kernel
-  render float/double + kernel benchmark solo-iterazioni, `DeviceNames()`,
-  `TryInitialize(deviceName)`, `LastError` diagnostico.
-- `MandelbrotViewer/DxMandelbrot.cs` — backend DirectX 11 (Vortice 3.8.3):
-  shader realtime + shader benchmark, swapchain sul pannello, `Capture`,
-  `RenderPreviewToBitmap`, benchmark offscreen headless (`EnsureDevice`,
+- `MandelbrotViewer/Mandelbrot.cs` — CPU computation and benchmark.
+- `MandelbrotViewer/Palette.cs` — `PaletteColors` (stops/gradients, single source).
+- `MandelbrotViewer/GpuMandelbrot.cs` — CUDA backend (ILGPU 1.5.3): render
+  kernel float/double + benchmark kernel iterations-only, `DeviceNames()`,
+  `TryInitialize(deviceName)`, diagnostic `LastError`.
+- `MandelbrotViewer/DxMandelbrot.cs` — DirectX 11 backend (Vortice 3.8.3):
+  realtime shader + benchmark shader, swapchain on the panel, `Capture`,
+  `RenderPreviewToBitmap`, offscreen headless benchmark (`EnsureDevice`,
   `TryInitializeHeadless`, `BeginBenchmarkOffscreen`,
   `RunBenchmarkFramesOffscreen`, `EndBenchmarkOffscreen`), `AdapterNames()`
-  (escluso WARP per nome), `TryInitialize(..., adapterName)`,
+  (WARP excluded by name), `TryInitialize(..., adapterName)`,
   `LastError`/`EnumerationError`, `ShortAdapterName`.
-- `MandelbrotViewer/MandelbrotForm.cs` / `.Designer.cs` — UI principale.
-- `MandelbrotViewer/BenchmarkForm.cs` / `.Designer.cs` — finestra benchmark
-  (auto-avvio, anteprima, grafico storici).
-- `MandelbrotViewer/BenchmarkStandard.cs` — parametri standard condivisi GUI/CLI.
-- `MandelbrotViewer/BenchmarkProgress.cs` — avanzamento (`ReportInterval` 1 s;
-  `TotalIters` significativo solo per CPU).
-- `MandelbrotViewer/Diagnostics.cs` — CLI senza UI
+- `MandelbrotViewer/MandelbrotForm.cs` / `.Designer.cs` — main UI.
+- `MandelbrotViewer/BenchmarkForm.cs` / `.Designer.cs` — benchmark window
+  (auto-start, preview, history chart).
+- `MandelbrotViewer/BenchmarkStandard.cs` — shared standard parameters GUI/CLI.
+- `MandelbrotViewer/BenchmarkProgress.cs` — progress (`ReportInterval` 1 s;
+  `TotalIters` meaningful only for CPU).
+- `MandelbrotViewer/Diagnostics.cs` — CLI without UI
   (`--diag-dx`, `--diag-gpu`, `--bench-dx`, `--bench-cuda`).
-- `MandelbrotViewer/Program.cs` — entry point + smistamento CLI.
-- `MandelbrotViewer/RenderEngine.cs` — enum motori + nomi display.
+- `MandelbrotViewer/Program.cs` — entry point + CLI dispatch.
+- `MandelbrotViewer/RenderEngine.cs` — engines enum + display names.
 - `MandelbrotViewer/Settings.cs` — `AppSettings` in JSON.
-- `MandelbrotViewer/LogForm.cs` — finestra log/diagnostica.
-- AppLog.cs - log eventi in memoria (ultime 200 righe, errori benchmark).
-- `MandelbrotViewer/AppVersion.cs` — versione X.Y.Z (`Display` breve se Z=0).
-- `MandelbrotViewer/app.ico` — icona exe + finestre (da `icon2.png`, 16/32/48/256).
-- Toolbar: due `FlowLayoutPanel` (riga 0: pulsanti + iterazioni + palette + AA;
-  riga 1: motore + precisione + GPU), controlli ammassati a sinistra.
-- Root: `avvia.bat` (esegue la versione corrente via `dotnet run`, passa gli
-  argomenti), `pubblica.bat` / `pubblica.ps1` (publish self-contained
+- `MandelbrotViewer/LogForm.cs` — log/diagnostics window.
+- AppLog.cs - in-memory events log (last 200 lines, benchmark errors).
+- `MandelbrotViewer/AppVersion.cs` — X.Y.Z version (short `Display` if Z=0).
+- `MandelbrotViewer/app.ico` — exe + windows icon (from `icon2.png`, 16/32/48/256).
+- Toolbar: two `FlowLayoutPanel` (row 0: buttons + iterations + palette + AA;
+  row 1: engine + precision + GPU), controls grouped to the left.
+- Root: `run.bat` (runs the current version via `dotnet run`, forwards the
+  arguments), `publish.bat` / `publish.ps1` (self-contained publish
   single-file in `pubblicato/`, ~158 MB), `AGENTS.md`, `TODO.md`,
-  `CHANGELOG.md`, `.gitignore` (esclude `bin/`, `obj/`, `pubblicato/`, `*.user`).
+  `CHANGELOG.md`, `.gitignore` (excludes `bin/`, `obj/`, `pubblicato/`, `*.user`).
 
 ## Changelog
 
-Vedi [CHANGELOG.md](CHANGELOG.md).
+See [CHANGELOG.md](CHANGELOG.md).
 
-## Note tecniche
+## Technical notes
 
-- `dotnet` solo in `~\.dotnet`, non nel PATH: usare percorso completo.
-- Audit 2026-09-06: SDK 8.0.424 + runtime 8.0.30 (ultimi), ILGPU 1.5.3 e
-  Vortice 3.8.3 (ultimi stabili) — nessun aggiornamento sicuro disponibile;
-  target resta `net8.0-windows` (LTS fino al 10/11/2026, poi valutare migrazione
-  a .NET 10 LTS).
-- Il backend CUDA richiede GPU NVIDIA + driver sulla macchina target (il toolkit
-  CUDA non serve a runtime); senza GPU l'app usa la CPU in automatico.
+- `dotnet` only in `~\.dotnet`, not in PATH: use the full path.
+- Audit 2026-09-06: SDK 8.0.424 + runtime 8.0.30 (latest), ILGPU 1.5.3 and
+  Vortice 3.8.3 (latest stable) — no safe updates available;
+  target stays `net8.0-windows` (LTS until 2026-11-10, then evaluate migration
+  to .NET 10 LTS).
+- The CUDA backend requires an NVIDIA GPU + driver on the target machine (the
+  CUDA toolkit is not needed at runtime); without a GPU the app uses the CPU automatically.

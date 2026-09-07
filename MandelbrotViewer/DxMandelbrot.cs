@@ -10,12 +10,12 @@ using DxgiFormat = Vortice.DXGI.Format;
 namespace MandelbrotViewer;
 
 /// <summary>
-/// Backend DirectX 11 realtime: triangolo fullscreen + pixel shader HLSL che calcola
-/// il frattale ogni frame (float). Presenta su swapchain legata all'handle del pannello.
+/// Realtime DirectX 11 backend: fullscreen triangle + HLSL pixel shader that computes
+/// the fractal every frame (float). Presents to a swapchain bound to the panel's handle.
 /// </summary>
 internal static class DxMandelbrot
 {
-    // Triangolo fullscreen senza vertex buffer (SV_VertexID).
+    // Fullscreen triangle without a vertex buffer (SV_VertexID).
     private const string VsSource = @"
 float4 VS(uint id : SV_VertexID) : SV_Position
 {
@@ -53,7 +53,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
             float2 p = pos.xy + sub;
             float2 px = float2(cx + (p.x * invW - 0.5) * scale,
                                cy + (p.y * invH - 0.5) * scale * aspect);
-            // Julia: z(0) = punto del pixel, c = costante; Mandelbrot: z(0) = 0, c = pixel.
+            // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
             float2 z = julia != 0 ? px : 0.0;
             float2 cc = julia != 0 ? float2(jcx, jcy) : px;
             int iter = 0;
@@ -67,7 +67,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
             {
                 float mod2 = max(dot(z, z), 4.0);
                 float smoothIterations = (float)iter + 1.0 - log(log(sqrt(mod2))) / log(2.0);
-                // Mappatura allineata con PaletteColors (CPU) e GpuMandelbrot.ColorFromIterations (CUDA).
+                // Mapping aligned with PaletteColors (CPU) and GpuMandelbrot.ColorFromIterations (CUDA).
                 float t = pow(saturate(smoothIterations / (float)maxIter), 0.35);
                 col = Graded(t);
             }
@@ -78,9 +78,9 @@ float4 PS(float4 pos : SV_Position) : SV_Target
 }";
 
     /// <summary>
-    /// Shader benchmark: soltanto il conteggio iterazioni del frattale, senza
-    /// colorazione, senza smooth e senza media dei campioni. Ogni pixel della
-    /// griglia è un campione elementare: identico al lavoro dei kernel CUDA/CPU.
+    /// Benchmark shader: only the iteration count of the fractal, no
+    /// coloring, no smooth and no sample averaging. Each pixel of the
+    /// grid is an elementary sample: identical to the work of the CUDA/CPU kernels.
     /// </summary>
     private const string BenchPsSource = @"
 cbuffer Params : register(b0)
@@ -100,7 +100,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         z = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
         iter++;
     }
-    // L'uscita dipende dalle iterazioni: il compilatore non può eliminare il loop.
+    // The output depends on the iterations: the compiler cannot eliminate the loop.
     float v = iter >= maxIter ? 0.0 : frac(float(iter) * 0.125);
     return float4(v, v, v, 1.0);
 }
@@ -133,11 +133,11 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     private static ID3D11PixelShader? _benchPs;
     private static int _backWidth, _backHeight;
 
-    // Benchmark offscreen (v2.5.20): render target in memoria della GPU testata,
-    // senza swapchain né Present — niente DWM, niente copia inter-GPU verso la
-    // scheda del monitor (che falsava le schede headless, vedi SPECIFICHE).
-    // Draw ritorna subito (comandi in coda): il completamento dei frame è rilevato
-    // con un anello di event query.
+    // Offscreen benchmark (v2.5.20): render target in the tested GPU's memory,
+    // no swapchain and no Present — no DWM, no cross-GPU copy to the
+    // monitor's card (which skewed the headless cards, see SPECIFICHE).
+    // Draw returns immediately (commands queued): frame completion is detected
+    // with a ring of event queries.
     private static ID3D11Texture2D? _benchTarget;
     private static ID3D11RenderTargetView? _benchRtv;
     private static ID3D11Query?[] _benchQueries = Array.Empty<ID3D11Query?>();
@@ -145,24 +145,24 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
 
     public static bool IsReady => _device != null;
     public static string LastError { get; private set; } = "";
-    /// <summary>Nome della scheda video attualmente usata ("" se non inizializzato).</summary>
+    /// <summary>Name of the video card currently in use ("" if not initialized).</summary>
     public static string AdapterName { get; private set; } = "";
 
-    /// <summary>Memoria dedicata + condivisa dell'adapter in uso (ulong.MaxValue se ignota).</summary>
+    /// <summary>Dedicated + shared memory of the adapter in use (ulong.MaxValue if unknown).</summary>
     public static ulong AdapterDedicatedBytes { get; private set; } = ulong.MaxValue;
     public static ulong AdapterSharedBytes { get; private set; } = ulong.MaxValue;
 
-    /// <summary>Errore dell'ultima enumerazione fallita (diagnostica), vuoto se OK.</summary>
+    /// <summary>Error of the last failed enumeration (diagnostic), empty if OK.</summary>
     public static string EnumerationError { get; private set; } = "";
 
-    /// <summary>Schede video hardware disponibili (esclusi i renderizzatori software WARP).</summary>
+    /// <summary>Available hardware video cards (software WARP renderers excluded).</summary>
     /// <remarks>
-    /// NON leggere né confrontare direttamente DedicatedVideoMemory: è un
-    /// PointerUSize (SIZE_T) e la conversione implicita di SharpGen passa per 32 bit
-    /// (UIntPtr.ToUInt32), che lancia OverflowException con GPU da più di 4 GB — è il
-    /// motivo per cui l'enumerazione restava vuota su macchine con GPU moderne
-    /// (cfr. nota v2.3.8 "overflow del wrapper"). I renderizzatori software si
-    /// escludono per nome: "Microsoft Basic Render Driver" è il WARP di D3D11.
+    /// Do NOT read or compare DedicatedVideoMemory directly: it is a
+    /// PointerUSize (SIZE_T) and the implicit conversion of SharpGen goes through 32 bits
+    /// (UIntPtr.ToUInt32), which throws OverflowException with GPUs of more than 4 GB — that is
+    /// why the enumeration stayed empty on machines with modern GPUs
+    /// (cf. note v2.3.8 "wrapper overflow"). The software renderers are
+    /// excluded by name: "Microsoft Basic Render Driver" is the WARP of D3D11.
     /// </remarks>
     public static IReadOnlyList<string> AdapterNames()
     {
@@ -189,10 +189,10 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         return names;
     }
 
-    /// <summary>Legge la memoria dell'adapter scelto (o del primo hardware se auto).
-    /// Le dimensioni DXGI oltre i 4 GB mandano in overflow la conversione a 32 bit
-    /// del wrapper: in quel caso (o se l'adapter non si trova) resta ulong.MaxValue
-    /// = memoria abbondante/sconosciuta e il controllo VRAM viene saltato.</summary>
+    /// <summary>Reads the memory of the chosen adapter (or of the first hardware one if auto).
+    /// DXGI sizes above 4 GB overflow the wrapper's 32-bit conversion:
+    /// in that case (or if the adapter is not found) it stays ulong.MaxValue
+    /// = abundant/unknown memory and the VRAM check is skipped.</summary>
     private static void RefreshAdapterMemory(string? adapterName)
     {
         AdapterDedicatedBytes = ulong.MaxValue;
@@ -216,7 +216,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
                 }
             }
         }
-        catch { /* memoria sconosciuta: nessun controllo */ }
+        catch { /* unknown memory: no check */ }
     }
 
     private static ulong SafeMemBytes(Func<ulong> read)
@@ -225,14 +225,14 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         catch { return ulong.MaxValue; }
     }
 
-    /// <param name="adapterName">Scheda da usare (nome DXGI esatto); null = adapter hardware predefinito.
-    /// Con una scheda richiesta, il device viene creato esplicitamente sull'adapter scelto.</param>
+    /// <param name="adapterName">Card to use (exact DXGI name); null = default hardware adapter.
+    /// With a requested card, the device is created explicitly on the chosen adapter.</param>
     public static bool TryInitialize(IntPtr hwnd, int width, int height, string? adapterName = null)
     {
         if (!EnsureDevice(adapterName))
             return false;
         LastError = "";
-        string step = "inizio";
+        string step = "start";
         try
         {
             step = "DXGI.CreateDXGIFactory2";
@@ -269,16 +269,16 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     }
 
     /// <summary>
-    /// Inizializza device, context e shader sulla scheda scelta senza finestra né
-    /// swapchain (headless): per il benchmark offscreen, che non presenta nulla.
+    /// Initializes device, context and shaders on the chosen card without a window or a
+    /// swapchain (headless): for the offscreen benchmark, which presents nothing.
     /// </summary>
-    /// <param name="adapterName">Scheda da usare (nome DXGI esatto); null = predefinito.</param>
+    /// <param name="adapterName">Card to use (exact DXGI name); null = default.</param>
     public static bool TryInitializeHeadless(string? adapterName = null) =>
         EnsureDevice(adapterName);
 
     /// <summary>
-    /// Crea (o riusa) device, context e shader sull'adapter scelto. La swapchain
-    /// resta di competenza di <see cref="TryInitialize"/> (serve una finestra).
+    /// Creates (or reuses) device, context and shaders on the chosen adapter. The swapchain
+    /// stays the responsibility of <see cref="TryInitialize"/> (it needs a window).
     /// </summary>
     private static bool EnsureDevice(string? adapterName)
     {
@@ -287,39 +287,39 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         if (IsReady)
         {
             if (same) return true;
-            Dispose(); // cambio scheda: il device va ricreato sull'adapter scelto
+            Dispose(); // card change: the device must be recreated on the chosen adapter
         }
         LastError = "";
-        string step = "inizio";
+        string step = "start";
         try
         {
             step = "DXGI.CreateDXGIFactory2";
             using IDXGIFactory2 factory = DXGI.CreateDXGIFactory2<IDXGIFactory2>(false);
 
-            // Se l'utente ha scelto una scheda, trova l'adapter DXGI corrispondente
-            // e passalo esplicito a D3D11CreateDevice (con DriverType.Unknown, come
-            // richiesto quando si passa un adapter); altrimenti adapter predefinito.
+            // If the user chose a card, find the matching DXGI adapter
+            // and pass it explicitly to D3D11CreateDevice (with DriverType.Unknown, as
+            // required when passing an adapter); otherwise the default adapter.
             IDXGIAdapter? chosen = null;
             if (adapterName != null)
             {
-                step = "ricerca dell'adapter DXGI richiesto";
+                step = "searching for the requested DXGI adapter";
                 for (uint i = 0; i < 32; i++)
                 {
                     if (factory.EnumAdapters(i, out IDXGIAdapter adapter).Failure) break;
                     if (string.Equals(adapter.Description.Description, adapterName, StringComparison.OrdinalIgnoreCase))
                     {
-                        chosen = adapter; // il dispose avviene dopo la creazione del device
+                        chosen = adapter; // the dispose happens after the device creation
                         break;
                     }
                     adapter.Dispose();
                 }
                 if (chosen == null)
-                    throw new InvalidOperationException($"Scheda video non trovata: {adapterName}");
+                    throw new InvalidOperationException($"Video card not found: {adapterName}");
             }
 
             step = chosen != null
-                ? $"D3D11CreateDevice (adapter scelto: {adapterName})"
-                : "D3D11CreateDevice (adapter hardware predefinito)";
+                ? $"D3D11CreateDevice (chosen adapter: {adapterName})"
+                : "D3D11CreateDevice (default hardware adapter)";
             var result = D3D11.D3D11CreateDevice(
                 chosen, chosen != null ? DriverType.Unknown : DriverType.Hardware,
                 DeviceCreationFlags.BgraSupport,
@@ -327,21 +327,21 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
                 out ID3D11Device device,
                 out FeatureLevel level,
                 out ID3D11DeviceContext context);
-            chosen?.Dispose(); // il device mantiene il proprio riferimento all'adapter
+            chosen?.Dispose(); // the device keeps its own reference to the adapter
             if (result.Failure)
-                throw new InvalidOperationException($"D3D11CreateDevice fallito (HRESULT 0x{result.Code:X8})");
+                throw new InvalidOperationException($"D3D11CreateDevice failed (HRESULT 0x{result.Code:X8})");
             _device = device;
             _context = context;
-            AdapterName = adapterName ?? "Auto (adapter hardware predefinito)";
+            AdapterName = adapterName ?? "Auto (default hardware adapter)";
             RefreshAdapterMemory(adapterName);
 
-            step = "D3DCompiler.Compile (shader)";
+            step = "D3DCompiler.Compile (shaders)";
             ReadOnlyMemory<byte> vsCode = Compiler.Compile(VsSource, "VS", "mandelbrot-vs", "vs_5_0");
             ReadOnlyMemory<byte> psCode = Compiler.Compile(PsSource, "PS", "mandelbrot-ps", "ps_5_0");
             _vs = _device.CreateVertexShader(vsCode.Span);
             _ps = _device.CreatePixelShader(psCode.Span);
 
-            step = "D3DCompiler.Compile (shader benchmark)";
+            step = "D3DCompiler.Compile (benchmark shader)";
             ReadOnlyMemory<byte> benchCode = Compiler.Compile(BenchPsSource, "BenchPS", "mandelbrot-bench-ps", "ps_5_0");
             _benchPs = _device.CreatePixelShader(benchCode.Span);
 
@@ -384,7 +384,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         CreateViews(width, height);
     }
 
-    /// <summary>Costruisce i parametri di un frame colorato (con gli stop della palette).</summary>
+    /// <summary>Builds the parameters of a colored frame (with the palette stops).</summary>
     private static DxParams BuildParams(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         var stops = PaletteColors.GetStops(palette);
@@ -410,8 +410,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     }
 
     /// <summary>
-    /// Pipeline comune a tutti i frame (Render, benchmark offscreen, RenderPreviewToBitmap):
-    /// costanti, shader, render target, viewport e draw del triangolo fullscreen.
+    /// Pipeline common to all frames (Render, offscreen benchmark, RenderPreviewToBitmap):
+    /// constants, shaders, render target, viewport and draw of the fullscreen triangle.
     /// </summary>
     private static void DrawFrame(DxParams pars, ID3D11RenderTargetView rtv, ID3D11PixelShader ps, int width, int height)
     {
@@ -436,26 +436,26 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     }
 
     /// <summary>
-    /// Prepara il benchmark offscreen: render target in memoria della GPU alle
-    /// dimensioni della griglia dei campioni elementari (es. 960x540 AA1x =
-    /// 960x540, ~2 MB in R8G8B8A8) più un anello di event query per rilevare
-    /// il completamento reale dei frame. Niente swapchain, niente Present.
+    /// Prepares the offscreen benchmark: render target in the GPU memory at the
+    /// dimensions of the elementary samples grid (e.g. 960x540 AA1x =
+    /// 960x540, ~2 MB in R8G8B8A8) plus a ring of event queries to detect
+    /// the real completion of the frames. No swapchain, no Present.
     /// </summary>
     public static void BeginBenchmarkOffscreen(int width, int height)
     {
-        if (!IsReady) throw new InvalidOperationException("DirectX non inizializzato.");
+        if (!IsReady) throw new InvalidOperationException("DirectX not initialized.");
         EndBenchmarkOffscreen();
         width = Math.Max(1, width);
         height = Math.Max(1, height);
-        // Stima memoria: render target R8G8B8A8 (4 byte/pixel) x2 di margine.
-        // Se l'adapter non ha abbastanza RAM il driver va in TDR/stallo senza errori:
-        // meglio un errore chiaro subito che un blocco infinito in DrainOne.
+        // Memory estimate: R8G8B8A8 render target (4 bytes/pixel) x2 margin.
+        // If the adapter does not have enough RAM the driver goes into TDR/stall without errors:
+        // better a clear error right away than an infinite hang in DrainOne.
         ulong need = (ulong)width * (ulong)height * 4ul * 2ul;
         ulong have = AdapterDedicatedBytes >= ulong.MaxValue - AdapterSharedBytes
             ? ulong.MaxValue : AdapterDedicatedBytes + AdapterSharedBytes;
         if (have != ulong.MaxValue && need > have)
         {
-            string msg = "Memoria GPU insufficiente per il benchmark (" + width + "x" + height + " = ~" + (need / 1048576) + " MB richiesti, ~" + (have / 1048576) + " MB su " + AdapterName + "): ridurre AA o usare un'altra scheda.";
+            string msg = "Insufficient GPU memory for the benchmark (" + width + "x" + height + " = ~" + (need / 1048576) + " MB required, ~" + (have / 1048576) + " MB on " + AdapterName + "): reduce AA or use another card.";
             throw new InvalidOperationException(msg);
         }
 
@@ -481,7 +481,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         _benchGridH = height;
     }
 
-    /// <summary>Rilascia le risorse del benchmark offscreen.</summary>
+    /// <summary>Releases the offscreen benchmark resources.</summary>
     public static void EndBenchmarkOffscreen()
     {
         if (_benchQueries != null)
@@ -492,7 +492,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
         _benchRtv?.Dispose(); _benchRtv = null;
         _benchTarget?.Dispose(); _benchTarget = null;
-        // Ripristina render target e viewport della swapchain per i render successivi.
+        // Restore the swapchain render target and viewport for subsequent renders.
         if (_rtv != null && _context != null)
         {
             _context.OMSetRenderTargets(_rtv);
@@ -500,14 +500,14 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
     }
 
-    /// <summary>Frame in flight: quanti Draw restano accodati prima di attendere
-    /// il completamento del più vecchio (pipeline piena, throughput reale).</summary>
+    /// <summary>Frames in flight: how many Draws remain queued before waiting
+    /// for the oldest to complete (full pipeline, real throughput).</summary>
     private const int BenchmarkFlight = 4;
 
     /// <summary>
-    /// Frame di benchmark offscreen: disegna con lo shader solo-iterazioni sulla
-    /// griglia dei campioni e accoda un evento di completamento. Nessun Present:
-    /// la misura è puro tempo di calcolo dello shader, indipendente dal monitor.
+    /// Offscreen benchmark frame: draws with the iterations-only shader on the
+    /// samples grid and queues a completion event. No Present:
+    /// the measure is pure shader compute time, independent of the monitor.
     /// </summary>
     private static void RenderBenchmarkOffscreen(double centerX, double centerY, double scale, int width, int height, int maxIter, ID3D11Query query)
     {
@@ -527,16 +527,16 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     }
 
     /// <summary>
-    /// Loop di misura standard offscreen: rende frame solo-iterazioni sulla griglia
-    /// dei campioni per il budget indicato e ritorna i secondi effettivi e il numero
-    /// di frame davvero completati dalla GPU (event query). Condiviso dal benchmark
-    /// GUI e da `--bench-dx`. Senza Present: DWM e copia inter-GPU esclusi.
+    /// Standard offscreen measurement loop: renders iterations-only frames on the
+    /// samples grid for the given budget and returns the effective seconds and the number
+    /// of frames really completed by the GPU (event query). Shared by the benchmark
+    /// GUI and by `--bench-dx`. No Present: DWM and cross-GPU copy excluded.
     /// </summary>
-    /// <param name="tick">Callback opzionale (frames completati, secondi) periodica.</param>
+    /// <param name="tick">Optional periodic callback (completed frames, seconds).</param>
     public static (double Seconds, int Frames) RunBenchmarkFramesOffscreen(double centerX, double centerY, double scale, int gridW, int gridH, int maxIter, TimeSpan budget, Action<int, double>? tick, CancellationToken ct)
     {
         if (_benchRtv == null || _benchQueries.Length == 0)
-            throw new InvalidOperationException("Benchmark offscreen non preparato (BeginBenchmarkOffscreen).");
+            throw new InvalidOperationException("Offscreen benchmark not prepared (BeginBenchmarkOffscreen).");
         var sw = System.Diagnostics.Stopwatch.StartNew();
         int submitted = 0, completed = 0;
         double completedSeconds = 0;
@@ -560,8 +560,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             }
         }
 
-        // Svuota la coda: i frame accodati ma non ancora completati contano,
-        // il tempo si ferma al completamento dell'ultimo.
+        // Drain the queue: the queued but not yet completed frames count,
+        // the time stops at the completion of the last one.
         _context!.Flush();
         while (pending.Count > 0)
             DrainOne(pending, sw, ref completed, ref completedSeconds, ct);
@@ -570,9 +570,9 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     }
 
     /// <summary>
-    /// True se l'event query è scattata (la GPU ha superato l'`End` corrispondente).
-    /// Con pData NULL, `GetData` fa solo il check di stato: S_OK = pronta, S_FALSE
-    /// = ancora in coda; con `DoNotFlush` non invia lavoro accodato alla GPU.
+    /// True if the event query fired (the GPU passed the matching `End`).
+    /// With pData NULL, `GetData` only does the status check: S_OK = ready, S_FALSE
+    /// = still queued; with `DoNotFlush` it does not send queued work to the GPU.
     /// </summary>
     private static bool QuerySignaled(ID3D11Query query, AsyncGetDataFlags flags)
     {
@@ -582,17 +582,17 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
         catch (SharpGen.Runtime.SharpGenException)
         {
-            // Su device removed GetData lancia invece di tornare S_FALSE:
-            // mappa in errore leggibile con il motivo della rimozione.
+            // On device removed GetData throws instead of returning S_FALSE:
+            // map it to a readable error with the reason of the removal.
             var removed = _device!.DeviceRemovedReason;
             if (removed.Failure)
                 throw new InvalidOperationException(
-                    $"GPU bloccata durante il benchmark (device removed, HRESULT 0x{removed.Code:X8}): frame troppo pesante per {AdapterName} a questa griglia.");
+                    $"GPU hung during the benchmark (device removed, HRESULT 0x{removed.Code:X8}): frame too heavy for {AdapterName} at this grid.");
             throw;
         }
     }
 
-    /// <summary>Conta i frame la cui event query è già scattata (senza flush).</summary>
+    /// <summary>Counts the frames whose event query already fired (without flush).</summary>
     private static void DrainReady(Queue<(ID3D11Query Query, int Seq)> pending,
         System.Diagnostics.Stopwatch sw, ref int completed, ref double completedSeconds)
     {
@@ -604,22 +604,22 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
     }
 
-    /// <summary>Attesa massima di un singolo frame prima di dichiarare la GPU bloccata.</summary>
+    /// <summary>Maximum wait of a single frame before declaring the GPU hung.</summary>
     private static readonly TimeSpan BenchmarkFrameTimeout = TimeSpan.FromSeconds(60);
 
-    /// <summary>Attende il frame più vecchio della coda (bloccante, interrompibile).</summary>
+    /// <summary>Waits for the oldest frame in the queue (blocking, interruptible).</summary>
     private static void DrainOne(Queue<(ID3D11Query Query, int Seq)> pending,
         System.Diagnostics.Stopwatch sw, ref int completed, ref double completedSeconds, CancellationToken ct)
     {
         var (query, _) = pending.Dequeue();
-        // Poll con flush: la GPU avanza mentre la CPU attende (GetData bloccante
-        // nativo non accetterebbe il CancellationToken). Con timeout e controllo
-        // device-removed: senza, una scheda che non regge la griglia del benchmark
-        // (TDR di Windows, OOM) resta in attesa per sempre senza errori.
+        // Poll with flush: the GPU advances while the CPU waits (blocking
+        // native GetData would not accept the CancellationToken). With timeout and
+        // device-removed check: without it, a card that cannot hold the benchmark grid
+        // (Windows TDR, OOM) stays waiting forever without errors.
         var waitStart = sw.Elapsed;
-        // Poll stretto senza sleep: a AA1x i frame durano ~1 ms e ogni quanto
-        // di attesa (~1-15 ms) deprimerebbe il throughput; i controlli costosi
-        // (cancel, device-removed, timeout) girano ogni 1024 poll.
+        // Tight poll without sleep: at AA1x the frames last ~1 ms and every
+        // wait interval (~1-15 ms) would depress the throughput; the expensive checks
+        // (cancel, device-removed, timeout) run every 1024 polls.
         int spins = 0;
         while (!QuerySignaled(query, AsyncGetDataFlags.None))
         {
@@ -628,12 +628,12 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             var removed = _device!.DeviceRemovedReason;
             if (removed.Failure)
             {
-                string msg = $"GPU bloccata durante il benchmark (device removed, HRESULT 0x{removed.Code:X8}): frame troppo pesante per {AdapterName} a questa griglia.";
+                string msg = $"GPU hung during the benchmark (device removed, HRESULT 0x{removed.Code:X8}): frame too heavy for {AdapterName} at this grid.";
                 throw new InvalidOperationException(msg);
             }
             if (sw.Elapsed - waitStart > BenchmarkFrameTimeout)
             {
-                string msg = $"Timeout GPU ({BenchmarkFrameTimeout.TotalSeconds:0} s) in attesa di un frame su {AdapterName}: scheda troppo lenta o driver bloccato.";
+                string msg = $"GPU timeout ({BenchmarkFrameTimeout.TotalSeconds:0} s) waiting for a frame on {AdapterName}: card too slow or driver hung.";
                 throw new TimeoutException(msg);
             }
 
@@ -642,7 +642,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         completedSeconds = sw.Elapsed.TotalSeconds;
     }
 
-    /// <summary>Nome compresso per la UI e lo storico: "NVIDIA GeForce RTX 5070 Ti"
+    /// <summary>Compressed name for the UI and the history: "NVIDIA GeForce RTX 5070 Ti"
     /// → "RTX 5070 Ti", "AMD Radeon(TM) Graphics" → "AMD Radeon Graphics".</summary>
     public static string ShortAdapterName(string fullName) =>
         fullName.Replace("NVIDIA GeForce ", "").Replace("(TM)", "").Trim();
@@ -650,18 +650,18 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     private static DxStop ToStop((double T, byte R, byte G, byte B) s) =>
         new() { R = s.R / 255f, G = s.G / 255f, B = s.B / 255f };
 
-    /// <summary>Cattura il backbuffer in un Bitmap (per Salva PNG).</summary>
+    /// <summary>Captures the backbuffer in a Bitmap (for Save PNG).</summary>
     public static Bitmap Capture()
     {
-        if (!IsReady) throw new InvalidOperationException("DirectX non inizializzato.");
+        if (!IsReady) throw new InvalidOperationException("DirectX not initialized.");
         using ID3D11Texture2D backbuffer = _swapChain!.GetBuffer<ID3D11Texture2D>(0);
         return ReadTextureToBitmap(backbuffer, _backWidth, _backHeight);
     }
 
     /// <summary>
-    /// Renderizza un frame COLORATO della zona su una render-target fuori dalla
-    /// swapchain e lo restituisce come Bitmap: la preview del benchmark per il
-    /// motore DirectX (senza presentare nulla sulla finestra principale).
+    /// Renders a COLORED frame of the area onto a render-target outside the
+    /// swapchain and returns it as a Bitmap: the benchmark preview for the
+    /// DirectX engine (without presenting anything on the main window).
     /// </summary>
     public static Bitmap? RenderPreviewToBitmap(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
@@ -674,8 +674,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
                 Height = (uint)Math.Max(1, height),
                 MipLevels = 1,
                 ArraySize = 1,
-                // B8G8R8A8: stesso layout di byte di Bitmap Format32bppArgb (B,G,R,A),
-                // così i canali non risultano invertiti in lettura.
+                // B8G8R8A8: same byte layout of Bitmap Format32bppArgb (B,G,R,A),
+                // so the channels do not come out inverted on read.
                 Format = DxgiFormat.B8G8R8A8_UNorm,
                 SampleDescription = new SampleDescription(1, 0),
                 Usage = ResourceUsage.Default,
@@ -690,8 +690,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
 
             var bmp = ReadTextureToBitmap(target, width, height);
 
-            // Ripristina render target e viewport della swapchain per i render successivi
-            // (se c'è una swapchain: in headless non esiste).
+            // Restore the swapchain render target and viewport for subsequent renders
+            // (if there is one: in headless it does not exist).
             if (_rtv != null)
             {
                 _context.OMSetRenderTargets(_rtv);
@@ -705,7 +705,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
     }
 
-    /// <summary>Copia il contenuto di una texture in un Bitmap (per cattura/anteprima).</summary>
+    /// <summary>Copies the content of a texture in a Bitmap (for capture/preview).</summary>
     private static Bitmap ReadTextureToBitmap(ID3D11Texture2D source, int width, int height)
     {
         Texture2DDescription stg = source.Description;
@@ -714,7 +714,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         stg.CPUAccessFlags = CpuAccessFlags.Read;
         stg.MiscFlags = ResourceOptionFlags.None;
         using ID3D11Texture2D staging = _device!.CreateTexture2D(stg);
-        _context!.CopyResource(staging, source); // CopyResource(dst, src): copia la texture renderizzata nello staging
+        _context!.CopyResource(staging, source); // CopyResource(dst, src): copies the rendered texture to the staging
 
         MappedSubresource mapped = _context.Map(staging, 0, MapMode.Read);
         try

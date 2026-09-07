@@ -92,7 +92,7 @@ public partial class BenchmarkForm : Form
             try
             {
                 var preview = await Task.Run(
-                    () => DxMandelbrot.RenderPreviewToBitmap(BCx, BCy, BScale, BW, BH, BMaxIter, 1, Palette.Fuoco),
+                    () => DxMandelbrot.RenderPreviewToBitmap(BCx, BCy, BScale, BW, BH, BMaxIter, 1, Palette.Fire),
                     _cts.Token);
                 if (preview != null && !IsDisposed)
                 {
@@ -301,9 +301,9 @@ public partial class BenchmarkForm : Form
         try
         {
             if (_useCuda)
-                GpuMandelbrot.Render(bmp, BCx, BCy, BScale, BMaxIter, Palette.Fuoco, 1, _useDouble, ct);
+                GpuMandelbrot.Render(bmp, BCx, BCy, BScale, BMaxIter, Palette.Fire, 1, _useDouble, ct);
             else
-                Mandelbrot.Render(bmp, BCx, BCy, BScale, BMaxIter, Palette.Fuoco, 1, ct);
+                Mandelbrot.Render(bmp, BCx, BCy, BScale, BMaxIter, Palette.Fire, 1, ct);
             return bmp;
         }
         catch

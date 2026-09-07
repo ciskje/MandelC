@@ -4,19 +4,19 @@ using Vortice.DXGI;
 namespace MandelbrotViewer;
 
 /// <summary>
-/// Diagnostica da riga di comando senza UI (MandelbrotViewer --diag-dx | --diag-gpu):
-/// verifica l'inizializzazione dei motori DirectX e CUDA. Utile per il troubleshooting
-/// quando la finestra principale non parte o un motore non si inizializza.
+/// Command-line diagnostics without UI (MandelbrotViewer --diag-dx | --diag-gpu):
+/// verifies the initialization of the DirectX and CUDA engines. Useful for troubleshooting
+/// when the main window does not start or an engine does not initialize.
 /// </summary>
 internal static class Diagnostics
 {
     public static void DiagDx(string? adapterName = null)
     {
-        Console.WriteLine("Schede DXGI: " + string.Join(", ", DxMandelbrot.AdapterNames())
-            + (DxMandelbrot.EnumerationError.Length > 0 ? "   [ERRORE ENUM: " + DxMandelbrot.EnumerationError + "]" : ""));
+        Console.WriteLine("DXGI cards: " + string.Join(", ", DxMandelbrot.AdapterNames())
+            + (DxMandelbrot.EnumerationError.Length > 0 ? "   [ENUM ERROR: " + DxMandelbrot.EnumerationError + "]" : ""));
 
-        // Enumerazione dettagliata: mostra il risultato di ogni adapter e ogni eventuale
-        // eccezione (AdapterNames restituisce solo i nomi validi e nasconde gli errori).
+        // Detailed enumeration: shows the result of every adapter and every
+        // exception (AdapterNames returns only the valid names and hides the errors).
         try
         {
             using IDXGIFactory1 factory = DXGI.CreateDXGIFactory1<IDXGIFactory1>();
@@ -26,7 +26,7 @@ internal static class Diagnostics
                 Result enumRes = factory.EnumAdapters(i, out IDXGIAdapter adapter);
                 if (enumRes.Failure)
                 {
-                    Console.WriteLine($"  EnumAdapters({i}): fine ({enumRes.Code})");
+                    Console.WriteLine($"  EnumAdapters({i}): end ({enumRes.Code})");
                     break;
                 }
                 using (adapter)
@@ -38,19 +38,19 @@ internal static class Diagnostics
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"  Adapter {i}: lettura descrizione FALLITA: {ex.GetType().Name}: {ex.Message}");
+                        Console.WriteLine($"  Adapter {i}: description read FAILED: {ex.GetType().Name}: {ex.Message}");
                     }
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Factory/enum DXGI falliti: {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"DXGI factory/enum failed: {ex.GetType().Name}: {ex.Message}");
         }
 
         using var f = new Form { ShowInTaskbar = false, WindowState = FormWindowState.Minimized, Opacity = 0 };
         f.CreateControl();
-        var handle = f.Handle; // forza creazione handle nativo
+        var handle = f.Handle; // forces creation of the native handle
         bool ok = DxMandelbrot.TryInitialize(handle, 800, 600, adapterName);
         Console.WriteLine("IsReady: " + ok);
         Console.WriteLine("AdapterName: " + DxMandelbrot.AdapterName);
@@ -59,12 +59,12 @@ internal static class Diagnostics
         {
             try
             {
-                DxMandelbrot.Render(MandelbrotForm.StartCenterX, MandelbrotForm.StartCenterY, MandelbrotForm.StartScale, 800, 600, 200, 1, Palette.Fuoco);
+                DxMandelbrot.Render(MandelbrotForm.StartCenterX, MandelbrotForm.StartCenterY, MandelbrotForm.StartScale, 800, 600, 200, 1, Palette.Fire);
                 Console.WriteLine("Render: OK");
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Render fallito: " + ex);
+                Console.WriteLine("Render failed: " + ex);
             }
         }
         DxMandelbrot.Dispose();
@@ -79,7 +79,7 @@ internal static class Diagnostics
             bool ok = GpuMandelbrot.TryInitialize();
             using var bmp = new Bitmap(320, 240);
             if (ok)
-                GpuMandelbrot.Render(bmp, MandelbrotForm.StartCenterX, MandelbrotForm.StartCenterY, MandelbrotForm.StartScale, 200, Palette.Fuoco, 1, false, CancellationToken.None);
+                GpuMandelbrot.Render(bmp, MandelbrotForm.StartCenterX, MandelbrotForm.StartCenterY, MandelbrotForm.StartScale, 200, Palette.Fire, 1, false, CancellationToken.None);
             File.WriteAllText(path, $"Devices: {string.Join(", ", devices)}\nReady: {ok}\nDevice: {GpuMandelbrot.DeviceName}\nError: {GpuMandelbrot.LastError}");
         }
         catch (Exception ex)
@@ -93,41 +93,41 @@ internal static class Diagnostics
     }
 
     /// <summary>
-    /// Triplo test standard su ogni scheda DirectX disponibile (o solo su quella
-    /// indicata): per scheda esegue <paramref name="runs"/> run del benchmark
-    /// standardizzato e stampa i valori in MPixel/s con il migliore — la misura
-    /// usata per lo storico del grafico benchmark (nome compresso).
-    /// Offscreen senza finestra né Present (headless): solo shader + event query,
-    /// così DWM e copia inter-GPU non falsano le schede senza monitor.
+    /// Standard triple test on every available DirectX card (or only on the
+    /// given one): per card runs <paramref name="runs"/> runs of the
+    /// standardized benchmark and prints the values in MPixel/s with the best one — the measure
+    /// used for the benchmark graph history (compressed name).
+    /// Offscreen without window nor Present (headless): only shader + event query,
+    /// so DWM and cross-GPU copy do not skew the headless cards.
     /// </summary>
     public static void BenchDx(string? adapterName, int runs, TimeSpan budget, string? csvPath = null)
     {
         int gridW = BenchmarkStandard.Width * BenchmarkStandard.Aa;
         int gridH = BenchmarkStandard.Height * BenchmarkStandard.Aa;
-        Console.WriteLine($"Benchmark DirectX standardizzato (offscreen, senza Present): {runs} run da {budget.TotalSeconds:0} s per scheda, " +
-            $"zona {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
-            $"(griglia {gridW}x{gridH}, {BenchmarkStandard.PixelsPerFrame / 1e6:0.##} MPixel/frame), " +
-            $"{BenchmarkStandard.MaxIter} iter, solo iterazioni, completamento via event query.");
+        Console.WriteLine($"Standardized DirectX benchmark (offscreen, no Present): {runs} runs of {budget.TotalSeconds:0} s per card, " +
+            $"area {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
+            $"(grid {gridW}x{gridH}, {BenchmarkStandard.PixelsPerFrame / 1e6:0.##} MPixel/frame), " +
+            $"{BenchmarkStandard.MaxIter} iter, iterations only, completion via event query.");
 
-        IReadOnlyList<string> schede = adapterName != null
+        IReadOnlyList<string> cards = adapterName != null
             ? new[] { adapterName }
             : DxMandelbrot.AdapterNames();
-        if (schede.Count == 0)
+        if (cards.Count == 0)
         {
-            Console.WriteLine("Nessuna scheda DirectX disponibile. " +
+            Console.WriteLine("No DirectX card available. " +
                 (DxMandelbrot.EnumerationError.Length > 0 ? "(" + DxMandelbrot.EnumerationError + ")" : ""));
             return;
         }
 
         var migliori = new List<(string Short, double Best)>();
-        foreach (string scheda in schede)
+        foreach (string card in cards)
         {
-            string shortName = DxMandelbrot.ShortAdapterName(scheda);
+            string shortName = DxMandelbrot.ShortAdapterName(card);
             Console.WriteLine();
             Console.WriteLine($"=== {shortName} ===");
-            if (!DxMandelbrot.TryInitializeHeadless(scheda))
+            if (!DxMandelbrot.TryInitializeHeadless(card))
             {
-                Console.WriteLine("  init fallita: " + DxMandelbrot.LastError);
+                Console.WriteLine("  init failed: " + DxMandelbrot.LastError);
                 continue;
             }
 
@@ -140,7 +140,7 @@ internal static class Diagnostics
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("  griglia offscreen non creata: " + ex.Message);
+                    Console.WriteLine("  offscreen grid not created: " + ex.Message);
                     continue;
                 }
                 for (int r = 1; r <= runs; r++)
@@ -152,12 +152,12 @@ internal static class Diagnostics
                             gridW, gridH, BenchmarkStandard.MaxIter, budget, null, CancellationToken.None);
                         double mps = BenchmarkStandard.PixelsPerSecond(frames, seconds) / 1e6;
                         best = Math.Max(best, mps);
-                        Console.WriteLine($"  run {r}: {frames} frame in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
+                        Console.WriteLine($"  run {r}: {frames} frames in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
                         WriteCsvRow(csvPath, "DirectX", shortName, "float", r, frames, seconds, mps);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"  run {r} fallito: {ex.GetType().Name}: {ex.Message}");
+                        Console.WriteLine($"  run {r} failed: {ex.GetType().Name}: {ex.Message}");
                     }
                 }
             }
@@ -170,40 +170,40 @@ internal static class Diagnostics
             if (best > 0)
             {
                 migliori.Add((shortName, best));
-                Console.WriteLine($"  MIGLIORE: {best:0.#} MPixel/s");
+                Console.WriteLine($"  BEST: {best:0.#} MPixel/s");
             }
             else
             {
-                Console.WriteLine("  nessuna misura valida");
+                Console.WriteLine("  no valid measurement");
             }
         }
 
         Console.WriteLine();
-        Console.WriteLine("=== Riepilogo (best per scheda, MPixel/s) ===");
+        Console.WriteLine("=== Summary (best per card, MPixel/s) ===");
         foreach (var (shortName, best) in migliori)
             Console.WriteLine($"  {shortName}: {best:0.#}");
     }
 
     /// <summary>
-    /// Triplo test standard su ogni device CUDA disponibile (o solo su quello
-    /// indicato): per device esegue <paramref name="runs"/> run del benchmark
-    /// standardizzato in float 32-bit e in double 64-bit e stampa i valori in
-    /// MPixel/s con il migliore — la misura usata per lo storico del grafico
-    /// benchmark. Analogo di <see cref="BenchDx"/> per il motore CUDA.
+    /// Standard triple test on every available CUDA device (or only on the
+    /// given one): per device runs <paramref name="runs"/> runs of the
+    /// standardized benchmark in float 32-bit and in double 64-bit and prints the values in
+    /// MPixel/s with the best one — the measure used for the benchmark graph
+    /// history. CUDA counterpart of <see cref="BenchDx"/> for the CUDA engine.
     /// </summary>
     public static void BenchCuda(string? deviceName, int runs, TimeSpan budget, string? csvPath = null)
     {
-        Console.WriteLine($"Benchmark CUDA standardizzato: {runs} run da {budget.TotalSeconds:0} s per device, " +
-            $"zona {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
+        Console.WriteLine($"Standardized CUDA benchmark: {runs} runs of {budget.TotalSeconds:0} s per device, " +
+            $"area {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
             $"({BenchmarkStandard.PixelsPerFrame / 1e6:0.##} MPixel/frame), " +
-            $"{BenchmarkStandard.MaxIter} iter, solo iterazioni (float 32-bit + double 64-bit).");
+            $"{BenchmarkStandard.MaxIter} iter, iterations only (float 32-bit + double 64-bit).");
 
         IReadOnlyList<string> devices = deviceName != null
             ? new[] { deviceName }
             : GpuMandelbrot.DeviceNames();
         if (devices.Count == 0)
         {
-            Console.WriteLine("Nessun device CUDA disponibile. (" + GpuMandelbrot.LastError + ")");
+            Console.WriteLine("No CUDA device available. (" + GpuMandelbrot.LastError + ")");
             return;
         }
 
@@ -215,7 +215,7 @@ internal static class Diagnostics
             Console.WriteLine($"=== {shortName} ===");
             if (!GpuMandelbrot.TryInitialize(device))
             {
-                Console.WriteLine("  init fallita: " + GpuMandelbrot.LastError);
+                Console.WriteLine("  init failed: " + GpuMandelbrot.LastError);
                 continue;
             }
 
@@ -234,12 +234,12 @@ internal static class Diagnostics
                         double mps = BenchmarkStandard.PixelsPerSecond(frames, seconds) / 1e6;
                         if (useDouble) best64 = Math.Max(best64, mps);
                         else best32 = Math.Max(best32, mps);
-                        Console.WriteLine($"  {tag} run {r}: {frames} frame in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
+                        Console.WriteLine($"  {tag} run {r}: {frames} frames in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
                         WriteCsvRow(csvPath, "CUDA", shortName, tag, r, frames, seconds, mps);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"  {tag} run {r} fallito: {ex.GetType().Name}: {ex.Message}");
+                        Console.WriteLine($"  {tag} run {r} failed: {ex.GetType().Name}: {ex.Message}");
                     }
                 }
             }
@@ -248,23 +248,23 @@ internal static class Diagnostics
             if (best32 > 0 || best64 > 0)
             {
                 migliori.Add((shortName, best32, best64));
-                Console.WriteLine($"  MIGLIORE 32-bit: {best32:0.#} MPixel/s");
-                Console.WriteLine($"  MIGLIORE 64-bit: {best64:0.#} MPixel/s");
+                Console.WriteLine($"  BEST 32-bit: {best32:0.#} MPixel/s");
+                Console.WriteLine($"  BEST 64-bit: {best64:0.#} MPixel/s");
             }
             else
             {
-                Console.WriteLine("  nessuna misura valida");
+                Console.WriteLine("  no valid measurement");
             }
         }
 
         Console.WriteLine();
-        Console.WriteLine("=== Riepilogo (best per device, MPixel/s) ===");
+        Console.WriteLine("=== Summary (best per device, MPixel/s) ===");
         foreach (var (shortName, best32, best64) in migliori)
             Console.WriteLine($"  {shortName}: 32-bit {best32:0.#} | 64-bit {best64:0.#}");
     }
 
-    /// <summary>Nome modello della CPU (da registro, senza suffissi), es.
-    /// "AMD Ryzen 9 9900X" o "Intel Core i7-14700K".</summary>
+    /// <summary>CPU model name (from registry, without suffixes), e.g.
+    /// "AMD Ryzen 9 9900X" or "Intel Core i7-14700K".</summary>
     public static string CpuName()
     {
         try
@@ -287,17 +287,17 @@ internal static class Diagnostics
     }
 
     /// <summary>
-    /// Triplo test standard sulla CPU: esegue <paramref name="runs"/> run del
-    /// benchmark standardizzato (`Mandelbrot.BenchmarkCpu`, double) e stampa i
-    /// valori in MPixel/s con il migliore — la misura usata per lo storico CPU
-    /// del grafico benchmark (con nome modello).
+    /// Standard triple test on the CPU: runs <paramref name="runs"/> runs of the
+    /// standardized benchmark (`Mandelbrot.BenchmarkCpu`, double) and prints the
+    /// values in MPixel/s with the best one — the measure used for the CPU history
+    /// of the benchmark graph (with model name).
     /// </summary>
     public static void BenchCpu(int runs, TimeSpan budget, string? csvPath = null)
     {
-        Console.WriteLine($"Benchmark CPU standardizzato ({CpuName()}): {runs} run da {budget.TotalSeconds:0} s, " +
-            $"zona {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
+        Console.WriteLine($"Standardized CPU benchmark ({CpuName()}): {runs} runs of {budget.TotalSeconds:0} s, " +
+            $"area {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
             $"({BenchmarkStandard.PixelsPerFrame / 1e6:0.##} MPixel/frame), " +
-            $"{BenchmarkStandard.MaxIter} iter, double, solo iterazioni.");
+            $"{BenchmarkStandard.MaxIter} iter, double, iterations only.");
 
         double best = 0;
         for (int r = 1; r <= runs; r++)
@@ -310,20 +310,20 @@ internal static class Diagnostics
                     BenchmarkStandard.Aa, budget, null, CancellationToken.None);
                 double mps = BenchmarkStandard.PixelsPerSecond(frames, seconds) / 1e6;
                 best = Math.Max(best, mps);
-                Console.WriteLine($"  run {r}: {frames} frame in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
+                Console.WriteLine($"  run {r}: {frames} frames in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
                 WriteCsvRow(csvPath, "CPU", CpuName(), "double", r, frames, seconds, mps);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"  run {r} fallito: {ex.GetType().Name}: {ex.Message}");
+                Console.WriteLine($"  run {r} failed: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
         Console.WriteLine();
-        Console.WriteLine($"=== Riepilogo (best, MPixel/s): {CpuName()}: {best:0.#} ===");
+        Console.WriteLine($"=== Summary (best, MPixel/s): {CpuName()}: {best:0.#} ===");
     }
 
-    /// <summary>Scrive una riga CSV se richiesto (errori non fatali: avviso e via).</summary>
+    /// <summary>Writes a CSV row if requested (non-fatal errors: warn and continue).</summary>
     private static void WriteCsvRow(string? csvPath, string engine, string device, string precision,
         int run, int frames, double seconds, double mps)
     {
@@ -334,7 +334,7 @@ internal static class Diagnostics
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"  CSV non scritto ({csvPath}): {ex.Message}");
+            Console.WriteLine($"  CSV not written ({csvPath}): {ex.Message}");
         }
     }
 }

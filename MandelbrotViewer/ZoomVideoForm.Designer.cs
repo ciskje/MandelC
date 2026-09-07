@@ -104,7 +104,7 @@ partial class ZoomVideoForm
         // cmbAAVid
         this.cmbAAVid.Dock = DockStyle.Fill;
         this.cmbAAVid.DropDownStyle = ComboBoxStyle.DropDownList;
-        this.cmbAAVid.Items.AddRange(new object[] { "Come vista", "1x", "2x", "4x", "8x" });
+        this.cmbAAVid.Items.AddRange(new object[] { "As view", "1x", "2x", "4x", "8x" });
         this.cmbAAVid.SelectedIndex = 0;
         this.cmbAAVid.SelectedIndexChanged += new EventHandler(this.CmbAAVid_Changed);
 
@@ -128,19 +128,19 @@ partial class ZoomVideoForm
         // btnStart
         this.btnStart.Dock = DockStyle.Right;
         this.btnStart.Width = 90;
-        this.btnStart.Text = "Avvia";
+        this.btnStart.Text = "Start";
         this.btnStart.Click += new EventHandler(this.BtnStart_Click);
         // btnClose
         this.btnClose.Dock = DockStyle.Right;
         this.btnClose.Width = 90;
-        this.btnClose.Text = "Chiudi";
+        this.btnClose.Text = "Close";
         this.btnClose.DialogResult = DialogResult.Cancel;
         this.btnClose.Click += new EventHandler(this.BtnClose_Click);
 
         // btnOpen
         this.btnOpen.Dock = DockStyle.Right;
         this.btnOpen.Width = 90;
-        this.btnOpen.Text = "Apri…";
+        this.btnOpen.Text = "Open…";
         this.btnOpen.Enabled = false;
         this.btnOpen.Click += new EventHandler(this.BtnOpen_Click);
 
@@ -153,7 +153,7 @@ partial class ZoomVideoForm
         this.Controls.Add(this.rowPanel);
         this.Controls.Add(this.lblInfo);
         this.Controls.Add(this.bottomPanel);
-        this.Text = "Esporta video zoom";
+        this.Text = "Export zoom video";
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
         this.MinimizeBox = false;

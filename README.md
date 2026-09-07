@@ -1,0 +1,74 @@
+# Mandelbrot Viewer (MandelC#)
+
+Interactive Mandelbrot set viewer built with C# / WinForms (.NET 8, Windows only).
+
+![Screenshot](screen1.png)
+
+## Features
+
+- **Three rendering engines** with automatic fallback:
+  - **CPU** — always available, `Parallel.For`, double precision
+  - **CUDA** (NVIDIA) — float 32-bit or double 64-bit, via ILGPU
+  - **DirectX 11** — realtime ~60 fps pixel shader, via Vortice
+
+- **Smooth coloring** — consistent across all engines, 7 palettes (Fire, Ice, Thermal, Ocean, Violet, Desert, Forest), gamma curve `t^0.35`
+
+- **Zoom & pan** — mouse wheel, click-to-zoom, drag or arrow keys; half-resolution preview during interaction, full resolution on release
+
+- **Anti-aliasing** — 1x / 2x / 4x / 8x supersampling with RGB averaging
+
+- **Auto iterations** — `2000 * (1 + log10(1.5/half))`, clamped 50–50000
+
+- **Julia mode** — `z = z² + c` with fixed c (click to set, persisted)
+
+- **History & favorites** — back/forward navigation (200 views), named saved zones
+
+- **Export** — high-resolution PNG (up to 8K+), zoom-out MP4 video (ffmpeg H.264)
+
+- **RealTime zoom-out** — animated return to the full set (120 frames @ 30 fps, AA 1x)
+
+- **Benchmark** — standardized 960×540 AA1x test, 8 s budget, MPixel/s chart with per-card history; CLI: `--bench-cpu`, `--bench-cuda`, `--bench-dx`
+
+- **Multi-GPU** — dropdown to select the adapter (CUDA + DirectX unified), precision selector (32/64-bit)
+
+- **Settings persistence** — iterations, palette, AA, engine, GPU, window size/position
+
+## Requirements
+
+- Windows 10/11 (x64)
+- .NET 8 Desktop Runtime (or use the self-contained publish)
+- Optional: NVIDIA GPU + driver for CUDA
+
+## Build & Run
+
+```powershell
+# Build
+dotnet build MandelbrotViewer\MandelbrotViewer.csproj
+
+# Run (debug)
+dotnet run --project MandelbrotViewer
+
+# Publish (self-contained single file, ~150 MB)
+dotnet publish MandelbrotViewer\MandelbrotViewer.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o pubblicato
+```
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `R` | Reset view |
+| `S` | Save PNG |
+| `+` / `-` | Iterations ±50 |
+| `Ctrl+O` / `Ctrl+S` | Load / Save zone |
+| `Ctrl+J` | Toggle Julia mode |
+| `Ctrl+D` | Save favorite |
+| `Ctrl+B` | Benchmark |
+| `Ctrl+Shift+R` | Back to set (RealTime) |
+| `Ctrl+Shift+E` | Export PNG |
+| `Ctrl+Shift+V` | Export zoom video |
+| `Alt+←` / `Alt+→` | History back / forward |
+| `Esc` | Stop animation |
+
+## License
+
+Private — all rights reserved.

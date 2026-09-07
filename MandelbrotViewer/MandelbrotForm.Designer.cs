@@ -9,7 +9,7 @@
     private FlowLayoutPanel row0 = null!;
     private FlowLayoutPanel row1 = null!;
     private Button btnReset = null!;
-    private Button btnTorna = null!;
+    private Button btnHome = null!;
     private Button btnBenchmark = null!;
     private Label lblIter = null!;
     private NumericUpDown numIter = null!;
@@ -70,7 +70,7 @@
         this.row0 = new FlowLayoutPanel();
         this.row1 = new FlowLayoutPanel();
         this.btnReset = new Button();
-        this.btnTorna = new Button();
+        this.btnHome = new Button();
         this.btnBenchmark = new Button();
         this.lblIter = new Label();
         this.numIter = new NumericUpDown();
@@ -124,14 +124,14 @@
         this.menuStrip.SuspendLayout();
         this.SuspendLayout();
 
-        // topPanel: due righe FlowLayoutPanel, controlli ammassati a sinistra
+        // topPanel: two rows FlowLayoutPanel, controls clustered to the left
         this.topPanel.Dock = DockStyle.Top;
         this.topPanel.Height = 72;
         this.topPanel.Padding = new Padding(8, 4, 8, 4);
         this.topPanel.Controls.Add(this.row0);
         this.topPanel.Controls.Add(this.row1);
 
-        // Riga 0
+        // Row 0
         this.row0.Dock = DockStyle.Top;
         this.row0.AutoSize = true;
         this.row0.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -139,7 +139,7 @@
         this.row0.Margin = new Padding(0);
         this.row0.Padding = new Padding(0);
         this.row0.Controls.Add(this.btnReset);
-        this.row0.Controls.Add(this.btnTorna);
+        this.row0.Controls.Add(this.btnHome);
         this.row0.Controls.Add(this.btnBenchmark);
         this.row0.Controls.Add(this.lblIter);
         this.row0.Controls.Add(this.numIter);
@@ -149,7 +149,7 @@
         this.row0.Controls.Add(this.lblAA);
         this.row0.Controls.Add(this.cmbAA);
 
-        // Riga 1
+        // Row 1
         this.row1.Dock = DockStyle.Top;
         this.row1.AutoSize = true;
         this.row1.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -163,7 +163,7 @@
         this.row1.Controls.Add(this.lblGpu);
         this.row1.Controls.Add(this.cmbGpu);
 
-        // Margini minimi tra controlli
+        // Minimal margins between controls
         foreach (Control ctrl in this.row0.Controls)
             ctrl.Margin = new Padding(3, 1, 3, 1);
         foreach (Control ctrl in this.row1.Controls)
@@ -175,13 +175,13 @@
         this.btnReset.Text = "Reset";
         this.btnReset.Click += new EventHandler(this.BtnReset_Click);
 
-        // btnTorna
-        this.btnTorna.Anchor = AnchorStyles.Left;
-        this.btnTorna.Size = new System.Drawing.Size(60, 23);
-        this.btnTorna.Text = "Torna";
-        this.btnTorna.Click += new EventHandler(this.RealTimeItem_Click);
+        // btnHome
+        this.btnHome.Anchor = AnchorStyles.Left;
+        this.btnHome.Size = new System.Drawing.Size(60, 23);
+        this.btnHome.Text = "Home";
+        this.btnHome.Click += new EventHandler(this.RealTimeItem_Click);
 
-        // btnBenchmark (il salvataggio PNG resta nel menu File)
+        // btnBenchmark (PNG saving stays in the File menu)
         this.btnBenchmark.Anchor = AnchorStyles.Left;
         this.btnBenchmark.Size = new System.Drawing.Size(100, 23);
         this.btnBenchmark.Text = "Benchmark";
@@ -190,7 +190,7 @@
         // lblIter
         this.lblIter.Anchor = AnchorStyles.Left;
         this.lblIter.AutoSize = true;
-        this.lblIter.Text = "Iterazioni:";
+        this.lblIter.Text = "Iterations:";
 
         // numIter
         this.numIter.Anchor = AnchorStyles.Left;
@@ -216,7 +216,7 @@
         this.cmbPalette.Anchor = AnchorStyles.Left;
         this.cmbPalette.Width = 110;
         this.cmbPalette.DropDownStyle = ComboBoxStyle.DropDownList;
-        this.cmbPalette.Items.AddRange(new object[] { "Fuoco", "Ghiaccio", "Termico", "Oceano", "Viola", "Deserto", "Foresta" });
+        this.cmbPalette.Items.AddRange(new object[] { "Fire", "Ice", "Thermal", "Ocean", "Violet", "Desert", "Forest" });
         this.cmbPalette.SelectedIndex = 0;
         this.cmbPalette.SelectedIndexChanged += new EventHandler(this.CmbPalette_SelectedIndexChanged);
 
@@ -233,7 +233,7 @@
         this.cmbAA.SelectedIndex = 0;
         this.cmbAA.SelectedIndexChanged += new EventHandler(this.CmbAA_SelectedIndexChanged);
 
-        // enginePanel: gruppo radio motore di rendering
+        // enginePanel: rendering engine radio group
         this.enginePanel.Anchor = AnchorStyles.Left;
         this.enginePanel.AutoSize = true;
         this.enginePanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -246,27 +246,27 @@
         // lblEngine
         this.lblEngine.Anchor = AnchorStyles.Left;
         this.lblEngine.AutoSize = true;
-        this.lblEngine.Text = "Motore:";
+        this.lblEngine.Text = "Engine:";
 
         // lblGpu
         this.lblGpu.Anchor = AnchorStyles.Left;
         this.lblGpu.AutoSize = true;
         this.lblGpu.Text = "GPU:";
-        this.lblGpu.Visible = false; // nascosto con motore CPU
+        this.lblGpu.Visible = false; // hidden with CPU engine
 
-        // cmbGpu (scheda video: "Auto" + schede enumerate di CUDA e DirectX)
+        // cmbGpu (video card: "Auto" + enumerated CUDA and DirectX cards)
         this.cmbGpu.Anchor = AnchorStyles.Left;
         this.cmbGpu.Width = 200;
         this.cmbGpu.DropDownStyle = ComboBoxStyle.DropDownList;
         this.cmbGpu.Items.AddRange(new object[] { "Auto" });
         this.cmbGpu.SelectedIndex = 0;
-        this.cmbGpu.Visible = false; // nascosto con motore CPU (visibile con CUDA/DirectX)
+        this.cmbGpu.Visible = false; // hidden with CPU engine (visible with CUDA/DirectX)
         this.cmbGpu.SelectedIndexChanged += new EventHandler(this.CmbGpu_SelectedIndexChanged);
 
-        // lblPrec + precisionPanel: precisione CUDA (32 = float, 64 = double)
+        // lblPrec + precisionPanel: CUDA precision (32 = float, 64 = double)
         this.lblPrec.Anchor = AnchorStyles.Left;
         this.lblPrec.AutoSize = true;
-        this.lblPrec.Text = "Precisione:";
+        this.lblPrec.Text = "Precision:";
 
         this.precisionPanel.Anchor = AnchorStyles.Left;
         this.precisionPanel.AutoSize = true;
@@ -279,14 +279,14 @@
         this.radPrec32.Anchor = AnchorStyles.Left;
         this.radPrec32.AutoSize = true;
         this.radPrec32.Text = "32";
-        this.radPrec32.Enabled = false; // abilitata solo con motore CUDA
+        this.radPrec32.Enabled = false; // enabled only with CUDA engine
         this.radPrec32.CheckedChanged += new EventHandler(this.PrecRadio_CheckedChanged);
 
         this.radPrec64.Anchor = AnchorStyles.Left;
         this.radPrec64.AutoSize = true;
         this.radPrec64.Text = "64";
-        this.radPrec64.Checked = true; // 64-bit (double) predefinita
-        this.radPrec64.Enabled = false; // abilitata solo con motore CUDA
+        this.radPrec64.Checked = true; // 64-bit (double) default
+        this.radPrec64.Enabled = false; // enabled only with CUDA engine
         this.radPrec64.CheckedChanged += new EventHandler(this.PrecRadio_CheckedChanged);
 
         // radioCpu
@@ -307,7 +307,7 @@
         this.radioDx.Anchor = AnchorStyles.Left;
         this.radioDx.AutoSize = true;
         this.radioDx.Text = "DirectX";
-        this.radioDx.Enabled = false; // abilitato se DxMandelbrot.TryInitialize riesce
+        this.radioDx.Enabled = false; // enabled if DxMandelbrot.TryInitialize succeeds
         this.radioDx.CheckedChanged += new EventHandler(this.EngineRadio_CheckedChanged);
 
         // statusStrip
@@ -315,11 +315,11 @@
 
         // lblStatus
         this.lblStatus.Spring = true;
-        this.lblStatus.Text = "Pronto";
+        this.lblStatus.Text = "Ready";
         this.lblStatus.TextAlign = ContentAlignment.MiddleLeft;
 
         // statusHelp
-        this.statusHelp.Text = "Click sx/dx: zoom | Rotella: zoom | Trascina/frecce: sposta | R: reset | S: salva";
+        this.statusHelp.Text = "Left/Right click: zoom | Wheel: zoom | Drag/arrows: pan | R: reset | S: save";
         this.statusHelp.ForeColor = System.Drawing.Color.Gray;
         this.statusHelp.Font = new System.Drawing.Font("Segoe UI", 8f);
 
@@ -335,7 +335,7 @@
         this.pictureBox.MouseEnter += new EventHandler(this.PictureBox_MouseEnter);
         this.pictureBox.Resize += new EventHandler(this.PictureBox_Resize);
 
-        // dxPanel: superficie DirectX (stessi handler mouse della pictureBox)
+        // dxPanel: DirectX surface (same mouse handlers as pictureBox)
         this.dxPanel.Dock = DockStyle.Fill;
         this.dxPanel.BackColor = System.Drawing.Color.Black;
         this.dxPanel.Cursor = Cursors.Cross;
@@ -358,22 +358,22 @@
             this.fileSeparator3, this.exitItem });
 
         // loadZoneItem
-        this.loadZoneItem.Text = "Carica &zona...";
+        this.loadZoneItem.Text = "Load &zone...";
         this.loadZoneItem.ShortcutKeys = Keys.Control | Keys.O;
         this.loadZoneItem.Click += new EventHandler(this.LoadZoneItem_Click);
 
         // saveZoneItem
-        this.saveZoneItem.Text = "&Salva zona...";
+        this.saveZoneItem.Text = "Save &zone...";
         this.saveZoneItem.ShortcutKeys = Keys.Control | Keys.S;
         this.saveZoneItem.Click += new EventHandler(this.SaveZoneItem_Click);
 
         // saveImageItem
-        this.saveImageItem.Text = "Salva immagine con &nome...";
+        this.saveImageItem.Text = "Save &image as...";
         this.saveImageItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.S;
         this.saveImageItem.Click += new EventHandler(this.SaveImageItem_Click);
 
         // generaMenu
-        this.generaMenu.Text = "&Genera";
+        this.generaMenu.Text = "&Generate";
         this.generaMenu.DropDownItems.AddRange(new ToolStripItem[] {
             this.exportItem, this.videoItem, this.realTimeItem });
 
@@ -383,12 +383,12 @@
         this.exportItem.Click += new EventHandler(this.ExportShotItem_Click);
 
         // videoItem
-        this.videoItem.Text = "Video &zoom...";
+        this.videoItem.Text = "&Zoom video...";
         this.videoItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.V;
         this.videoItem.Click += new EventHandler(this.VideoItem_Click);
 
         // realTimeItem
-        this.realTimeItem.Text = "Torna all'insieme (&RealTime)";
+        this.realTimeItem.Text = "Back to set (&RealTime)";
         this.realTimeItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.R;
         this.realTimeItem.Click += new EventHandler(this.RealTimeItem_Click);
 
@@ -398,47 +398,47 @@
         this.benchmarkItem.Click += new EventHandler(this.BenchmarkItem_Click);
 
         // exitItem
-        this.exitItem.Text = "&Esci";
+        this.exitItem.Text = "E&xit";
         this.exitItem.ShortcutKeys = Keys.Alt | Keys.F4;
         this.exitItem.Click += new EventHandler(this.ExitItem_Click);
 
         // helpMenu
-        this.helpMenu.Text = "&Aiuto";
+        this.helpMenu.Text = "&Help";
         this.helpMenu.DropDownItems.AddRange(new ToolStripItem[] { this.aboutItem, this.helpSeparator, this.logItem });
 
         // aboutItem
-        this.aboutItem.Text = "&Informazioni...";
+        this.aboutItem.Text = "&About...";
         this.aboutItem.ShortcutKeys = Keys.F1;
         this.aboutItem.Click += new EventHandler(this.AboutItem_Click);
 
         // logItem
-        this.logItem.Text = "Mostra &log / diagnostica...";
+        this.logItem.Text = "Show &log / diagnostics...";
         this.logItem.Click += new EventHandler(this.LogItem_Click);
 
-        // toolTip: spiegazione di ogni controllo (si mostra al passaggio del mouse)
-        this.toolTip.SetToolTip(this.btnReset, "Ripristina la vista iniziale dell'insieme (tasto R)");
-        this.toolTip.SetToolTip(this.btnTorna, "Torna all'insieme con animazione RealTime (Ctrl+Shift+R)");
-        this.toolTip.SetToolTip(this.btnBenchmark, "Apri il benchmark standard (Ctrl+B)");
-        this.toolTip.SetToolTip(this.numIter, "Numero massimo di iterazioni per pixel (tasti +/-)");
-        this.toolTip.SetToolTip(this.chkIterAuto, "Iterazioni automatiche: crescono con l'ingrandimento");
-        this.toolTip.SetToolTip(this.cmbPalette, "Palette colori del frattale (Fuoco, Ghiaccio, Termico, Oceano, Viola, Deserto, Foresta)");
-        this.toolTip.SetToolTip(this.cmbAA, "Antialiasing: 1x disattivato, 2x/4x/8x media dei pixel vicini");
-        this.toolTip.SetToolTip(this.cmbGpu, "Scheda video da usare (Auto = la più potente)");
-        this.toolTip.SetToolTip(this.radPrec32, "Precisione CUDA 32-bit (float): più veloce, meno precisa. Ignorata con CPU/DirectX.");
-        this.toolTip.SetToolTip(this.radPrec64, "Precisione CUDA 64-bit (double): più precisa, più lenta. Ignorata con CPU/DirectX.");
-        this.toolTip.SetToolTip(this.radioCpu, "Motore CPU multicore (sempre disponibile)");
-        this.toolTip.SetToolTip(this.radioCuda, "Motore CUDA: GPU NVIDIA via ILGPU (float/double)");
-        this.toolTip.SetToolTip(this.radioDx, "Motore DirectX: GPU in tempo reale (float)");
-        // le voci menu sono ToolStripItem: si usa la proprietà ToolTipText
-        this.loadZoneItem.ToolTipText = "Ricarica la vista salvata in un file JSON (Ctrl+O)";
-        this.saveZoneItem.ToolTipText = "Salva la vista corrente (centro, scala, iterazioni) in un file JSON (Ctrl+S)";
-        this.saveImageItem.ToolTipText = "Salva l'immagine corrente come PNG (Ctrl+Shift+S)";
-        this.generaMenu.ToolTipText = "Genera output dalla vista: screenshot PNG o video zoom MP4";
-        this.exportItem.ToolTipText = "Screenshot alla risoluzione vista con AA a scelta (Ctrl+Shift+E)";
-        this.videoItem.ToolTipText = "Video MP4 dello zoom con AA a scelta (Ctrl+Shift+V, serve ffmpeg)";
-        this.realTimeItem.ToolTipText = "Torna all'insieme con animazione RealTime (Esc per fermare, Ctrl+Shift+R)";
-        this.benchmarkItem.ToolTipText = "Benchmark standard: 8 s ad alte iterazioni (Ctrl+B)";
-        this.aboutItem.ToolTipText = "Informazioni su MandelC# (F1)";
+        // toolTip: description of each control (shown on mouse hover)
+        this.toolTip.SetToolTip(this.btnReset, "Restore the initial set view (R key)");
+        this.toolTip.SetToolTip(this.btnHome, "Back to set with RealTime animation (Ctrl+Shift+R)");
+        this.toolTip.SetToolTip(this.btnBenchmark, "Open the standard benchmark (Ctrl+B)");
+        this.toolTip.SetToolTip(this.numIter, "Maximum iterations per pixel (+/- keys)");
+        this.toolTip.SetToolTip(this.chkIterAuto, "Automatic iterations: grow with zoom level");
+        this.toolTip.SetToolTip(this.cmbPalette, "Fractal color palette (Fire, Ice, Thermal, Ocean, Violet, Desert, Forest)");
+        this.toolTip.SetToolTip(this.cmbAA, "Antialiasing: 1x disabled, 2x/4x/8x average of nearby pixels");
+        this.toolTip.SetToolTip(this.cmbGpu, "Video card to use (Auto = the most powerful)");
+        this.toolTip.SetToolTip(this.radPrec32, "CUDA precision 32-bit (float): faster, less precise. Ignored with CPU/DirectX.");
+        this.toolTip.SetToolTip(this.radPrec64, "CUDA precision 64-bit (double): more precise, slower. Ignored with CPU/DirectX.");
+        this.toolTip.SetToolTip(this.radioCpu, "CPU multicore engine (always available)");
+        this.toolTip.SetToolTip(this.radioCuda, "CUDA engine: NVIDIA GPU via ILGPU (float/double)");
+        this.toolTip.SetToolTip(this.radioDx, "DirectX engine: real-time GPU (float)");
+        // menu items are ToolStripItem: use the ToolTipText property
+        this.loadZoneItem.ToolTipText = "Reload the view saved in a JSON file (Ctrl+O)";
+        this.saveZoneItem.ToolTipText = "Save the current view (center, scale, iterations) to a JSON file (Ctrl+S)";
+        this.saveImageItem.ToolTipText = "Save the current image as PNG (Ctrl+Shift+S)";
+        this.generaMenu.ToolTipText = "Generate output from the view: PNG screenshot or MP4 zoom video";
+        this.exportItem.ToolTipText = "Screenshot at view resolution with optional AA (Ctrl+Shift+E)";
+        this.videoItem.ToolTipText = "MP4 zoom video with optional AA (Ctrl+Shift+V, requires ffmpeg)";
+        this.realTimeItem.ToolTipText = "Back to set with RealTime animation (Esc to stop, Ctrl+Shift+R)";
+        this.benchmarkItem.ToolTipText = "Standard benchmark: 8s at high iterations (Ctrl+B)";
+        this.aboutItem.ToolTipText = "About MandelC# (F1)";
 
         // MandelbrotForm
         this.AutoScaleMode = AutoScaleMode.Font;
@@ -449,7 +449,7 @@
         this.Controls.Add(this.menuStrip);
         this.Controls.Add(this.statusStrip);
         this.MainMenuStrip = this.menuStrip;
-        this.Text = "Visualizzatore Insieme di Mandelbrot";
+        this.Text = "Mandelbrot Set Viewer";
         this.KeyPreview = true;
         this.KeyDown += new KeyEventHandler(this.MandelbrotForm_KeyDown);
 

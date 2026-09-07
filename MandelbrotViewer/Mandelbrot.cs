@@ -3,27 +3,27 @@
 namespace MandelbrotViewer;
 
 /// <summary>
-/// Logica di calcolo dell'insieme di Mandelbrot (e Julia) con smooth coloring.
-/// Mandelbrot: z(n+1) = z(n)^2 + c, con z(0) = 0. Se |z| > 2 entro maxIter, c è fuori.
-/// Julia: stessa iterazione ma z(0) = punto del pixel e c = costante fissata.
+/// Computation logic of the Mandelbrot (and Julia) set with smooth coloring.
+/// Mandelbrot: z(n+1) = z(n)^2 + c, with z(0) = 0. If |z| > 2 within maxIter, c is outside.
+/// Julia: same iteration but z(0) = pixel point and c = fixed constant.
 /// </summary>
 public static class Mandelbrot
 {
     /// <summary>
-    /// Renderizza il frattale nel bitmap dato.
+    /// Renders the fractal into the given bitmap.
     /// </summary>
-    /// <param name="bmp">Bitmap di destinazione (verrà sovrascritta).</param>
-    /// <param name="centerX">Centro asse reale.</param>
-    /// <param name="centerY">Centro asse immaginario.</param>
-    /// <param name="scale">Larghezza del piano complesso visualizzata.</param>
-    /// <param name="maxIter">Massimo numero di iterazioni.</param>
-    /// <param name="palette">Palette di colori per i punti esterni.</param>
-    /// <param name="supersample">Antialias: fattore k, calcola a risoluzione k volte
-    /// maggiore e media ogni blocco kxk (1 = nessun antialias).</param>
-    /// <param name="ct">Token per cancellare un rendering obsoleto.</param>
-    /// <param name="juliaCx">Costante c (parte reale) in modalità Julia.</param>
-    /// <param name="juliaCy">Costante c (parte immaginaria) in modalità Julia.</param>
-    /// <param name="julia">True = insieme di Julia con c fissata, false = Mandelbrot.</param>
+    /// <param name="bmp">Destination bitmap (will be overwritten).</param>
+    /// <param name="centerX">Center of the real axis.</param>
+    /// <param name="centerY">Center of the imaginary axis.</param>
+    /// <param name="scale">Width of the complex plane displayed.</param>
+    /// <param name="maxIter">Maximum number of iterations.</param>
+    /// <param name="palette">Color palette for the external points.</param>
+    /// <param name="supersample">Antialias: factor k, computes at a resolution k times
+    /// greater and averages each kxk block (1 = no antialias).</param>
+    /// <param name="ct">Token to cancel an obsolete rendering.</param>
+    /// <param name="juliaCx">Constant c (real part) in Julia mode.</param>
+    /// <param name="juliaCy">Constant c (imaginary part) in Julia mode.</param>
+    /// <param name="julia">True = Julia set with fixed c, false = Mandelbrot.</param>
     public static void Render(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette, int supersample, CancellationToken ct, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         int w = bmp.Width;
@@ -34,7 +34,7 @@ public static class Mandelbrot
         int bigW = w * k;
         int bigH = h * k;
         double pixelSize = scale / bigW;
-        // Per mantenere le proporzioni, l'altezza complessa deriva dalla larghezza.
+        // To keep the aspect ratio, the complex height derives from the width.
         double topY = centerY - (bigH * 0.5) * pixelSize;
 
         var rect = new Rectangle(0, 0, w, h);
@@ -42,8 +42,8 @@ public static class Mandelbrot
 
         try
         {
-            int stride = data.Stride / 4; // int per riga
-            int[] big = new int[bigW * bigH]; // colori a piena risoluzione (k=1: quella finale)
+            int stride = data.Stride / 4; // ints per row
+            int[] big = new int[bigW * bigH]; // full-resolution colors (k=1: the final one)
 
             Parallel.For(0, bigH, new ParallelOptions { CancellationToken = ct }, by =>
             {
@@ -52,7 +52,7 @@ public static class Mandelbrot
                 {
                     double px = centerX + (bx - bigW * 0.5) * pixelSize;
 
-                    // Julia: z(0) = punto del pixel, c = costante; Mandelbrot: z(0) = 0, c = pixel.
+                    // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
                     double zx = julia ? px : 0, zy = julia ? py : 0;
                     double ccx = julia ? juliaCx : px, ccy = julia ? juliaCy : py;
                     double zx2 = zx * zx, zy2 = zy * zy;
@@ -71,7 +71,7 @@ public static class Mandelbrot
                 }
             });
 
-            // Downsample: media di ogni blocco kxk (con k=1 è l'identità).
+            // Downsample: average of each kxk block (with k=1 it is the identity).
             int[] pixels = new int[stride * h];
             Parallel.For(0, h, new ParallelOptions { CancellationToken = ct }, y =>
             {
@@ -87,7 +87,7 @@ public static class Mandelbrot
         }
     }
 
-    /// <summary>Media RGB di un blocco kxk del buffer a piena risoluzione.</summary>
+    /// <summary>RGB average of a kxk block of the full-resolution buffer.</summary>
     internal static int AverageBlock(int[] big, int bigW, int x0, int y0, int k)
     {
         long r = 0, g = 0, b = 0;
@@ -107,22 +107,22 @@ public static class Mandelbrot
     }
 
     /// <summary>
-    /// Colore da iterazioni e palette, condiviso dal percorso CPU. La formula dello
-    /// smooth (log/log) e la mappatura sulla palette devono restare allineate con
-    /// il kernel CUDA (GpuMandelbrot.cs) e lo shader HLSL (DxMandelbrot.cs).
+    /// Color from iterations and palette, shared by the CPU path. The smooth
+    /// (log/log) formula and the palette mapping must stay aligned with
+    /// the CUDA kernel (GpuMandelbrot.cs) and the HLSL shader (DxMandelbrot.cs).
     /// </summary>
     internal static int ColorFromEscape(int iter, double mod2, int maxIter, Palette palette)
     {
         if (iter >= maxIter)
-            return unchecked((int)0xFF000000); // dentro -> nero
+            return unchecked((int)0xFF000000); // inside -> black
         double smoothIterations = iter + 1.0 - Math.Log(Math.Log(Math.Sqrt(Math.Max(mod2, 4.0)))) / Math.Log(2.0);
         return PaletteColors.ColorFor(smoothIterations, maxIter, palette);
     }
 
     /// <summary>
-    /// Iterazioni automatiche in base all'ingrandimento: 2000 per la vista iniziale
-    /// (meta lato = 1.5) piu 2000 ogni 10x, cioe 2000 * (1 + log10(1.5 / half)),
-    /// con half = scale / 2 (meta della larghezza vista). Clamp 50-50000.
+    /// Automatic iterations based on the zoom: 2000 for the initial view
+    /// (half side = 1.5) plus 2000 every 10x, i.e. 2000 * (1 + log10(1.5 / half)),
+    /// with half = scale / 2 (half of the visible width). Clamp 50-50000.
     /// </summary>
     public static int AutoIterForScale(double scale)
     {
@@ -134,9 +134,9 @@ public static class Mandelbrot
     }
 
     /// <summary>
-    /// Benchmark CPU: ripete il calcolo delle fughe (senza colorazione) per il budget
-    /// dato e conta le iterazioni totali. Ritorna (iterazioni, secondi, frame).
-    /// Il progresso alla UI è limitato (ogni 3 s) per non falsare la misura.
+    /// CPU benchmark: repeats the escape computation (without coloring) for the given
+    /// budget and counts the total iterations. Returns (iterations, seconds, frames).
+    /// The progress to the UI is limited (every 3 s) to not skew the measure.
     /// </summary>
     public static (long TotalIters, double Seconds, int Frames) BenchmarkCpu(double centerX, double centerY, double scale, int w, int h, int maxIter, int supersample, TimeSpan budget, IProgress<BenchmarkProgress>? progress, CancellationToken ct)
     {

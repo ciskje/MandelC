@@ -6,7 +6,7 @@ using ILGPU.Runtime.Cuda;
 
 namespace MandelbrotViewer;
 
-/// <summary>Parametri della vista passati ai kernel (struct blittabile, deve essere public per ILGPU).</summary>
+/// <summary>View parameters passed to the kernels (blittable struct, must be public for ILGPU).</summary>
 public readonly struct GpuViewParams
 {
     public readonly double CenterX;
@@ -52,8 +52,8 @@ public readonly struct GpuPaletteParams
 }
 
 /// <summary>
-/// Backend CUDA via ILGPU: un thread per pixel calcola fuga, colorazione smooth
-/// e downsampling AA direttamente sulla GPU.
+/// CUDA backend via ILGPU: one thread per pixel computes the escape, the smooth
+/// coloring and the AA downsampling directly on the GPU.
 /// </summary>
 internal static class GpuMandelbrot
 {
@@ -61,7 +61,7 @@ internal static class GpuMandelbrot
     private static Accelerator? _accelerator;
     private static Action<Index1D, ArrayView<int>, GpuViewParams, GpuPaletteParams>? _floatKernel;
     private static Action<Index1D, ArrayView<int>, GpuViewParams, GpuPaletteParams>? _doubleKernel;
-    // Kernel benchmark: solo conteggio iterazioni, niente buffer |z|² (un terzo del traffico).
+    // Benchmark kernel: only the iteration count, no |z|² buffer (a third of the traffic).
     private static Action<Index1D, ArrayView<int>, GpuViewParams>? _floatBenchKernel;
     private static Action<Index1D, ArrayView<int>, GpuViewParams>? _doubleBenchKernel;
     private static readonly object RenderGate = new();
@@ -72,13 +72,13 @@ internal static class GpuMandelbrot
     public static bool IsReady => _accelerator != null;
     public static string DeviceName { get; private set; } = "";
     public static string DeviceShortName => DeviceName.Replace("NVIDIA GeForce ", "");
-    /// <summary>Motivo dell'ultima inizializzazione fallita (diagnostica).</summary>
+    /// <summary>Reason of the last failed initialization (diagnostic).</summary>
     public static string LastError { get; private set; } = "";
 
-    /// <summary>True se la scala richiede il double (il float non ha cifre a sufficienza).</summary>
+    /// <summary>True if the scale requires double (float does not have enough digits).</summary>
     public static bool WantsDouble(double scale) => scale < 1e-3;
 
-    /// <summary>Device CUDA disponibili (nomi ILGPU); vuoto se nessun CUDA.</summary>
+    /// <summary>CUDA devices available (ILGPU names); empty if no CUDA.</summary>
     public static IReadOnlyList<string> DeviceNames()
     {
         try
@@ -98,9 +98,9 @@ internal static class GpuMandelbrot
     }
 
     /// <summary>
-    /// Inizializza contesto, device CUDA e kernel. Con <paramref name="deviceName"/>
-    /// usa quella scheda; senza, prova i device CUDA dal più capiente.
-    /// Ritorna false se nessuno funziona (si usa la CPU).
+    /// Initializes the context, the CUDA device and the kernels. With <paramref name="deviceName"/>
+    /// it uses that card; without it, it tries the CUDA devices from the largest.
+    /// Returns false if none works (the CPU is used).
     /// </summary>
     public static bool TryInitialize(string? deviceName = null)
     {
@@ -115,7 +115,7 @@ internal static class GpuMandelbrot
                 .ToList();
             if (cudaDevices.Count == 0)
             {
-                LastError = "Nessun device CUDA enumerato.";
+                LastError = "No CUDA device enumerated.";
                 return false;
             }
 
@@ -124,7 +124,7 @@ internal static class GpuMandelbrot
                 : cudaDevices.Where(d => d.Name == deviceName).ToList();
             if (candidates.Count == 0)
             {
-                LastError = $"Device CUDA non trovato: {deviceName}";
+                LastError = $"CUDA device not found: {deviceName}";
                 return false;
             }
 
@@ -156,7 +156,7 @@ internal static class GpuMandelbrot
         }
     }
 
-    /// <summary>Scarica accelerator+kernel (il contesto CUDA resta riusabile).</summary>
+    /// <summary>Unloads accelerator+kernels (the CUDA context stays reusable).</summary>
     private static void ResetAccelerator()
     {
         lock (RenderGate)
@@ -178,17 +178,17 @@ internal static class GpuMandelbrot
         DeviceName = "";
     }
 
-    /// <summary>Calcola il frame su GPU (lancio kernel + ricopia in RAM).</summary>
-    /// <param name="supersample">Antialias: risoluzione k volte maggiore (1 = nessuno).</param>
-    /// <param name="useDouble">True per il kernel double 64-bit, false per single 32-bit (float).</param>
-    /// <param name="juliaCx">Costante c (parte reale) in modalità Julia.</param>
-    /// <param name="juliaCy">Costante c (parte immaginaria) in modalità Julia.</param>
-    /// <param name="julia">True = insieme di Julia con c fissata, false = Mandelbrot.</param>
+    /// <summary>Computes the frame on the GPU (kernel launch + copy back to RAM).</summary>
+    /// <param name="supersample">Antialias: resolution k times greater (1 = none).</param>
+    /// <param name="useDouble">True for the double 64-bit kernel, false for single 32-bit (float).</param>
+    /// <param name="juliaCx">Constant c (real part) in Julia mode.</param>
+    /// <param name="juliaCy">Constant c (imaginary part) in Julia mode.</param>
+    /// <param name="julia">True = Julia set with fixed c, false = Mandelbrot.</param>
     public static bool Render(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette, int supersample, bool useDouble, CancellationToken ct, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         lock (RenderGate)
         {
-            var accelerator = _accelerator ?? throw new InvalidOperationException("GPU non inizializzata.");
+            var accelerator = _accelerator ?? throw new InvalidOperationException("GPU not initialized.");
             int k = Math.Max(1, supersample);
             int bigW = bmp.Width * k;
             int bigH = bmp.Height * k;
@@ -228,13 +228,13 @@ internal static class GpuMandelbrot
         }
     }
 
-    /// Il progresso alla UI è limitato (ogni 3 s) per non falsare la misura.
+    /// The progress to the UI is limited (every 3 s) to not skew the measure.
     /// </summary>
     public static (long TotalIters, double Seconds, int Frames) BenchmarkGpu(double centerX, double centerY, double scale, int w, int h, int maxIter, int supersample, bool useDouble, TimeSpan budget, IProgress<BenchmarkProgress>? progress, CancellationToken ct)
     {
-        var accelerator = _accelerator ?? throw new InvalidOperationException("GPU non inizializzata.");
+        var accelerator = _accelerator ?? throw new InvalidOperationException("GPU not initialized.");
 
-        // Buffer allocati una volta sola e riusati per tutti i frame (niente alloc/copy extra).
+        // Buffers allocated once and reused for all the frames (no extra alloc/copy).
         int k = Math.Max(1, supersample);
         int bigW = w * k;
         int bigH = h * k;
@@ -276,7 +276,7 @@ internal static class GpuMandelbrot
         _context = null;
     }
 
-    // ---------- Kernel benchmark: solo iterazioni (niente |z|², un terzo del traffico) ----------
+    // ---------- Benchmark kernel: only iterations (no |z|², a third of the traffic) ----------
 
     private static void FloatBenchKernel(Index1D index, ArrayView<int> iters, GpuViewParams p)
     {
@@ -322,9 +322,9 @@ internal static class GpuMandelbrot
     }
 
     /// <summary>
-    /// Interpolazione della palette nel kernel CUDA: deve restare allineata con
-    /// PaletteColors.ColorFor (CPU) e con la funzione Graded dello shader HLSL
-    /// (DxMandelbrot.cs): stessi 5 stop e stessa mappatura t = (nu/maxIter)^0.35.
+    /// Palette interpolation in the CUDA kernel: it must stay aligned with
+    /// PaletteColors.ColorFor (CPU) and with the Graded function of the HLSL shader
+    /// (DxMandelbrot.cs): same 5 stops and same mapping t = (nu/maxIter)^0.35.
     /// </summary>
     private static int ColorFromIterations(float iterations, int maxIter, GpuPaletteParams p)
     {
@@ -357,7 +357,7 @@ internal static class GpuMandelbrot
             {
                 float px = (float)p.CenterX + (x * k + sx - p.W * k * 0.5f) * pixel;
                 float py = (float)p.TopY + (y * k + sy) * pixel;
-                // Julia: z(0) = punto del pixel, c = costante; Mandelbrot: z(0) = 0, c = pixel.
+                // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
                 float zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
                 float ccx = p.JuliaOn != 0 ? (float)p.Jcx : px;
                 float ccy = p.JuliaOn != 0 ? (float)p.Jcy : py;
@@ -399,7 +399,7 @@ internal static class GpuMandelbrot
             {
                 double px = p.CenterX + (x * k + sx - p.W * k * 0.5) * p.PixelSize;
                 double py = p.TopY + (y * k + sy) * p.PixelSize;
-                // Julia: z(0) = punto del pixel, c = costante; Mandelbrot: z(0) = 0, c = pixel.
+                // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
                 double zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
                 double ccx = p.JuliaOn != 0 ? p.Jcx : px;
                 double ccy = p.JuliaOn != 0 ? p.Jcy : py;

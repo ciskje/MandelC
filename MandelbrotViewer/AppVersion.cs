@@ -1,9 +1,9 @@
 ﻿namespace MandelbrotViewer;
 
 /// <summary>
-/// Versione dell'applicazione in formato X.Y.Z (Semantic Versioning semplificato).
-/// Bump: X = breaking change, Y = nuova funzionalità, Z = fix/refactor/docs.
-/// La UI mostra <see cref="Display"/>: se Z è 0 si usa la notazione breve "X.Y".
+/// Application version in X.Y.Z format (simplified Semantic Versioning).
+/// Bump: X = breaking change, Y = new feature, Z = fix/refactor/docs.
+/// The UI shows <see cref="Display"/>: if Z is 0 the short notation "X.Y" is used.
 /// </summary>
 public static class AppVersion
 {

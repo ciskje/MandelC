@@ -1,149 +1,125 @@
-﻿- [x] v2.17.3: Toolbar FlowLayoutPanel (controlli ammassati, niente spazi colonne) — completed
-- [x] v2.17.2: Icona app da icon2.png — completed
-- [x] v2.17.1: Fix resize finestra (stretch DX, CUDA/CPU non ridisegnavano) — completed
-- [x] v2.17.0: Colore palette gamma (allineamento Python) — completed
-- [x] v2.16.0: Zoom Real Time sulla finestra principale — completed
-- [x] v2.16.0: Menu Genera principale (sposta Esporta da File) — completed
-- [x] Domanda: CUDA vs DX, colpa di ILGPU? (analisi) — completed (nessun cambio codice)
-- [x] v2.15.10: Fix poll DX stretto (non V-Sync) + storici — completed
-- [x] Discrepanza bench CPU CLI vs UI: era Debug vs Release, avvia resta Debug — completed
-- [x] v2.15.9: Benchmark standard a AA1x + ricalcolo storici — completed
-- [x] Test AA1x su Radeon: regge a 4,8 MPixel/s (fuori standard), revert — completed
-- [x] Test AA4x su Radeon: TDR anche a AA4x, revert, resta lo skip — completed
-- [x] Domanda: bench AA4x per Radeon? (analisi) — completed (nessun cambio codice)
-- [x] v2.15.8: Bench DX skip iGPU + misura DX 4070 SUPER — completed
-- [x] v2.15.7: Errori benchmark DX nel log/diagnostica — completed
-- [x] Pubblicazione v2.15.6 + riverifica Radeon — completed
-- [x] v2.15.6: Benchmark DX anti-blocco (VRAM check + timeout 60s + device-removed) — completed
-- [ ] Crash app (dialog eccezione, solo coda assembly visibile) — pending
-- [x] v2.15.5: Ricalcolo storici benchmark via CLI + tabella nel codice — completed
-- [x] v2.15.4: Benchmark rinomina pulsante CSV + Chiudi sempre a destra — completed
-- [x] v2.15.3: Benchmark mi calcolata via auto (non fissa) = 10915 — completed
-- [x] half=5.226737155905588e-05 -> scala? (info) — completed (nessun cambio codice)
-- [x] v2.15.2: Zona benchmark cx=-0.7499302568795561 cy=-0.015139113925433963 half=5.226737155905588e-05 mi=10915 — completed
-- [x] Zona del benchmark (info) — completed (nessun cambio codice)
-- [x] v2.15.1: Formula iter auto 2000*(1+log10(1.5/half)) clamp 50-50000 + valore benchmark — completed
-
-# TODO — MandelC#
-
-Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
-
-- [x] v2.5.23: Revisione SPECIFICHE.md su specifiche reali, pulizia note extra dagli .md — `completed`
-
-- [x] Pubblicazione v2.5.22 + commit — `completed`
-- [x] v2.13.2: Icona dell'exe e delle finestre (render Mandelbrot in .ico) — `completed`
-
-- [x] v2.14.1: Palette a 2-3 colori base (Foresta marrone→verde) — `completed`
-- [x] Commit v2.14.0 nel repo annidato (6492e75, solo locale) — `completed`
-- [x] v2.14.0: Fix encode video (exit -542398533, "no packets": lati dispari) — `completed`
-- [x] v2.15.0: Submenu Esporta (Screenshot + Video) + selettore AA proprio nel video — `completed`
-- [x] v2.14.0: Export PNG con preset, AA selezionabile e custom validato — `completed`
-- [x] Pubblicazione v2.13.1 — `completed`
-
-- [x] v2.6.0: Pan con frecce direzionali (Shift = passo fine) — `completed`
-- [x] v2.7.0: Quattro palette fisse aggiuntive — `completed`
-- [x] v2.8.0: --bench-cpu con nome modello CPU negli storici — `completed`
-- [x] v2.9.0: Export CSV dei risultati benchmark — `completed`
-- [x] v2.10.0: Cronologia zone (avanti/indietro) + preferiti nominati — `completed`
-- [x] v2.11.0: Export PNG ad alta risoluzione — `completed`
-- [x] v2.12.0: Modalità Julia — `completed`
-- [x] v2.13.1: Hang export video + direzione invertita + centro proporzionale allo zoom + transizione ease-out — `completed`
-
-- [x] Installazione ffmpeg 7.1 in %USERPROFILE%\ffmpeg + PATH utente (via imageio-ffmpeg/PyPI: gyan.dev andava a 100 KB/s) — `completed`
-
-- [x] v2.13.0: Video zoom MP4 via ffmpeg — `completed`
-
-- [ ] Upgrade a .NET 10 LTS (piano pronto, da eseguire: SDK side-by-side, retarget, riverifica motori+bench, bump v2.6.0) — `pending`
-
-- [x] Audit aggiornamenti sicuri (SDK/runtime/NuGet): tutto già all'ultimo stabile, nessun cambio — `completed`
-
-- [x] v2.5.22: AppStarting (freccia+clessidra) al posto di Wait dove l'UI resta interattiva — `completed`
-
-- [x] v2.5.21: Cursore wait non visibile durante i render lunghi se il mouse è sull'immagine (pictureBox fuori dalla lista di SetBusyCursor) — `completed`
-
-- [x] v2.5.20: Benchmark DirectX offscreen senza Present (headless + event query) così le schede senza monitor non pagano la copia inter-GPU — `completed`
-
-- [x] v2.5.19: Test CUDA (8sx3) e inserimento risultati negli storici del benchmark — `completed`
-
-- [x] v2.5.18: Triplo test DirectX per ogni scheda (3×8 s, best per scheda) via `--bench-dx` e storico per scheda nel grafico benchmark — `completed`
-
-- [x] v2.5.17: DXGI: AdapterNames restituiva elenco vuoto (overflow su GPU >4GB via PointerUSize→uint); elencare davvero le schede DirectX — `completed`
-
-- [x] v2.5.16: DirectX: applicare davvero la scheda scelta dal dropdown (creare il device sull'adapter DXGI selezionato) — `completed`
-
-- [x] v2.5.15: Revisione e pulizia del codice (codice morto, deduplicazione, riordino file) — `completed`
-
-- [x] v2.5.14: Confronto teorico prestazioni RTX 4070 SUPER vs RTX 5070 Ti (tensor, memoria, FP32/FP64) — `completed`
-
-
-- [x] v2.5.13: Fix benchmark DirectX: risultati irrealistici (resize swapchain non avvenuto) e preview nera (CopyResource invertito) — `completed`
-
-- [x] v2.5.12: Preview colorata del benchmark anche per DirectX e pannello DX nascosto durante il test — `completed`
-- [x] v2.5.11: Mostrare il primo frame del benchmark anche in CUDA (e CPU) — `completed`
-- [x] v2.5.10: Standardizzare il benchmark tra i motori (960x540 AA8x senza media dei campioni, DirectX senza v-sync) — `completed`
-- [x] v2.5.9: Aggiornare i riferimenti storici del grafico benchmark — `completed`
-- [x] v2.5.8: Mostrare subito 0% e aggiornare lo stato ogni secondo — `completed`
-- [x] v2.5.7: Spostare benchmark DirectX su worker e mostrare MPixel/s intermedi — `completed`
-- [x] v2.5.6: Rendere visibili gli aggiornamenti intermedi del benchmark su tutti i motori — `completed`
-- [x] v2.5.5: Rimuovere la barra di avanzamento dal benchmark — `completed`
-- [x] v2.5.4: Mostrare percentuale, correggere asse grafico e consentire il primo ridisegno — `completed`
-- [x] v2.5.3: Sistemare valore benchmark tagliato e usare barre orizzontali — `completed`
-- [x] v2.5.2: Aggiungere launcher BAT per provare la versione corrente senza publish — `completed`
-- [x] v2.5.1: Correggere il riferimento CUDA RTX 5070 Ti nel grafico benchmark — `completed`
-- [x] v2.5.0: Avviare subito il benchmark e mostrare il grafico dei riferimenti prestazionali — `completed`
-- [x] v2.4.1: Correggere le variazioni cromatiche CUDA ad alte iterazioni — `completed`
-- [x] v2.4.0: Ripristinare lo smooth coloring coerente su CPU, CUDA e DirectX — `completed`
-- [x] v2.3.15: Rimuovere tutti i launcher `avvia.*` — `completed`
-- [x] v2.3.14: Correggere la selezione iniziale blu nella finestra log — `completed`
-- [x] v2.3.13: Schiarire la luminosità delle palette dopo la rimozione dello smooth coloring — `completed`
-- [x] v2.3.12: Aggiungere benchmark reale del motore DirectX — `completed`
-- [x] v2.3.11: Correggere testo benchmark DirectX fallback CPU e indicazione precisione — `completed`
-- [x] v2.3.10: Uniformare la colorazione CPU a CUDA/DirectX usando le iterazioni — `completed`
-- [x] v2.3.9: CUDA/DX: allineare la colorazione e mantenere AA/downsampling GPU; fix runtime — `completed`
-- [x] v2.3.6: Ottimizzare al massimo il render GPU e il benchmark CUDA — `completed`
-- [x] v2.3.5: Fix DirectX: usare `DriverType.Unknown` quando D3D11CreateDevice riceve un adapter DXGI — `completed`
-- [x] v2.3.4: DirectX: log con lo step esatto che fallisce; swapchain FlipDiscard→FlipSequential + SampleDescription esplicito — `completed`
-- [x] v2.3.3: voce di menù Aiuto → "Mostra log / diagnostica..." con stato motori (DirectX/CUDA), schede, errori e impostazioni — `completed`
-- [x] v2.3.2: all'avvio, se un motore GPU (DirectX/CUDA) non è disponibile, mostrare il motivo nella barra di stato — `completed`
-- [x] DirectX: verificare dal log lo step esatto dopo FlipSequential; se ancora fallisce, valutare render su texture + blit a bitmap (fallback) — `cancelled` (obsoleto: DirectX operativo in modo stabile dalla v2.3.5)
-- [x] v2.3.1: nascondere il dropdown GPU (e la label) quando è selezionato il motore CPU — `completed`
-- [x] v2.3: radio "32"/"64" per la precisione del motore CUDA (float/double) — `completed`
-- [x] v2.2: ToolTip sui controlli e sulle voci del menu che ne spiegano la funzione — `completed`
-- [x] Fix: cursore wait visibile anche col mouse sopra un controllo (es. dropdown AA) durante il render — `completed`
-- [x] Dropdown GPU disabilitato se è selezionato il motore CPU — `completed`
-- [x] v2.1: più schede video, dropdown per scegliere quale usare (CUDA + DirectX) — `completed`
-- [x] Messaggi commit che partono col numero di versione (regola in AGENTS.md) — `completed`
-- [x] Parti sempre dall'insieme (non memorizzare la zona tra un lancio e l'altro) — `completed`
-- [x] Limite massimo iterazioni a 50000 — `completed`
-- [x] Iter auto: almeno 2000 iterazioni a scala 1,95e-4 — `completed`
-- [x] Fix: radio Manuale e CPU nello stesso gruppo (servono contenitori separati) — `completed`
-- [x] v2.0 motore DirectX realtime (shader HLSL, 60fps) — `completed`
-- [x] Mantenere i parametri cambiati tra un lancio e l'altro (settings.json) — `completed`
-- [x] Togliere le iterazioni totali dal benchmark — `completed`
-- [x] Velocizzare CUDA (il 3x sulla CPU è poco) — `completed`
-- [x] Sostituire il tasto "Salva PNG" (usato poco) con il Benchmark — `completed`
-- [x] Benchmark: aggiornamento UI ogni 3 secondi per non falsare il test — `completed`
-- [x] Benchmark in AA 8x — `completed`
-- [x] Risultato benchmark in pixel/s — `completed`
-- [x] Benchmark standard 8s ad alte iterazioni con iter/s in grande — `completed`
-- [x] AA senza checkbox: solo dropdown (1x = disabilitato) — `completed`
-- [x] Durante il pan: niente AA e rendering a 1/4 di risoluzione (full al rilascio) — `completed`
-- [x] Iter auto: almeno 4500 iterazioni a scala 1e-5 — `completed`
-- [x] Antialias 1x/2x/4x/8x con checkbox (supersampling + media dei pixel) — `completed`
-- [x] Iterazioni automatiche da radio a checkbox — `completed`
-- [x] Roadmap v1.4: backend CUDA con ILGPU, float poi double, auto + fallback CPU — `completed`
-- [x] Radio button per selezionare il motore di rendering — `completed`
-- [x] Rinominare Form1 in MandelbrotForm — `completed`
-- [x] Numero iterazioni aggiornato anche in modalità auto (se disabilitato) — `completed`
-- [x] CHANGELOG.md separato + Esci nel menu File — `completed`
-- [x] Dropdown palette (fuoco, ghiaccio, termico) — `completed`
-- [x] Allineare numero iterazioni con label + radio iterazioni auto da zoom — `completed`
-- [x] Menu File (carica/salva zona JSON, salva immagine con nome), menu Help con info, zoom con rotella sul mouse — `completed`
-- [x] Zoom solo col click del mouse, tenendo schiacciato si fa pan/scroll — `completed`
-- [x] Creare in C# un visualizzatore semplice dell'insieme di Mandelbrot — `completed`
-- [x] Spiegare come lanciarlo — `completed`
-- [x] Creare uno script per il lancio (`avvia.bat` + `avvia.ps1`) — `completed`
-- [x] Risolvere richiesta di installazione .NET Desktop Runtime (publish self-contained in `pubblicato/`) — `completed`
-- [x] Chiarire se AGENTS.md viene letto a sessione vuota — `completed`
-- [x] Setup progetto: git + versione in sorgente X.Y.Z + AGENTS.md + TODO.md + SPECIFICHE.md — `completed`
-
+﻿# TODO — MandelC#
+Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] v2.17.3: Toolbar FlowLayoutPanel (controls grouped, no column gaps) — completed
+- [x] v2.17.2: App icon from icon2.png — completed
+- [x] v2.17.1: Fix window resize (DX stretch, CUDA/CPU not redrawing) — completed
+- [x] v2.17.0: Palette gamma color (Python alignment) — completed
+- [x] v2.16.0: Real Time zoom on main window — completed
+- [x] v2.16.0: Main Generate menu (moves Export from File) — completed
+- [x] Question: CUDA vs DX, is ILGPU to blame? (analysis) — completed (no code change)
+- [x] v2.15.10: Fix DX tight poll (not V-Sync) + history — completed
+- [x] CPU bench CLI vs UI discrepancy: it was Debug vs Release, avvia stays Debug — completed
+- [x] v2.15.9: Standard benchmark at AA1x + history recalc — completed
+- [x] AA1x test on Radeon: holds at 4.8 MPixel/s (out of standard), reverted — completed
+- [x] AA4x test on Radeon: TDR also at AA4x, reverted, skip remains — completed
+- [x] Question: AA4x bench for Radeon? (analysis) — completed (no code change)
+- [x] v2.15.8: DX bench skip iGPU + measure DX 4070 SUPER — completed
+- [x] v2.15.7: DX benchmark errors in log/diagnostics — completed
+- [x] Publish v2.15.6 + re-verify Radeon — completed
+- [x] v2.15.6: DX benchmark anti-hang (VRAM check + 60s timeout + device-removed) — completed
+- [ ] App crash (exception dialog, only assembly queue visible) — pending
+- [x] v2.15.5: Recalculate benchmark history via CLI + table in code — completed
+- [x] v2.15.4: Benchmark rename CSV button + Close always on right — completed
+- [x] v2.15.3: Benchmark auto-calculated iterations (not fixed) = 10915 — completed
+- [x] half=5.226737155905588e-05 -> scale? (info) — completed (no code change)
+- [x] v2.15.2: Benchmark zone cx=-0.7499302568795561 cy=-0.015139113925433963 half=5.226737155905588e-05 mi=10915 — completed
+- [x] Benchmark zone (info) — completed (no code change)
+- [x] v2.15.1: Auto iteration formula 2000*(1+log10(1.5/half)) clamp 50-50000 + benchmark value — completed
+- [x] v2.5.23: SPECIFICHE.md review on actual specs, cleanup extra notes from .md — `completed`
+- [x] Publish v2.5.22 + commit — `completed`
+- [x] v2.13.2: Exe and window icon (Mandelbrot render in .ico) — `completed`
+- [x] v2.14.1: 2-3 base color palette (Forest brown→green) — `completed`
+- [x] Commit v2.14.0 in nested repo (6492e75, local only) — `completed`
+- [x] v2.14.0: Fix video encode (exit -542398533, "no packets": odd dimensions) — `completed`
+- [x] v2.15.0: Export submenu (Screenshot + Video) + AA selector in video — `completed`
+- [x] v2.14.0: PNG export with presets, selectable AA and validated custom — `completed`
+- [x] Publish v2.13.1 — `completed`
+- [x] v2.6.0: Arrow key panning (Shift = fine step) — `completed`
+- [x] v2.7.0: Four additional fixed palettes — `completed`
+- [x] v2.8.0: --bench-cpu with CPU model name in history — `completed`
+- [x] v2.9.0: CSV export of benchmark results — `completed`
+- [x] v2.10.0: Zone history (forward/back) + named favorites — `completed`
+- [x] v2.11.0: High-resolution PNG export — `completed`
+- [x] v2.12.0: Julia mode — `completed`
+- [x] v2.13.1: Video export hang + inverted direction + proportional center to zoom + ease-out transition — `completed`
+- [x] ffmpeg 7.1 installation in %USERPROFILE%\ffmpeg + user PATH (via imageio-ffmpeg/PyPI: gyan.dev was at 100 KB/s) — `completed`
+- [x] v2.13.0: Zoom video MP4 via ffmpeg — `completed`
+- [x] Safe updates audit (SDK/runtime/NuGet): all already at latest stable, no changes — `completed`
+- [x] v2.5.22: AppStarting (arrow+clock) instead of Wait where UI stays interactive — `completed`
+- [x] v2.5.21: Wait cursor not visible during long renders if mouse is on the image (pictureBox missing from SetBusyCursor list) — `completed`
+- [x] v2.5.20: DirectX benchmark offscreen without Present (headless + event query) so headless cards don't pay the inter-GPU copy — `completed`
+- [x] v2.5.19: CUDA test (8s×3) and results insertion in benchmark history — `completed`
+- [x] v2.5.18: Triple DirectX test per card (3×8 s, best per card) via `--bench-dx` and per-card history in benchmark chart — `completed`
+- [x] v2.5.17: DXGI: AdapterNames returned empty list (overflow on GPU >4GB via PointerUSize→uint); actually list the DirectX cards — `completed`
+- [x] v2.5.16: DirectX: actually apply the card chosen from the dropdown (create the device on the selected DXGI adapter) — `completed`
+- [x] v2.5.15: Code review and cleanup (dead code, deduplication, file reorganization) — `completed`
+- [x] v2.5.14: Theoretical performance comparison RTX 4070 SUPER vs RTX 5070 Ti (tensor, memory, FP32/FP64) — `completed`
+- [x] v2.5.13: DirectX benchmark fix: unrealistic results (swapchain resize not done) and black preview (CopyResource reversed) — `completed`
+- [x] v2.5.12: Colored benchmark preview also for DirectX and DX panel hidden during test — `completed`
+- [x] v2.5.11: Show the first benchmark frame also in CUDA (and CPU) — `completed`
+- [x] v2.5.10: Standardize benchmark across engines (960x540 AA8x without sample averaging, DirectX without v-sync) — `completed`
+- [x] v2.5.9: Update benchmark chart historical references — `completed`
+- [x] v2.5.8: Show 0% immediately and update status every second — `completed`
+- [x] v2.5.7: Move DirectX benchmark to worker and show intermediate MPixel/s — `completed`
+- [x] v2.5.6: Make intermediate benchmark updates visible on all engines — `completed`
+- [x] v2.5.5: Remove progress bar from benchmark — `completed`
+- [x] v2.5.4: Show percentage, fix chart axis and allow the first redraw — `completed`
+- [x] v2.5.3: Fix truncated benchmark value and use horizontal bars — `completed`
+- [x] v2.5.2: Add BAT launcher to try current version without publish — `completed`
+- [x] v2.5.1: Fix CUDA RTX 5070 Ti reference in benchmark chart — `completed`
+- [x] v2.5.0: Start benchmark immediately and show performance reference chart — `completed`
+- [x] v2.4.1: Fix CUDA color variations at high iterations — `completed`
+- [x] v2.4.0: Restore consistent smooth coloring on CPU, CUDA and DirectX — `completed`
+- [x] v2.3.15: Remove all `avvia.*` launchers — `completed`
+- [x] v2.3.14: Fix initial blue selection in log window — `completed`
+- [x] v2.3.13: Lighten palette brightness after smooth coloring removal — `completed`
+- [x] v2.3.12: Add real DirectX engine benchmark — `completed`
+- [x] v2.3.11: Fix DirectX benchmark CPU fallback text and precision indication — `completed`
+- [x] v2.3.10: Unify CPU coloring with CUDA/DirectX using iterations — `completed`
+- [x] v2.3.9: CUDA/DX: align coloring and keep GPU AA/downsampling; runtime fix — `completed`
+- [x] v2.3.6: Maximize GPU render and CUDA benchmark optimization — `completed`
+- [x] v2.3.5: DirectX fix: use `DriverType.Unknown` when D3D11CreateDevice gets a DXGI adapter — `completed`
+- [x] v2.3.4: DirectX: log with the exact failing step; swapchain FlipDiscard→FlipSequential + explicit SampleDescription — `completed`
+- [x] v2.3.3: Help menu item → "Show log / diagnostics..." with engine status (DirectX/CUDA), cards, errors and settings — `completed`
+- [x] v2.3.2: On startup, if a GPU engine (DirectX/CUDA) is unavailable, show the reason in the status bar — `completed`
+- [x] DirectX: verify from log the exact step after FlipSequential; if still failing, evaluate render to texture + blit to bitmap (fallback) — `cancelled` (obsolete: DirectX stable since v2.3.5)
+- [x] v2.3.1: Hide GPU dropdown (and label) when CPU engine is selected — `completed`
+- [x] v2.3: "32"/"64" radio for CUDA engine precision (float/double) — `completed`
+- [x] v2.2: Tooltips on controls and menu items explaining their function — `completed`
+- [x] Fix: wait cursor visible even with mouse over a control (e.g. AA dropdown) during render — `completed`
+- [x] GPU dropdown disabled when CPU engine is selected — `completed`
+- [x] v2.1: Multiple video cards, dropdown to choose which to use (CUDA + DirectX) — `completed`
+- [x] Commit messages starting with the version number (rule in AGENTS.md) — `completed`
+- [x] Always start from the set (don't save the zone between launches) — `completed`
+- [x] Maximum iterations limit at 50000 — `completed`
+- [x] Auto iter: at least 2000 iterations at scale 1.95e-4 — `completed`
+- [x] Fix: Manual radio and CPU in the same group (separate containers needed) — `completed`
+- [x] v2.0 DirectX realtime engine (HLSL shader, 60fps) — `completed`
+- [x] Keep the changed parameters between launches (settings.json) — `completed`
+- [x] Remove total iterations from benchmark — `completed`
+- [x] Speed up CUDA (3x over CPU is not enough) — `completed`
+- [x] Replace the "Save PNG" button (rarely used) with Benchmark — `completed`
+- [x] Benchmark: UI update every 3 seconds to not skew the test — `completed`
+- [x] Benchmark at AA 8x — `completed`
+- [x] Benchmark result in pixels/s — `completed`
+- [x] Standard 8s benchmark at high iterations with large iter/s display — `completed`
+- [x] AA without checkbox: dropdown only (1x = disabled) — `completed`
+- [x] During pan: no AA and 1/4 resolution rendering (full on release) — `completed`
+- [x] Auto iter: at least 4500 iterations at scale 1e-5 — `completed`
+- [x] Antialias 1x/2x/4x/8x with checkbox (supersampling + pixel averaging) — `completed`
+- [x] Auto iterations from radio to checkbox — `completed`
+- [x] Roadmap v1.4: CUDA backend with ILGPU, float then double, auto + CPU fallback — `completed`
+- [x] Radio button to select the rendering engine — `completed`
+- [x] Rename Form1 to MandelbrotForm — `completed`
+- [x] Iteration count updated even in auto mode (if disabled) — `completed`
+- [x] Separate CHANGELOG.md + Exit in File menu — `completed`
+- [x] Palette dropdown (fire, ice, thermal) — `completed`
+- [x] Align iteration count with label + auto iterations radio from zoom — `completed`
+- [x] File menu (load/save zone JSON, save named image), Help menu with info, mouse wheel zoom — `completed`
+- [x] Zoom only with mouse click, holding does pan/scroll — `completed`
+- [x] Create a simple Mandelbrot set viewer in C# — `completed`
+- [x] Explain how to launch it — `completed`
+- [x] Create launch script (`avvia.bat` + `avvia.ps1`) — `completed`
+- [x] Resolve .NET Desktop Runtime installation request (self-contained publish in `pubblicato/`) — `completed`
+- [x] Clarify if AGENTS.md is read on empty session — `completed`
+- [x] Project setup: git + X.Y.Z version in source + AGENTS.md + TODO.md + SPECIFICHE.md — `completed`

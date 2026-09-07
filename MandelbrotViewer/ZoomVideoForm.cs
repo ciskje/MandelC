@@ -1,14 +1,14 @@
 ﻿namespace MandelbrotViewer;
 
 /// <summary>
-/// Video zoom MP4: interpola dalla vista corrente all'insieme completo (scala in
-/// logaritmo, centro lineare, iterazioni auto per frame) e rende ogni frame col
-/// motore attivo a risoluzione vista e AA1x. Codifica con ffmpeg se presente
-/// (altrimenti resta la sequenza PNG). Annullabile.
+/// Zoom video MP4: interpolates from the current view to the full set (scale in
+/// logarithm, linear center, auto iterations per frame) and renders every frame with
+/// the active engine at view resolution and AA1x. Encodes with ffmpeg if present
+/// (otherwise the PNG sequence remains). Cancelable.
 /// </summary>
 public partial class ZoomVideoForm : Form
 {
-    /// <summary>Tetto campioni totali per frame (come ExportForm): oltre, l'AA scende.</summary>
+    /// <summary>Ceiling of total samples per frame (like ExportForm): beyond it, AA drops.</summary>
     private const long MaxSamples = 134_217_728; // 128 MPixel
 
     private readonly double _endCx, _endCy, _endScale;
@@ -22,7 +22,7 @@ public partial class ZoomVideoForm : Form
     private readonly int _viewW, _viewH;
     private CancellationTokenSource? _cts;
     private bool _rendering;
-    private string _resultPath = ""; // MP4 creato o cartella PNG (per Apri)
+    private string _resultPath = ""; // MP4 created or PNG folder (for Open)
 
     public ZoomVideoForm(double endCx, double endCy, double endScale, Palette palette, int aa,
         RenderEngine engine, bool useCuda, bool useDouble, Size viewSize,
@@ -48,7 +48,7 @@ public partial class ZoomVideoForm : Form
         UpdateInfo();
     }
 
-    /// <summary>AA scelto nel dialog (Come vista = quello attivo) o della vista.</summary>
+    /// <summary>AA chosen in the dialog (As view = the active one) or of the view.</summary>
     private int SelectedAa() =>
         cmbAAVid.SelectedIndex <= 0 ? _aa : 1 << (cmbAAVid.SelectedIndex - 1);
 
@@ -59,16 +59,16 @@ public partial class ZoomVideoForm : Form
         string mode = _julia ? "Julia" : "Mandelbrot";
         int reqAa = SelectedAa();
         int effAa = EffectiveAa();
-        string aaNote = effAa < reqAa ? $" (AA ridotto da {reqAa}x: oltre il tetto)" : "";
-        lblInfo.Text = $"Dalla vista corrente all'insieme ({_viewW}×{_viewH} AA{effAa}x{aaNote}, {mode}, " +
-            $"{engineLabel}, iter auto): ffmpeg " +
-            (FindFfmpeg() != null ? "trovato → MP4 diretto." : "assente → resta la sequenza PNG.");
+        string aaNote = effAa < reqAa ? $" (AA reduced from {reqAa}x: over the ceiling)" : "";
+        lblInfo.Text = $"From the current view to the full set ({_viewW}×{_viewH} AA{effAa}x{aaNote}, {mode}, " +
+            $"{engineLabel}, auto iter): ffmpeg " +
+            (FindFfmpeg() != null ? "found → direct MP4." : "absent → PNG sequence remains.");
     }
 
     private void CmbAAVid_Changed(object? sender, EventArgs e) => UpdateInfo();
 
-    /// <summary>AA effettivo: quello selezionato, ridotto a potenze di 2 finché i
-    /// campioni totali del frame rientrano nel tetto.</summary>
+    /// <summary>Effective AA: the selected one, reduced to powers of 2 until the
+    /// total samples of the frame fit within the ceiling.</summary>
     private int EffectiveAa()
     {
         int a = SelectedAa();
@@ -77,7 +77,7 @@ public partial class ZoomVideoForm : Form
         return a;
     }
 
-    /// <summary>Percorso di ffmpeg (PATH) o null se assente.</summary>
+    /// <summary>Path of ffmpeg (PATH) or null if absent.</summary>
     internal static string? FindFfmpeg()
     {
         foreach (string dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
@@ -89,7 +89,7 @@ public partial class ZoomVideoForm : Form
             }
             catch
             {
-                // Voci di PATH non valide: ignora e continua.
+                // Invalid PATH entries: ignore and continue.
             }
         }
         return null;
@@ -105,8 +105,8 @@ public partial class ZoomVideoForm : Form
         if (MandelbrotForm.StartScale / _endScale < 2.0)
         {
             MessageBox.Show(this,
-                "Sei già all'insieme completo: inquadra prima una zona per generare il video.",
-                "Video zoom", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                "You are already at the full set: frame a region first to generate the video.",
+                "Zoom video", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -126,13 +126,13 @@ public partial class ZoomVideoForm : Form
             progressBar.Value = Math.Clamp((i + 1) * 100 / frames, 0, 100);
             lblResult.Text = $"Frame {i + 1}/{frames}…";
         });
-        btnStart.Text = "Annulla";
+        btnStart.Text = "Cancel";
         btnClose.Enabled = false;
         btnOpen.Enabled = false;
         _resultPath = "";
 
-        // Direzione: dalla vista corrente all'insieme (il caso "già all'insieme"
-        // è bloccato sopra con errore).
+        // Direction: from the current view to the full set (the "already at the set"
+        // case is blocked above with an error).
         double startCx = _endCx, startCy = _endCy, startScale = _endScale;
         string tmpDir = Path.Combine(Path.GetTempPath(),
             "MandelC#-video-" + Guid.NewGuid().ToString("N")[..8]);
@@ -147,23 +147,23 @@ public partial class ZoomVideoForm : Form
             {
                 _resultPath = tmpDir;
                 btnOpen.Enabled = true;
-                lblResult.Text = $"ffmpeg assente: sequenza PNG in {tmpDir}";
-                tmpDir = ""; // non cancellare: è il risultato
+                lblResult.Text = $"ffmpeg absent: PNG sequence in {tmpDir}";
+                tmpDir = ""; // do not delete: it is the result
                 return;
             }
-            lblResult.Text = "Codifica MP4…";
+            lblResult.Text = "Encoding MP4…";
             await Task.Run(() => RunFfmpeg(ffmpeg, tmpDir, frames, fps, dlg.FileName, token), token);
             _resultPath = dlg.FileName;
             btnOpen.Enabled = true;
-            lblResult.Text = $"Video salvato: {Path.GetFileName(dlg.FileName)} ({frames} frame, {fps} fps)";
+            lblResult.Text = $"Video saved: {Path.GetFileName(dlg.FileName)} ({frames} frames, {fps} fps)";
         }
         catch (OperationCanceledException)
         {
-            lblResult.Text = "Annullato.";
+            lblResult.Text = "Cancelled.";
         }
         catch (Exception ex)
         {
-            lblResult.Text = "Errore: " + ex.Message;
+            lblResult.Text = "Error: " + ex.Message;
         }
         finally
         {
@@ -174,7 +174,7 @@ public partial class ZoomVideoForm : Form
             _cts?.Dispose();
             _cts = null;
             _rendering = false;
-            btnStart.Text = "Avvia";
+            btnStart.Text = "Start";
             btnClose.Enabled = true;
             progressBar.Value = 0;
         }
@@ -190,15 +190,15 @@ public partial class ZoomVideoForm : Form
             FrameAt(i, frames, startCx, startCy, startScale,
                 out double cx, out double cy, out double scale, out int maxIter);
             using var bmp = RenderFrame(cx, cy, scale, maxIter, effAa, ct);
-            if (bmp == null) throw new InvalidOperationException("Render non riuscito (DirectX non pronto?).");
+            if (bmp == null) throw new InvalidOperationException("Render failed (DirectX not ready?).");
             bmp.Save(Path.Combine(tmpDir, $"f{i:0000}.png"),
                 System.Drawing.Imaging.ImageFormat.Png);
             progress.Report(i);
         }
     }
 
-    /// <summary>Parametri del frame i-esimo dello zoom (stessa interpolazione del video:
-    /// scala geometrica ease-out, centro che segue lo zoom, iterazioni auto).</summary>
+    /// <summary>Parameters of the i-th frame of the zoom (same interpolation as the video:
+    /// geometric scale ease-out, center following the zoom, auto iterations).</summary>
     private void FrameAt(int i, int frames, double startCx, double startCy, double startScale,
         out double cx, out double cy, out double scale, out int maxIter)
     {
@@ -246,21 +246,21 @@ public partial class ZoomVideoForm : Form
     }
 
     /// <summary>
-    /// Codifica i PNG con ffmpeg (su thread worker: mai sul thread UI). Lo stderr
-    /// è drenato in asincrono DURANTE l'attesa: leggerlo dopo il WaitForExit
-    /// deadlocka appena il pipe si riempie (ffmpeg logga ogni frame). Su
-    /// cancellazione il processo viene ucciso.
+    /// Encodes the PNGs with ffmpeg (on a worker thread: never on the UI thread). The stderr
+    /// is drained asynchronously DURING the wait: reading it after the WaitForExit
+    /// deadlocks as soon as the pipe fills (ffmpeg logs every frame). On
+    /// cancellation the process is killed.
     /// </summary>
     private static void RunFfmpeg(string ffmpeg, string tmpDir, int frames, int fps,
         string output, CancellationToken ct)
     {
-        // Pre-flight: senza frame l'encode fallisce con "no packets".
+        // Pre-flight: without frames the encode fails with "no packets".
         if (Directory.GetFiles(tmpDir, "f*.png").Length == 0)
-            throw new InvalidOperationException("Nessun frame renderizzato da codificare.");
+            throw new InvalidOperationException("No rendered frames to encode.");
         using var proc = new System.Diagnostics.Process();
         proc.StartInfo.FileName = ffmpeg;
-        // pad a dimensioni pari: la vista ha spesso lati dispari e yuv420p/libx264
-        // li rifiuta ("Could not open encoder" + "no packets", exit 0xDFABA7BB).
+        // pad to even dimensions: the view often has odd sides and yuv420p/libx264
+        // rejects them ("Could not open encoder" + "no packets", exit 0xDFABA7BB).
         proc.StartInfo.Arguments = $"-y -framerate {fps} -i \"{Path.Combine(tmpDir, "f%04d.png")}\" " +
             $"-frames:v {frames} -vf \"pad=ceil(iw/2)*2:ceil(ih/2)*2\" " +
             $"-c:v libx264 -pix_fmt yuv420p -crf 18 \"{output}\"";
@@ -275,7 +275,7 @@ public partial class ZoomVideoForm : Form
         {
             while (!proc.WaitForExit(500))
                 ct.ThrowIfCancellationRequested();
-            proc.WaitForExit(); // ricongiunge i reader asincroni
+            proc.WaitForExit(); // rejoins the async readers
         }
         catch
         {
@@ -284,7 +284,7 @@ public partial class ZoomVideoForm : Form
         }
         if (proc.ExitCode != 0)
             throw new InvalidOperationException(
-                "ffmpeg fallito (exit " + proc.ExitCode + "): " + LastLines(stderr.ToString(), 10));
+                "ffmpeg failed (exit " + proc.ExitCode + "): " + LastLines(stderr.ToString(), 10));
     }
 
     private static string LastLines(string text, int n)
@@ -293,7 +293,7 @@ public partial class ZoomVideoForm : Form
         return string.Join(" | ", lines.Skip(Math.Max(0, lines.Length - n)));
     }
 
-    /// <summary>Apre il risultato (MP4 col player predefinito, cartella PNG in Explorer).</summary>
+    /// <summary>Opens the result (MP4 with the default player, PNG folder in Explorer).</summary>
     private void BtnOpen_Click(object? sender, EventArgs e)
     {
         if (string.IsNullOrEmpty(_resultPath)) return;
@@ -306,7 +306,7 @@ public partial class ZoomVideoForm : Form
         }
         catch (Exception ex)
         {
-            lblResult.Text = "Apertura fallita: " + ex.Message;
+            lblResult.Text = "Open failed: " + ex.Message;
         }
     }
 

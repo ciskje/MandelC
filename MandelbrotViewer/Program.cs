@@ -8,9 +8,9 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
-        // Diagnostica e benchmark senza UI: --diag-dx [scheda] | --diag-gpu |
-        // --bench-dx [scheda] | --bench-cuda [device] | --bench-cpu [--csv file]
-        // (vedi Diagnostics.cs). `--csv file` accoda una riga per run al CSV.
+        // Diagnostics and benchmarks without UI: --diag-dx [card] | --diag-gpu |
+        // --bench-dx [card] | --bench-cuda [device] | --bench-cpu [--csv file]
+        // (see Diagnostics.cs). `--csv file` appends one row per run to the CSV.
         if (args.Length > 0 && args[0] == "--diag-dx")
         {
             Diagnostics.DiagDx(args.Length > 1 ? args[1] : null);
@@ -46,8 +46,8 @@ static class Program
     }
 
     /// <summary>
-    /// Icona dell'app (app.ico incorporata) sulla finestra data; facoltativa,
-    /// mai bloccante.
+    /// App icon (embedded app.ico) on the given window; optional,
+    /// never blocking.
     /// </summary>
     internal static void ApplyIcon(Form form)
     {
@@ -59,13 +59,13 @@ static class Program
         }
         catch
         {
-            // Senza icona si avvia comunque.
+            // It starts anyway without the icon.
         }
     }
 
     /// <summary>
-    /// Argomenti dei comandi --bench-*: primo posizionale = scheda/device,
-    /// `--csv file` ovunque dopo il flag. Ritorna (device, csvPath).
+    /// Arguments of the --bench-* commands: first positional = card/device,
+    /// `--csv file` anywhere after the flag. Returns (device, csvPath).
     /// </summary>
     private static (string? Device, string? Csv) ParseBenchArgs(string[] args)
     {

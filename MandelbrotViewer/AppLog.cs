@@ -1,8 +1,8 @@
 ﻿namespace MandelbrotViewer;
 
 /// <summary>
-/// Log eventi in memoria (ultime 200 righe con timestamp): errori dei benchmark
-/// e altre segnalazioni, visibili nel dialog log/diagnostica (menu Aiuto).
+/// In-memory event log (last 200 lines with timestamp): benchmark errors
+/// and other reports, visible in the log/diagnostics dialog (Help menu).
 /// </summary>
 internal static class AppLog
 {
@@ -22,6 +22,6 @@ internal static class AppLog
     public static string GetText()
     {
         lock (_gate)
-            return _lines.Count > 0 ? string.Join(Environment.NewLine, _lines) + Environment.NewLine : "(vuoto)" + Environment.NewLine;
+            return _lines.Count > 0 ? string.Join(Environment.NewLine, _lines) + Environment.NewLine : "(empty)" + Environment.NewLine;
     }
 }
