@@ -1,4 +1,4 @@
-using SharpGen.Runtime;
+﻿using SharpGen.Runtime;
 using Vortice.DXGI;
 
 namespace MandelbrotViewer;
@@ -134,7 +134,15 @@ internal static class Diagnostics
             double best = 0;
             try
             {
-                DxMandelbrot.BeginBenchmarkOffscreen(gridW, gridH);
+                try
+                {
+                    DxMandelbrot.BeginBenchmarkOffscreen(gridW, gridH);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("  griglia offscreen non creata: " + ex.Message);
+                    continue;
+                }
                 for (int r = 1; r <= runs; r++)
                 {
                     try

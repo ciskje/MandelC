@@ -1,4 +1,4 @@
-# SPECIFICHE — Visualizzatore Mandelbrot (MandelC#)
+﻿# SPECIFICHE — Visualizzatore Mandelbrot (MandelC#)
 
 App WinForms (.NET 8, `net8.0-windows`) che renderizza l'insieme di Mandelbrot
 (`z = z² + c`) con smooth coloring coerente su tutti i motori: la tinta dipende
@@ -16,21 +16,22 @@ Fuoco, Ghiaccio, Termico, Oceano, Viola, Deserto, Foresta (stop in
   full al rilascio; anti-rimbalzo sul resize di 300 ms; frecce = 1/10 della
   vista, Shift = 1/100, non attive sul numero iterazioni).
 - `R` = reset vista, `S` = salva PNG, `+`/`-` = ±50 iterazioni (50…50000).
-- Checkbox Auto: iterazioni `200 + 790·log10(zoom)` (clamp 50…50000, ~2000 a
-  scala 1,95e-4); il numero mostra il valore usato pur restando disabilitato.
+- Checkbox Auto: iterazioni 2000*(1+log10(1.5/half)) (half = scala/2, clamp 50-50000; ~1944 alla vista iniziale scala 3.2, 10915 alla zona benchmark); il numero mostra il valore usato pur restando disabilitato. Formula centrale in Mandelbrot.AutoIterForScale, usata anche dal video zoom. Il benchmark usa le iterazioni calcolate con la formula auto alla sua scala (10915) (BenchmarkStandard.MaxIter)
 - Dropdown AA 1x/2x/4x/8x (1x = off): supersampling k×k e media RGB (costo ~k²)
   su CPU e CUDA; in DirectX dentro lo shader.
 - Menu File: carica/salva zona JSON (Ctrl+O / Ctrl+S: centro, scala,
-  iterazioni), salva immagine (Ctrl+Shift+S), export PNG ad alta risoluzione
-  (Ctrl+Shift+E: preset Vista/Full HD/2K/4K/8K/Doppio 4K/Personalizzata con
-  dimensioni validate 320…16384, AA selezionabile, render offscreen col motore
-  attivo, AA auto-ridotto oltre 128 MPixel di campioni), video zoom MP4 (Ctrl+Shift+V:
+  iterazioni), salva immagine (Ctrl+Shift+S), submenu Esporta: screenshot PNG
+  (Ctrl+Shift+E: dialog da Vista corrente con preset Vista/Full HD/2K/4K/8K/
+  Doppio 4K/Personalizzata, dimensioni validate 320…16384, AA selezionabile,
+  render offscreen col motore attivo, AA auto-ridotto oltre 128 MPixel di
+  campioni), video zoom MP4 (Ctrl+Shift+V:
   dalla vista corrente all'insieme (errore se si è già all'insieme; centro
   proporzionale allo zoom così il punto di partenza resta inquadrato;
   transizione ease-out: veloce all'inizio, lento alla fine), 60…480 frame
   a 24/30/60 fps, AA selezionato (auto-ridotto oltre 128 MPixel di campioni),
   iter auto per frame, ffmpeg H.264 (su worker, stderr asincrono, kill su
-  annulla) o sequenza PNG se assente (tasto Apri per il risultato)),
+  annulla, pad a dimensioni pari perché la vista ha spesso lati dispari) o
+  sequenza PNG se assente (tasto Apri per il risultato)),
   benchmark (Ctrl+B), Esci (Alt+F4).
 - Menu Vista: cronologia Indietro/Avanti (Alt+Left/Right, max 200 viste: ogni
   zoom, pan, reset e caricamento è committed) e zone preferite nominate
@@ -39,7 +40,7 @@ Fuoco, Ghiaccio, Termico, Oceano, Viola, Deserto, Foresta (stop in
   fissata, default −0,7 + 0,27015i persistita: click = fissa c, R resetta anche
   c; zone includono modo e c).
 - Menu Aiuto: Informazioni (versione, comandi) e log/diagnostica (stato motori,
-  schede, errori con step esatto, impostazioni).
+  schede, errori con step esatto, impostazioni, log eventi con errori dei benchmark).
 - Barra di stato: centro, larghezza, iterazioni, palette, motore (+AA/anteprima);
   guida comandi fissa. ToolTip su controlli e voci di menu.
 - Cursore AppStarting (freccia+clessidra) durante i render async — l'UI resta
@@ -75,27 +76,25 @@ palette, AA, motore, GPU, precisione CUDA, finestra. La vista NON è memorizzata
 ## Benchmark
 
 Test standardizzato identico per i motori (`BenchmarkStandard`): zona fissa
-960×540, AA 8× inteso come griglia di campioni elementari senza media
-(7680×4320 = 33,18 MPixel per frame), 5000 iterazioni, solo conteggio delle
+960×540, AA 1× inteso come griglia di campioni elementari senza media
+(960x540 = 0,52 MPixel per frame), iterazioni calcolate con la formula auto alla scala del test (10915), centro (-0.7499302568795561, -0.015139113925433963), scala 1.0453474311811176e-04 (half 5.226737155905588e-05), solo conteggio delle
 iterazioni di fuga (niente colorazione né downsampling), budget 8 s, metrica
 frame × campioni/frame / secondi.
 - CPU: accumula le iterazioni; CUDA: kernel solo-iterazioni con buffer riusati;
   DirectX: shader solo-iterazioni su render target offscreen in memoria
-  (132 MB), senza finestra né Present, con 4 event query in anello per contare
+  (~2 MB), senza finestra né Present, con 4 event query in anello per contare
   i frame davvero completati (DWM e copia inter-GPU esclusi: le schede senza
-  monitor misurano il puro shader).
+  monitor misurano il puro shader). Anti-blocco: VRAM stimata prima dellallocazione (errore se insufficiente), timeout 60 s per frame e rilevazione device-removed: la Radeon iGPU va in TDR (frame troppo pesante a 10915 iter) e il run fallisce con errore invece di bloccarsi).
 - La finestra parte da sola, mostra l'anteprima colorata 960×540 AA1x del frame
   (resa col motore attivo prima della misura), percentuale + MPixel/s
   intermedi ogni secondo, risultato in grande e grafico a 9 barre (misura +
-  storici best-di-3: CUDA 5070 Ti 5653,6/140,7 e 4070 SUPER 4667,8/110,3 in
-  32/64-bit; DirectX 5070 Ti 5780,7, 4070 SUPER 4441,6, AMD Radeon 102,2;
-  CPU 9900X 27,8 in double). Durante il test DirectX il pannello realtime è
+  storici best-di-3 sulla zona corrente: CUDA 5070 Ti 276,3/6,7 e 4070 SUPER 220,7/5,3 in 32/64-bit; DirectX 5070 Ti 292,4, 4070 SUPER 239,2 e Radeon 5,1; CPU 9900X 4,8 in double) Durante il test DirectX il pannello realtime è
   nascosto e il timer sospeso, ripristinati alla chiusura.
 - CLI: `--bench-dx [scheda]` (tutte le DXGI o una), `--bench-cuda [device]`
   (tutti i device, 32 + 64 bit), `--bench-cpu` (con nome modello),
   `--diag-dx [scheda]`, `--diag-gpu`; `--csv file` accoda una riga per run
   (timestamp, motore, device, precisione, run, frame, secondi, MPixel/s),
-  come il pulsante "CSV…" della finestra.
+  come il pulsante "Esporta CSV" della finestra. Nota: gli storici sono misurati in Release (pubblicato); avvia.bat gira in Debug e in CPU rende ~2,7x meno
 
 ## File
 
@@ -123,6 +122,7 @@ frame × campioni/frame / secondi.
 - `MandelbrotViewer/RenderEngine.cs` — enum motori + nomi display.
 - `MandelbrotViewer/Settings.cs` — `AppSettings` in JSON.
 - `MandelbrotViewer/LogForm.cs` — finestra log/diagnostica.
+- AppLog.cs - log eventi in memoria (ultime 200 righe, errori benchmark).
 - `MandelbrotViewer/AppVersion.cs` — versione X.Y.Z (`Display` breve se Z=0).
 - `MandelbrotViewer/app.ico` — icona exe + finestre (render Fuoco 256 px,
   16/32/48/256).

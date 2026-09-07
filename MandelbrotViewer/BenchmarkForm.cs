@@ -1,4 +1,4 @@
-namespace MandelbrotViewer;
+﻿namespace MandelbrotViewer;
 
 /// <summary>
 /// Benchmark standard: zona fissa ad alte iterazioni per 8 secondi, misura le
@@ -6,13 +6,13 @@ namespace MandelbrotViewer;
 /// </summary>
 public partial class BenchmarkForm : Form
 {
-    // Parametri standard del test (fissi, così i risultati sono confrontabili):
+    // Parametri standard del test (condivisi, così i risultati sono confrontabili):
     // vivono in BenchmarkStandard, condivisi anche dalla CLI --bench-dx.
     private const int BW = BenchmarkStandard.Width;
     private const int BH = BenchmarkStandard.Height;
-    private const int BMaxIter = BenchmarkStandard.MaxIter;
-    private const int BAA = BenchmarkStandard.Aa; // il test gira in AA 8x (64x pixel per frame)
-    private const double BCx = BenchmarkStandard.CenterX; // valle dei cavallucci marini
+    private static int BMaxIter => BenchmarkStandard.MaxIter;
+    private const int BAA = BenchmarkStandard.Aa; // il test gira in AA 1x
+    private const double BCx = BenchmarkStandard.CenterX;
     private const double BCy = BenchmarkStandard.CenterY;
     private const double BScale = BenchmarkStandard.Scale;
     private static readonly TimeSpan Budget = BenchmarkStandard.Budget;
@@ -161,6 +161,14 @@ public partial class BenchmarkForm : Form
         {
             lblResult.Text = "Annullato";
         }
+        catch (Exception ex)
+        {
+            AppLog.Add("Benchmark " + (_useDirectX ? "DirectX" : (_useCuda ? "CUDA" : "CPU")) + ": " + ex.Message);
+            lblResult.Text = "Errore";
+            lblDetail.Text = ex.Message;
+            lblLive.Text = "";
+            chartPanel.Invalidate();
+        }
         finally
         {
             _cts?.Dispose();
@@ -211,14 +219,14 @@ public partial class BenchmarkForm : Form
         (string Label, double Value, Brush Brush)[] bars =
         [
             ("Risultato", _measuredMpixel, actualBrush),
-            ("CUDA 5070 Ti 32-bit", 5653.6, cudaBrush),
-            ("CUDA 4070 SUPER 32-bit", 4667.8, cudaBrush),
-            ("CUDA 5070 Ti 64-bit", 140.7, cudaBrush),
-            ("CUDA 4070 S. 64-bit", 110.3, cudaBrush),
-            ("DirectX 5070 Ti", 5780.7, dxBrush),
-            ("DirectX 4070 SUPER", 4441.6, dxBrush),
-            ("DirectX AMD Radeon", 102.2, dxBrush),
-            ("CPU 9900X", 27.8, cpuBrush),
+            ("CUDA 5070 Ti 32-bit", 276.3, cudaBrush),
+            ("CUDA 4070 SUPER 32-bit", 220.7, cudaBrush),
+            ("CUDA 5070 Ti 64-bit", 6.7, cudaBrush),
+            ("CUDA 4070 S. 64-bit", 5.3, cudaBrush),
+            ("DirectX 5070 Ti", 292.4, dxBrush),
+            ("DirectX 4070 SUPER", 239.2, dxBrush),
+            ("DirectX AMD Radeon", 5.1, dxBrush),
+            ("CPU 9900X", 4.8, cpuBrush),
         ];
         double maximum = bars.Max(b => b.Value) * 1.15;
 
@@ -307,7 +315,7 @@ public partial class BenchmarkForm : Form
 
     /// <summary>
     /// Benchmark DirectX standardizzato offscreen: rende la griglia dei campioni
-    /// elementari (960x540 AA8x = 7680x4320 pixel) con lo shader solo-iterazioni su
+    /// elementari (960x540 AA1x) con lo shader solo-iterazioni su
     /// una render target in memoria, senza media dei campioni e senza Present.
     /// Il completamento dei frame è rilevato con event query: il lavoro per frame
     /// è quindi identico a quello dei benchmark CUDA e CPU, e DWM/copia inter-GPU

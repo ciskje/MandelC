@@ -1,4 +1,4 @@
-namespace MandelbrotViewer;
+﻿namespace MandelbrotViewer;
 
 partial class BenchmarkForm
 {
@@ -80,8 +80,8 @@ partial class BenchmarkForm
         this.bottomPanel.Padding = new Padding(12, 8, 12, 10);
         this.bottomPanel.Controls.Add(this.lblLive);
         this.bottomPanel.Controls.Add(this.btnStart);
-        this.bottomPanel.Controls.Add(this.btnClose);
         this.bottomPanel.Controls.Add(this.btnCsv);
+        this.bottomPanel.Controls.Add(this.btnClose);
         // lblLive
         this.lblLive.Dock = DockStyle.Fill;
         this.lblLive.Text = "";
@@ -102,8 +102,8 @@ partial class BenchmarkForm
 
         // btnCsv
         this.btnCsv.Dock = DockStyle.Right;
-        this.btnCsv.Width = 90;
-        this.btnCsv.Text = "CSV…";
+        this.btnCsv.Width = 108;
+        this.btnCsv.Text = "Esporta CSV";
         this.btnCsv.Enabled = false;
         this.btnCsv.Click += new EventHandler(this.BtnCsv_Click);
 

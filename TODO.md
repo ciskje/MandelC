@@ -1,3 +1,23 @@
+﻿- [x] Domanda: CUDA vs DX, colpa di ILGPU? (analisi) — completed (nessun cambio codice)
+- [x] v2.15.10: Fix poll DX stretto (non V-Sync) + storici — completed
+- [x] Discrepanza bench CPU CLI vs UI: era Debug vs Release, avvia resta Debug — completed
+- [x] v2.15.9: Benchmark standard a AA1x + ricalcolo storici — completed
+- [x] Test AA1x su Radeon: regge a 4,8 MPixel/s (fuori standard), revert — completed
+- [x] Test AA4x su Radeon: TDR anche a AA4x, revert, resta lo skip — completed
+- [x] Domanda: bench AA4x per Radeon? (analisi) — completed (nessun cambio codice)
+- [x] v2.15.8: Bench DX skip iGPU + misura DX 4070 SUPER — completed
+- [x] v2.15.7: Errori benchmark DX nel log/diagnostica — completed
+- [x] Pubblicazione v2.15.6 + riverifica Radeon — completed
+- [x] v2.15.6: Benchmark DX anti-blocco (VRAM check + timeout 60s + device-removed) — completed
+- [ ] Crash app (dialog eccezione, solo coda assembly visibile) — pending
+- [x] v2.15.5: Ricalcolo storici benchmark via CLI + tabella nel codice — completed
+- [x] v2.15.4: Benchmark rinomina pulsante CSV + Chiudi sempre a destra — completed
+- [x] v2.15.3: Benchmark mi calcolata via auto (non fissa) = 10915 — completed
+- [x] half=5.226737155905588e-05 -> scala? (info) — completed (nessun cambio codice)
+- [x] v2.15.2: Zona benchmark cx=-0.7499302568795561 cy=-0.015139113925433963 half=5.226737155905588e-05 mi=10915 — completed
+- [x] Zona del benchmark (info) — completed (nessun cambio codice)
+- [x] v2.15.1: Formula iter auto 2000*(1+log10(1.5/half)) clamp 50-50000 + valore benchmark — completed
+
 # TODO — MandelC#
 
 Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed`/`cancelled`.
@@ -7,6 +27,10 @@ Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed
 - [x] Pubblicazione v2.5.22 + commit — `completed`
 - [x] v2.13.2: Icona dell'exe e delle finestre (render Mandelbrot in .ico) — `completed`
 
+- [x] v2.14.1: Palette a 2-3 colori base (Foresta marrone→verde) — `completed`
+- [x] Commit v2.14.0 nel repo annidato (6492e75, solo locale) — `completed`
+- [x] v2.14.0: Fix encode video (exit -542398533, "no packets": lati dispari) — `completed`
+- [x] v2.15.0: Submenu Esporta (Screenshot + Video) + selettore AA proprio nel video — `completed`
 - [x] v2.14.0: Export PNG con preset, AA selezionabile e custom validato — `completed`
 - [x] Pubblicazione v2.13.1 — `completed`
 
@@ -116,3 +140,4 @@ Ogni richiesta dell'utente diventa una voce qui. Stato: `pending` → `completed
 - [x] Risolvere richiesta di installazione .NET Desktop Runtime (publish self-contained in `pubblicato/`) — `completed`
 - [x] Chiarire se AGENTS.md viene letto a sessione vuota — `completed`
 - [x] Setup progetto: git + versione in sorgente X.Y.Z + AGENTS.md + TODO.md + SPECIFICHE.md — `completed`
+

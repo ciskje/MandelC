@@ -29,9 +29,11 @@ public partial class ExportForm : Form
 
     public ExportForm(double cx, double cy, double scale, int maxIter, Palette palette, int aa,
         RenderEngine engine, bool useCuda, bool useDouble, Size viewSize,
-        bool julia = false, double juliaCx = 0, double juliaCy = 0)
+        bool julia = false, double juliaCx = 0, double juliaCy = 0, int presetDefault = -1)
     {
         InitializeComponent();
+        if (presetDefault >= 0 && presetDefault < cmbPreset.Items.Count)
+            cmbPreset.SelectedIndex = presetDefault; // screenshot: parte da Vista, tutto libero
         Program.ApplyIcon(this);
 
         _cx = cx;

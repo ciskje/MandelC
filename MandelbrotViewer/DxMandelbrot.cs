@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using SharpGen.Runtime;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
@@ -148,6 +148,10 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     /// <summary>Nome della scheda video attualmente usata ("" se non inizializzato).</summary>
     public static string AdapterName { get; private set; } = "";
 
+    /// <summary>Memoria dedicata + condivisa dell'adapter in uso (ulong.MaxValue se ignota).</summary>
+    public static ulong AdapterDedicatedBytes { get; private set; } = ulong.MaxValue;
+    public static ulong AdapterSharedBytes { get; private set; } = ulong.MaxValue;
+
     /// <summary>Errore dell'ultima enumerazione fallita (diagnostica), vuoto se OK.</summary>
     public static string EnumerationError { get; private set; } = "";
 
@@ -183,6 +187,42 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             EnumerationError = $"{ex.GetType().Name}: {ex.Message}";
         }
         return names;
+    }
+
+    /// <summary>Legge la memoria dell'adapter scelto (o del primo hardware se auto).
+    /// Le dimensioni DXGI oltre i 4 GB mandano in overflow la conversione a 32 bit
+    /// del wrapper: in quel caso (o se l'adapter non si trova) resta ulong.MaxValue
+    /// = memoria abbondante/sconosciuta e il controllo VRAM viene saltato.</summary>
+    private static void RefreshAdapterMemory(string? adapterName)
+    {
+        AdapterDedicatedBytes = ulong.MaxValue;
+        AdapterSharedBytes = ulong.MaxValue;
+        try
+        {
+            using IDXGIFactory1 factory = DXGI.CreateDXGIFactory1<IDXGIFactory1>();
+            for (uint i = 0; i < 32; i++)
+            {
+                if (factory.EnumAdapters(i, out IDXGIAdapter adapter).Failure) break;
+                using (adapter)
+                {
+                    string name = adapter.Description.Description;
+                    if (name.StartsWith("Microsoft Basic", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (adapterName != null &&
+                        !string.Equals(name, adapterName, StringComparison.OrdinalIgnoreCase)) continue;
+                    var d = adapter.Description;
+                    AdapterDedicatedBytes = SafeMemBytes(() => (ulong)(d.DedicatedVideoMemory / (1024 * 1024)) * 1024ul * 1024ul);
+                    AdapterSharedBytes = SafeMemBytes(() => (ulong)(d.SharedSystemMemory / (1024 * 1024)) * 1024ul * 1024ul);
+                    return;
+                }
+            }
+        }
+        catch { /* memoria sconosciuta: nessun controllo */ }
+    }
+
+    private static ulong SafeMemBytes(Func<ulong> read)
+    {
+        try { return read(); }
+        catch { return ulong.MaxValue; }
     }
 
     /// <param name="adapterName">Scheda da usare (nome DXGI esatto); null = adapter hardware predefinito.
@@ -293,6 +333,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             _device = device;
             _context = context;
             AdapterName = adapterName ?? "Auto (adapter hardware predefinito)";
+            RefreshAdapterMemory(adapterName);
 
             step = "D3DCompiler.Compile (shader)";
             ReadOnlyMemory<byte> vsCode = Compiler.Compile(VsSource, "VS", "mandelbrot-vs", "vs_5_0");
@@ -396,8 +437,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
 
     /// <summary>
     /// Prepara il benchmark offscreen: render target in memoria della GPU alle
-    /// dimensioni della griglia dei campioni elementari (es. 960x540 AA8 =
-    /// 7680x4320, ~132 MB in R8G8B8A8) più un anello di event query per rilevare
+    /// dimensioni della griglia dei campioni elementari (es. 960x540 AA1x =
+    /// 960x540, ~2 MB in R8G8B8A8) più un anello di event query per rilevare
     /// il completamento reale dei frame. Niente swapchain, niente Present.
     /// </summary>
     public static void BeginBenchmarkOffscreen(int width, int height)
@@ -406,6 +447,18 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         EndBenchmarkOffscreen();
         width = Math.Max(1, width);
         height = Math.Max(1, height);
+        // Stima memoria: render target R8G8B8A8 (4 byte/pixel) x2 di margine.
+        // Se l'adapter non ha abbastanza RAM il driver va in TDR/stallo senza errori:
+        // meglio un errore chiaro subito che un blocco infinito in DrainOne.
+        ulong need = (ulong)width * (ulong)height * 4ul * 2ul;
+        ulong have = AdapterDedicatedBytes >= ulong.MaxValue - AdapterSharedBytes
+            ? ulong.MaxValue : AdapterDedicatedBytes + AdapterSharedBytes;
+        if (have != ulong.MaxValue && need > have)
+        {
+            string msg = "Memoria GPU insufficiente per il benchmark (" + width + "x" + height + " = ~" + (need / 1048576) + " MB richiesti, ~" + (have / 1048576) + " MB su " + AdapterName + "): ridurre AA o usare un'altra scheda.";
+            throw new InvalidOperationException(msg);
+        }
+
         var desc = new Texture2DDescription
         {
             Width = (uint)width,
@@ -521,8 +574,23 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     /// Con pData NULL, `GetData` fa solo il check di stato: S_OK = pronta, S_FALSE
     /// = ancora in coda; con `DoNotFlush` non invia lavoro accodato alla GPU.
     /// </summary>
-    private static bool QuerySignaled(ID3D11Query query, AsyncGetDataFlags flags) =>
-        _context!.GetData(query, IntPtr.Zero, 0, flags) == SharpGen.Runtime.Result.Ok;
+    private static bool QuerySignaled(ID3D11Query query, AsyncGetDataFlags flags)
+    {
+        try
+        {
+            return _context!.GetData(query, IntPtr.Zero, 0, flags) == SharpGen.Runtime.Result.Ok;
+        }
+        catch (SharpGen.Runtime.SharpGenException)
+        {
+            // Su device removed GetData lancia invece di tornare S_FALSE:
+            // mappa in errore leggibile con il motivo della rimozione.
+            var removed = _device!.DeviceRemovedReason;
+            if (removed.Failure)
+                throw new InvalidOperationException(
+                    $"GPU bloccata durante il benchmark (device removed, HRESULT 0x{removed.Code:X8}): frame troppo pesante per {AdapterName} a questa griglia.");
+            throw;
+        }
+    }
 
     /// <summary>Conta i frame la cui event query è già scattata (senza flush).</summary>
     private static void DrainReady(Queue<(ID3D11Query Query, int Seq)> pending,
@@ -536,15 +604,40 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
     }
 
+    /// <summary>Attesa massima di un singolo frame prima di dichiarare la GPU bloccata.</summary>
+    private static readonly TimeSpan BenchmarkFrameTimeout = TimeSpan.FromSeconds(60);
+
     /// <summary>Attende il frame più vecchio della coda (bloccante, interrompibile).</summary>
     private static void DrainOne(Queue<(ID3D11Query Query, int Seq)> pending,
         System.Diagnostics.Stopwatch sw, ref int completed, ref double completedSeconds, CancellationToken ct)
     {
         var (query, _) = pending.Dequeue();
         // Poll con flush: la GPU avanza mentre la CPU attende (GetData bloccante
-        // nativo non accetterebbe il CancellationToken).
+        // nativo non accetterebbe il CancellationToken). Con timeout e controllo
+        // device-removed: senza, una scheda che non regge la griglia del benchmark
+        // (TDR di Windows, OOM) resta in attesa per sempre senza errori.
+        var waitStart = sw.Elapsed;
+        // Poll stretto senza sleep: a AA1x i frame durano ~1 ms e ogni quanto
+        // di attesa (~1-15 ms) deprimerebbe il throughput; i controlli costosi
+        // (cancel, device-removed, timeout) girano ogni 1024 poll.
+        int spins = 0;
         while (!QuerySignaled(query, AsyncGetDataFlags.None))
+        {
+            if ((++spins & 1023) != 0) continue;
             ct.ThrowIfCancellationRequested();
+            var removed = _device!.DeviceRemovedReason;
+            if (removed.Failure)
+            {
+                string msg = $"GPU bloccata durante il benchmark (device removed, HRESULT 0x{removed.Code:X8}): frame troppo pesante per {AdapterName} a questa griglia.";
+                throw new InvalidOperationException(msg);
+            }
+            if (sw.Elapsed - waitStart > BenchmarkFrameTimeout)
+            {
+                string msg = $"Timeout GPU ({BenchmarkFrameTimeout.TotalSeconds:0} s) in attesa di un frame su {AdapterName}: scheda troppo lenta o driver bloccato.";
+                throw new TimeoutException(msg);
+            }
+
+        }
         completed++;
         completedSeconds = sw.Elapsed.TotalSeconds;
     }

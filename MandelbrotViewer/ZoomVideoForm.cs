@@ -1,4 +1,4 @@
-namespace MandelbrotViewer;
+﻿namespace MandelbrotViewer;
 
 /// <summary>
 /// Video zoom MP4: interpola dalla vista corrente all'insieme completo (scala in
@@ -45,21 +45,33 @@ public partial class ZoomVideoForm : Form
         _viewW = Math.Max(320, viewSize.Width);
         _viewH = Math.Max(240, viewSize.Height);
 
+        UpdateInfo();
+    }
+
+    /// <summary>AA scelto nel dialog (Come vista = quello attivo) o della vista.</summary>
+    private int SelectedAa() =>
+        cmbAAVid.SelectedIndex <= 0 ? _aa : 1 << (cmbAAVid.SelectedIndex - 1);
+
+    private void UpdateInfo()
+    {
         string engineLabel = _useCuda ? $"CUDA {(_useDouble ? "64-bit" : "32-bit")}"
             : _useDirectX ? "DirectX" : "CPU";
         string mode = _julia ? "Julia" : "Mandelbrot";
+        int reqAa = SelectedAa();
         int effAa = EffectiveAa();
-        string aaNote = effAa < _aa ? $" (AA ridotto da {_aa}x: oltre il tetto)" : "";
+        string aaNote = effAa < reqAa ? $" (AA ridotto da {reqAa}x: oltre il tetto)" : "";
         lblInfo.Text = $"Dalla vista corrente all'insieme ({_viewW}×{_viewH} AA{effAa}x{aaNote}, {mode}, " +
             $"{engineLabel}, iter auto): ffmpeg " +
             (FindFfmpeg() != null ? "trovato → MP4 diretto." : "assente → resta la sequenza PNG.");
     }
 
+    private void CmbAAVid_Changed(object? sender, EventArgs e) => UpdateInfo();
+
     /// <summary>AA effettivo: quello selezionato, ridotto a potenze di 2 finché i
     /// campioni totali del frame rientrano nel tetto.</summary>
     private int EffectiveAa()
     {
-        int a = _aa;
+        int a = SelectedAa();
         while ((long)_viewW * a * _viewH * a > MaxSamples && a > 1)
             a /= 2;
         return a;
@@ -189,9 +201,7 @@ public partial class ZoomVideoForm : Form
             double cx = startCx + (MandelbrotForm.StartCenterX - startCx) * u;
             double cy = startCy + (MandelbrotForm.StartCenterY - startCy) * u;
             // Iterazioni auto come nella vista (stessa formula di AutoIter).
-            int maxIter = Math.Clamp(
-                (int)(200 + 790 * Math.Log10(Math.Max(1.0, MandelbrotForm.StartScale / Math.Max(double.Epsilon, scale)))),
-                50, 50000);
+            int maxIter = Mandelbrot.AutoIterForScale(scale);
             using var bmp = RenderFrame(cx, cy, scale, maxIter, effAa, ct);
             if (bmp == null) throw new InvalidOperationException("Render non riuscito (DirectX non pronto?).");
             bmp.Save(Path.Combine(tmpDir, $"f{i:0000}.png"),
@@ -241,10 +251,16 @@ public partial class ZoomVideoForm : Form
     private static void RunFfmpeg(string ffmpeg, string tmpDir, int frames, int fps,
         string output, CancellationToken ct)
     {
+        // Pre-flight: senza frame l'encode fallisce con "no packets".
+        if (Directory.GetFiles(tmpDir, "f*.png").Length == 0)
+            throw new InvalidOperationException("Nessun frame renderizzato da codificare.");
         using var proc = new System.Diagnostics.Process();
         proc.StartInfo.FileName = ffmpeg;
+        // pad a dimensioni pari: la vista ha spesso lati dispari e yuv420p/libx264
+        // li rifiuta ("Could not open encoder" + "no packets", exit 0xDFABA7BB).
         proc.StartInfo.Arguments = $"-y -framerate {fps} -i \"{Path.Combine(tmpDir, "f%04d.png")}\" " +
-            $"-frames:v {frames} -c:v libx264 -pix_fmt yuv420p -crf 18 \"{output}\"";
+            $"-frames:v {frames} -vf \"pad=ceil(iw/2)*2:ceil(ih/2)*2\" " +
+            $"-c:v libx264 -pix_fmt yuv420p -crf 18 \"{output}\"";
         proc.StartInfo.UseShellExecute = false;
         proc.StartInfo.CreateNoWindow = true;
         proc.StartInfo.RedirectStandardError = true;
@@ -265,7 +281,7 @@ public partial class ZoomVideoForm : Form
         }
         if (proc.ExitCode != 0)
             throw new InvalidOperationException(
-                "ffmpeg fallito (exit " + proc.ExitCode + "): " + LastLines(stderr.ToString(), 3));
+                "ffmpeg fallito (exit " + proc.ExitCode + "): " + LastLines(stderr.ToString(), 10));
     }
 
     private static string LastLines(string text, int n)

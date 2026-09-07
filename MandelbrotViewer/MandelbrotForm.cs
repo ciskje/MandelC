@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace MandelbrotViewer;
 
@@ -115,9 +115,8 @@ public partial class MandelbrotForm : Form
     private int AutoIter()
     {
         // Più si ingrandisce, più iterazioni servono per bordi nitidi.
-        // Tarata per ~2000 iterazioni a scala 1,95e-4 e ~4550 a scala 1e-5.
-        double zoom = StartScale / Math.Max(double.Epsilon, _scale);
-        int iter = (int)(200 + 790 * Math.Log10(Math.Max(1.0, zoom)));
+        // 2000 alla vista iniziale (meta lato 1.5) + 2000 ogni 10x: 2000*(1+log10(1.5/half)).
+        int iter = Mandelbrot.AutoIterForScale(_scale);
         return Math.Clamp(iter, (int)numIter.Minimum, (int)numIter.Maximum);
     }
 
@@ -748,11 +747,12 @@ public partial class MandelbrotForm : Form
 
     private void SaveImageItem_Click(object? sender, EventArgs e) => SavePng(); // menu File → "Salva immagine..." (Ctrl+Shift+S)
 
-    private void ExportItem_Click(object? sender, EventArgs e)
+    private void ExportShotItem_Click(object? sender, EventArgs e)
     {
         bool useCuda = _engine == RenderEngine.Cuda && GpuMandelbrot.IsReady;
         using var dlg = new ExportForm(_centerX, _centerY, _scale, MaxIter, ActivePalette,
-            AaFactor, _engine, useCuda, UseDoublePrecision, ActiveViewSize, _julia, _jcx, _jcy);
+            AaFactor, _engine, useCuda, UseDoublePrecision, ActiveViewSize, _julia, _jcx, _jcy,
+            presetDefault: 0); // screenshot: parte da Vista corrente, preset e AA liberi
         dlg.ShowDialog(this);
     }
 
@@ -810,6 +810,9 @@ public partial class MandelbrotForm : Form
         sb.AppendLine($"GPU:        {(_settings.Gpu.Length > 0 ? _settings.Gpu : "Auto")}");
         sb.AppendLine($"Palette:    {_settings.Palette}    AA: {_settings.AaIndex}    Iterazioni: {_settings.MaxIter} (auto = {_settings.IterAuto})");
         sb.AppendLine($"Precisione (Single): {_settings.Single}");
+        sb.AppendLine();
+        sb.AppendLine("=== Log eventi ===");
+        sb.Append(AppLog.GetText());
         return sb.ToString();
     }
 

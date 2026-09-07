@@ -60,13 +60,14 @@ internal static class PaletteColors
         (1.00, 235, 250, 255),
     ];
 
+    // Viola: 2 colori base opposti e vivaci, magenta e ciano (l'interno resta nero).
     private static readonly (double T, byte R, byte G, byte B)[] VioletStops =
     [
-        (0.00, 0, 0, 0),
-        (0.25, 48, 0, 95),
-        (0.50, 125, 20, 175),
-        (0.75, 205, 85, 220),
-        (1.00, 245, 220, 255),
+        (0.00, 60, 0, 80),
+        (0.25, 210, 0, 190),
+        (0.50, 120, 40, 220),
+        (0.75, 0, 200, 230),
+        (1.00, 210, 255, 255),
     ];
 
     private static readonly (double T, byte R, byte G, byte B)[] DesertStops =
@@ -78,13 +79,14 @@ internal static class PaletteColors
         (1.00, 255, 245, 220),
     ];
 
+    // Foresta: 2 colori base, marrone e verde agli estremi (l'interno resta nero).
     private static readonly (double T, byte R, byte G, byte B)[] ForestStops =
     [
-        (0.00, 0, 0, 0),
-        (0.25, 0, 70, 20),
-        (0.50, 20, 150, 60),
-        (0.75, 140, 230, 120),
-        (1.00, 240, 255, 220),
+        (0.00, 55, 32, 12),
+        (0.25, 115, 78, 32),
+        (0.50, 95, 125, 45),
+        (0.75, 60, 170, 70),
+        (1.00, 205, 235, 175),
     ];
 
     /// <summary>Gradienti (t, r, g, b) della palette (5 stop da t=0 a t=1).</summary>

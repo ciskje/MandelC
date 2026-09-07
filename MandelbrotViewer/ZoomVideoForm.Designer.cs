@@ -9,6 +9,9 @@ partial class ZoomVideoForm
     private ComboBox cmbFrames = null!;
     private Label lblFps = null!;
     private ComboBox cmbFps = null!;
+    private Panel rowAA = null!;
+    private Label lblAA = null!;
+    private ComboBox cmbAAVid = null!;
     private ProgressBar progressBar = null!;
     private Label lblResult = null!;
     private Panel bottomPanel = null!;
@@ -34,6 +37,9 @@ partial class ZoomVideoForm
         this.cmbFrames = new ComboBox();
         this.lblFps = new Label();
         this.cmbFps = new ComboBox();
+        this.rowAA = new Panel();
+        this.lblAA = new Label();
+        this.cmbAAVid = new ComboBox();
         this.progressBar = new ProgressBar();
         this.lblResult = new Label();
         this.bottomPanel = new Panel();
@@ -42,6 +48,7 @@ partial class ZoomVideoForm
         this.btnOpen = new Button();
 
         this.rowPanel.SuspendLayout();
+        this.rowAA.SuspendLayout();
         this.bottomPanel.SuspendLayout();
         this.SuspendLayout();
 
@@ -82,6 +89,24 @@ partial class ZoomVideoForm
         this.cmbFps.Items.AddRange(new object[] { "24", "30", "60" });
         this.cmbFps.SelectedIndex = 1;
 
+        // rowAA
+        this.rowAA.Dock = DockStyle.Top;
+        this.rowAA.Height = 34;
+        this.rowAA.Padding = new Padding(12, 4, 12, 4);
+        this.rowAA.Controls.Add(this.cmbAAVid);
+        this.rowAA.Controls.Add(this.lblAA);
+        // lblAA
+        this.lblAA.Dock = DockStyle.Left;
+        this.lblAA.Width = 150;
+        this.lblAA.Text = "Antialias:";
+        this.lblAA.TextAlign = ContentAlignment.MiddleLeft;
+        // cmbAAVid
+        this.cmbAAVid.Dock = DockStyle.Fill;
+        this.cmbAAVid.DropDownStyle = ComboBoxStyle.DropDownList;
+        this.cmbAAVid.Items.AddRange(new object[] { "Come vista", "1x", "2x", "4x", "8x" });
+        this.cmbAAVid.SelectedIndex = 0;
+        this.cmbAAVid.SelectedIndexChanged += new EventHandler(this.CmbAAVid_Changed);
+
         // progressBar
         this.progressBar.Dock = DockStyle.Top;
         this.progressBar.Height = 16;
@@ -120,9 +145,10 @@ partial class ZoomVideoForm
 
         // ZoomVideoForm
         this.AutoScaleMode = AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(420, 250);
+        this.ClientSize = new System.Drawing.Size(420, 284);
         this.Controls.Add(this.lblResult);
         this.Controls.Add(this.progressBar);
+        this.Controls.Add(this.rowAA);
         this.Controls.Add(this.rowPanel);
         this.Controls.Add(this.lblInfo);
         this.Controls.Add(this.bottomPanel);
@@ -134,6 +160,7 @@ partial class ZoomVideoForm
         this.CancelButton = this.btnClose;
 
         this.rowPanel.ResumeLayout(false);
+        this.rowAA.ResumeLayout(false);
         this.bottomPanel.ResumeLayout(false);
         this.ResumeLayout(false);
     }

@@ -1,4 +1,4 @@
-namespace MandelbrotViewer;
+﻿namespace MandelbrotViewer;
 
 /// <summary>
 /// Versione dell'applicazione in formato X.Y.Z (Semantic Versioning semplificato).
@@ -8,8 +8,8 @@ namespace MandelbrotViewer;
 public static class AppVersion
 {
     public const int Major = 2;
-    public const int Minor = 14;
-    public const int Patch = 0;
+    public const int Minor = 15;
+    public const int Patch = 10;
 
     public static string Full => $"{Major}.{Minor}.{Patch}";
 

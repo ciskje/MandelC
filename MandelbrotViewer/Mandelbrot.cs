@@ -1,4 +1,4 @@
-using System.Drawing.Imaging;
+﻿using System.Drawing.Imaging;
 
 namespace MandelbrotViewer;
 
@@ -117,6 +117,20 @@ public static class Mandelbrot
             return unchecked((int)0xFF000000); // dentro -> nero
         double smoothIterations = iter + 1.0 - Math.Log(Math.Log(Math.Sqrt(Math.Max(mod2, 4.0)))) / Math.Log(2.0);
         return PaletteColors.ColorFor(smoothIterations, maxIter, palette);
+    }
+
+    /// <summary>
+    /// Iterazioni automatiche in base all'ingrandimento: 2000 per la vista iniziale
+    /// (meta lato = 1.5) piu 2000 ogni 10x, cioe 2000 * (1 + log10(1.5 / half)),
+    /// con half = scale / 2 (meta della larghezza vista). Clamp 50-50000.
+    /// </summary>
+    public static int AutoIterForScale(double scale)
+    {
+        double half = Math.Max(double.Epsilon, scale * 0.5);
+        double iter = 2000.0 * (1.0 + Math.Log10(1.5 / half));
+        if (iter < 50.0) return 50;
+        if (iter > 50000.0) return 50000;
+        return (int)iter;
     }
 
     /// <summary>

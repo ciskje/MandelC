@@ -36,6 +36,7 @@
     private ToolStripMenuItem saveZoneItem = null!;
     private ToolStripSeparator fileSeparator = null!;
     private ToolStripMenuItem saveImageItem = null!;
+    private ToolStripMenuItem exportMenu = null!;
     private ToolStripMenuItem exportItem = null!;
     private ToolStripMenuItem videoItem = null!;
     private ToolStripSeparator fileSeparator2 = null!;
@@ -93,6 +94,7 @@
         this.saveZoneItem = new ToolStripMenuItem();
         this.fileSeparator = new ToolStripSeparator();
         this.saveImageItem = new ToolStripMenuItem();
+        this.exportMenu = new ToolStripMenuItem();
         this.exportItem = new ToolStripMenuItem();
         this.videoItem = new ToolStripMenuItem();
         this.fileSeparator2 = new ToolStripSeparator();
@@ -339,7 +341,7 @@
         this.fileMenu.Text = "&File";
         this.fileMenu.DropDownItems.AddRange(new ToolStripItem[] {
             this.loadZoneItem, this.saveZoneItem, this.fileSeparator,
-            this.saveImageItem, this.exportItem, this.videoItem, this.fileSeparator2, this.benchmarkItem,
+            this.saveImageItem, this.exportMenu, this.fileSeparator2, this.benchmarkItem,
             this.fileSeparator3, this.exitItem });
 
         // loadZoneItem
@@ -357,13 +359,18 @@
         this.saveImageItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.S;
         this.saveImageItem.Click += new EventHandler(this.SaveImageItem_Click);
 
+        // exportMenu
+        this.exportMenu.Text = "&Esporta";
+        this.exportMenu.DropDownItems.AddRange(new ToolStripItem[] {
+            this.exportItem, this.videoItem });
+
         // exportItem
-        this.exportItem.Text = "Esporta PNG ad alta &risoluzione...";
+        this.exportItem.Text = "&Screenshot...";
         this.exportItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.E;
-        this.exportItem.Click += new EventHandler(this.ExportItem_Click);
+        this.exportItem.Click += new EventHandler(this.ExportShotItem_Click);
 
         // videoItem
-        this.videoItem.Text = "Esporta &video zoom...";
+        this.videoItem.Text = "Video &zoom...";
         this.videoItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.V;
         this.videoItem.Click += new EventHandler(this.VideoItem_Click);
 
@@ -407,8 +414,9 @@
         this.loadZoneItem.ToolTipText = "Ricarica la vista salvata in un file JSON (Ctrl+O)";
         this.saveZoneItem.ToolTipText = "Salva la vista corrente (centro, scala, iterazioni) in un file JSON (Ctrl+S)";
         this.saveImageItem.ToolTipText = "Salva l'immagine corrente come PNG (Ctrl+Shift+S)";
-        this.exportItem.ToolTipText = "Rende la vista a risoluzione scelta e salva il PNG (Ctrl+Shift+E)";
-        this.videoItem.ToolTipText = "Video MP4 dello zoom dall'insieme alla vista (Ctrl+Shift+V, serve ffmpeg)";
+        this.exportMenu.ToolTipText = "Esporta la vista: screenshot PNG o video zoom MP4";
+        this.exportItem.ToolTipText = "Screenshot alla risoluzione vista con AA a scelta (Ctrl+Shift+E)";
+        this.videoItem.ToolTipText = "Video MP4 dello zoom con AA a scelta (Ctrl+Shift+V, serve ffmpeg)";
         this.benchmarkItem.ToolTipText = "Benchmark standard: 8 s ad alte iterazioni (Ctrl+B)";
         this.aboutItem.ToolTipText = "Informazioni su MandelC# (F1)";
 

@@ -1,13 +1,49 @@
-# CHANGELOG — MandelC#
+﻿# CHANGELOG — MandelC#
 
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
+- **v2.15.10** — Fix throughput DX a AA1x: poll event-query di nuovo stretto (lo Sleep/quanto deprimeva i frame da ~1 ms: 5070 Ti 67,4→292,4); controlli anti-blocco ogni 1024 poll. Storici DX aggiornati. File: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.15.9** — Benchmark standard a AA1x (griglia 960x540): la metrica resta MPixel/s e la Radeon rientra (niente piu TDR ne skip iGPU); storici ricalcolati via CLI: CUDA 5070 Ti 276,3/6,7 e 4070 SUPER 220,7/5,3, DirectX 5070 Ti 65,9, 4070 SUPER 56,8 e Radeon 4,8, CPU 9900X 4,8 (9 barre). File: `BenchmarkStandard.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.15.8** — Benchmark DX: skip preventivo schede con <1 GB dedicati (niente piu TDR/popup AMD), `QuerySignaled` sicura su device removed (niente piu HRESULT grezzo nel log), log evento unico via GUI; storici: DirectX 5070 Ti 436,3 + 4070 SUPER 355,2 (8 barre). File: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.15.7** — Log/diagnostica (menu Aiuto): nuova sezione Log eventi con errori dei benchmark (AppLog in memoria, ultime 200 righe); gli errori DX (device removed, timeout, VRAM) e della GUI ora restano nel log. File: `AppLog.cs`, `MandelbrotForm.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.15.6** — Benchmark DX anti-blocco: check VRAM prima della griglia AA8x, timeout 60 s per frame e rilevazione device-removed in `DrainOne` (la Radeon iGPU andava in TDR e restava appesa senza errori); errori visibili in GUI e `run fallito` in CLI. File: `DxMandelbrot.cs`, `Diagnostics.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.15.5** — Storici benchmark ricalcolati via CLI sulla nuova zona (best di 3): CUDA 5070 Ti 490,7/9,0 e 4070 SUPER 384,1/7,0 (32/64-bit), DirectX 5070 Ti 483,0, CPU 9900X 6,1; rimosse le barre DirectX 4070 SUPER (scheda assente in DXGI) e AMD Radeon (bench si blocca). Grafico a 7 barre. File: BenchmarkForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+
+- **v2.15.4** — Benchmark: pulsante export rinominato CSV… → Esporta CSV e Chiudi sempre a destra (ordine dock: Avvia, Esporta CSV, Chiudi). File: BenchmarkForm.Designer.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+
+- **v2.15.3** — Benchmark: iterazioni non piu fisse ma calcolate con la formula auto alla scala del test (BenchmarkStandard.MaxIter => Mandelbrot.AutoIterForScale(Scale) = 10915). File: BenchmarkStandard.cs, BenchmarkForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+
+- **v2.15.2** — Zona benchmark: centro (-0.7499302568795561, -0.015139113925433963), scala 1.0453474311811176e-04 (half 5.226737155905588e-05), 10915 iter (= auto della zona); w×h 960×540 e budget 8 s invariati. Storici invariati (riferiti alla vecchia zona). File: BenchmarkStandard.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+
+- **v2.15.1** — Iter auto 2000*(1+log10(1.5/half)) (half = scala/2, clamp 50-50000) centralizzata in Mandelbrot.AutoIterForScale, usata da vista e video zoom (alla scala benchmark 5e-4 vale 9556, ma il benchmark resta a 5000 iter fisse). File: Mandelbrot.cs, MandelbrotForm.cs, ZoomVideoForm.cs, TODO.md, SPECIFICHE.md, CHANGELOG.md, AppVersion.cs, .csproj.
+
+- **v2.15.0** — Submenu File → Esporta con Screenshot (Ctrl+Shift+E: dialog che
+  parte da Vista corrente con preset e AA liberi) e Video zoom (Ctrl+Shift+V)
+  con selettore AA proprio (Come vista/1x/2x/4x/8x: il video può usare un AA
+  diverso dalla vista); tolte le voci singole. File: `MandelbrotForm.cs`,
+  `MandelbrotForm.Designer.cs`, `ExportForm.cs`, `ZoomVideoForm.cs`,
+  `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`,
+  `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.14.1** — Palette a 2-3 colori base: Foresta ridisegnata (marrone e verde
+  agli estremi, interno sempre nero) e Viola con opposti vivaci magenta↔ciano;
+  le altre erano già a 2-3 tinte. Vale su tutti i motori (stop generici). File:
+  `Palette.cs`, `TODO.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
 - **v2.14.0** — Export PNG con preset (Vista corrente, Full HD, 2K, 4K, 8K,
   Doppio 4K 7680×2160, Personalizzata), AA selezionabile (Come vista/1x/2x/4x/8x) e
   dimensioni custom validate (interi 320…16384, caselle attive solo su
-  Personalizzata); tetto campioni e dialog invariati. File: `ExportForm.cs`,
-  `ExportForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`,
-  `AppVersion.cs`, `.csproj`.
+  Personalizzata); tetto campioni e dialog invariati. Fix encode video: la
+  vista ha spesso lati dispari e libx264/yuv420p li rifiuta ("Could not open
+  encoder" + "no packets", exit 0xDFABA7BB, riprodotto) — pad a dimensioni pari,
+  pre-flight sui PNG e più righe stderr negli errori. File: `ExportForm.cs`,
+  `ExportForm.Designer.cs`, `ZoomVideoForm.cs`, `TODO.md`, `SPECIFICHE.md`,
+  `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.13.2** — Icona dell'exe e delle finestre: render 256 px dell'insieme in
   palette Fuoco, `.ico` multirisoluzione (16/32/48/256) via `ApplicationIcon` +
