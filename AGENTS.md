@@ -29,11 +29,11 @@ must be written in **English** from now on.
 & "$env:USERPROFILE\.dotnet\dotnet.exe" build "MandelbrotViewer\MandelbrotViewer.csproj"
 # Debug run
 & "$env:USERPROFILE\.dotnet\dotnet.exe" run --project "MandelbrotViewer"
-# Publish self-contained (regenerates pubblicato\, ~150 MB, no installed runtime required)
-& "$env:USERPROFILE\.dotnet\dotnet.exe" publish "MandelbrotViewer\MandelbrotViewer.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "pubblicato"
+# Publish self-contained (regenerates published\, ~150 MB, no installed runtime required)
+& "$env:USERPROFILE\.dotnet\dotnet.exe" publish "MandelbrotViewer\MandelbrotViewer.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "published"
 ```
 
-- End-user launch: run the published file in `pubblicato\` if present;
+- End-user launch: run the published file in `published\` if present;
   for development use the `dotnet run` command indicated above.
 
 ## Versioning (mandatory)
@@ -60,7 +60,7 @@ must be written in **English** from now on.
 
 - The project lives in the `test/` repo (root above `MandelC#/`). No nested repo.
 - Commit scope: only files in `MandelC#/`. Never commit secrets.
-- Ignored via `MandelC#/.gitignore`: `bin/`, `obj/`, `pubblicato/` (regenerable).
+- Ignored via `MandelC#/.gitignore`: `bin/`, `obj/`, `published/` (regenerable).
 - Concise commit messages in English starting with the version number
   (e.g. `v2.0.1: DirectX realtime, benchmark, ...`).
 - Commit/push only on explicit user request.

@@ -83,16 +83,30 @@ Standardized test identical for the engines (`BenchmarkStandard`): fixed zone
 (960x540 = 0.52 MPixel per frame), iterations computed with the auto formula at the test scale (10915), center (-0.7499302568795561, -0.015139113925433963), scale 1.0453474311811176e-04 (half 5.226737155905588e-05), only counting
 escape iterations (no coloring nor downsampling), 8 s budget, metric
 frames × samples/frame / seconds.
-- CPU: accumulates the iterations; CUDA: iterations-only kernel with reused buffers;
+- CPU: accumulates the iterations; CUDA: iterations-only kernel with reused buffers
+  and an adaptive in-flight batch (4…256 launches, about 0.8 s of queued work),
+  synchronizing once per batch rather than once per frame;
   DirectX: iterations-only shader on an in-memory offscreen render target
-  (~2 MB), without window nor Present, with 4 event queries in a ring to count
-  the frames actually completed (DWM and inter-GPU copy excluded: headless cards
-  measure the pure shader). Anti-hang: VRAM estimated before allocation (error if insufficient), 60 s timeout per frame and device-removed detection: the Radeon iGPU goes into TDR (frame too heavy at 10915 iterations) and the run fails with an error instead of hanging).
+  (~2 MB), without window nor Present, with an event-query ring to count the
+   frames actually completed (DWM and inter-GPU copy excluded: headless cards
+   measure the pure shader). The DirectX and CUDA benchmark kernels use the same
+   iteration loop (incremental squares) and the same zone mapping, so the chart bars
+   are a fair engine-to-engine comparison of the identical workload. The frames-in-flight
+   depth is sized at run time from
+  a TDR-safe estimate batch (min 4, max 256, ~0.8 s of queued work): deep enough
+  to keep fast cards saturated (true compute throughput, not the per-frame submit
+  round-trip), while slow cards stay clear of TDR. Anti-hang: VRAM estimated before
+  allocation (error if insufficient), 60 s timeout per frame and device-removed
+  detection: the Radeon iGPU goes into TDR (frame too heavy at 10915 iterations) and
+  the run fails with an error instead of hanging).
+- CUDA benchmark execution is serialized with normal CUDA rendering through the
+  shared render gate. This prevents concurrent use of the same accelerator from
+  changing the result or causing backend contention.
 - The window opens on its own, shows the colored 960×540 AA1x preview of the frame
   (rendered with the active engine before the measurement), percentage + MPixel/s
-  intermediate every second, result in large and a 9-bar chart (measurement +
-  best-of-3 history on the current zone: CUDA 5070 Ti 276.3/6.7 and 4070 SUPER 220.7/5.3 in 32/64-bit; DirectX 5070 Ti 292.4, 4070 SUPER 239.2 and Radeon 5.1; CPU 9900X 4.8 in double) During the DirectX test the realtime panel is
-  hidden and the timer suspended, restored on close.
+   intermediate every second, result in large and a 9-bar chart (measurement +
+  best-of-3 history on the current zone: CUDA 5070 Ti 278.2/6.7 and 4070 SUPER 222.1/5.3 in 32/64-bit; DirectX 5070 Ti 337.4, 4070 SUPER 262.6 and Radeon 5.2; CPU 9900X 4.9 in double). Bars are ordered by MPixel/s descending. During the DirectX test the realtime panel is
+   hidden and the timer suspended, restored on close.
 - CLI: `--bench-dx [card]` (all DXGI or one), `--bench-cuda [device]`
   (all devices, 32 + 64 bit), `--bench-cpu` (with model name),
   `--diag-dx [card]`, `--diag-gpu`; `--csv file` queues one row per run
@@ -132,8 +146,8 @@ frames × samples/frame / seconds.
   row 1: engine + precision + GPU), controls grouped to the left.
 - Root: `run.bat` (runs the current version via `dotnet run`, forwards the
   arguments), `publish.bat` / `publish.ps1` (self-contained publish
-  single-file in `pubblicato/`, ~158 MB), `AGENTS.md`, `TODO.md`,
-  `CHANGELOG.md`, `.gitignore` (excludes `bin/`, `obj/`, `pubblicato/`, `*.user`).
+  single-file in `published/`, ~158 MB), `AGENTS.md`, `TODO.md`,
+  `CHANGELOG.md`, `.gitignore` (excludes `bin/`, `obj/`, `published/`, `*.user`).
 
 ## Changelog
 
@@ -148,3 +162,34 @@ See [CHANGELOG.md](CHANGELOG.md).
   to .NET 10 LTS).
 - The CUDA backend requires an NVIDIA GPU + driver on the target machine (the
   CUDA toolkit is not needed at runtime); without a GPU the app uses the CPU automatically.
+
+## Benchmark blocking-risk audit (2026-09-07)
+
+- **High risk — CUDA has no bounded wait.** `GpuMandelbrot.BenchmarkGpu`
+  calls `accelerator.Synchronize()` for every frame. Cancellation is checked
+  before launch and after synchronization, so a CUDA driver/device hang can
+  keep the worker blocked indefinitely and the GUI cannot cancel it. The same
+  limitation affects the CUDA benchmark preview render.
+- **High risk — closing the benchmark window does not await the worker.**
+  `BenchmarkForm.OnFormClosing` cancels the token and immediately closes the
+  form. The asynchronous start handler may later resume and update disposed
+  controls, or DirectX cleanup may run while the worker is still in the
+  benchmark loop. This can turn a close operation into an exception or leave
+  GPU work running in the background.
+- **Resolved in v2.17.5 — CUDA benchmark and main render are serialized.**
+  Both `GpuMandelbrot.Render` and `BenchmarkGpu` now use `RenderGate`, so the
+  modal benchmark dialog cannot let a main render use the same accelerator at
+  the same time and distort the throughput result.
+- **DirectX is better bounded but not absolute.** Its event-query loop has a
+  60-second timeout, cancellation checks, and device-removal detection. A
+  native `GetData` call that itself stalls cannot be interrupted by managed
+  code, so the timeout protects the polling path rather than every possible
+  driver-level stall.
+- **CPU has no comparable indefinite wait in the benchmark loop.** Its work is
+  finite per frame and `Parallel.For` observes the cancellation token, although
+  cancellation can only be observed between iteration-loop checks.
+
+Recommended follow-up: serialize all CUDA accelerator operations through one
+benchmark/render gate, add a bounded CUDA execution strategy or watchdog that
+can reset the accelerator, and make benchmark form closing asynchronous or
+prevent disposal until the worker has completed its cleanup.

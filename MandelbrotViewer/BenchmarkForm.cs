@@ -213,21 +213,23 @@ public partial class BenchmarkForm : Form
         using var centered = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
         using var rightAligned = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
 
-        // Riferimenti storici, misurati con il test standardizzato (best di 3 run da
-        // 8 s: DirectX offscreen con `--bench-dx`, CUDA con `--bench-cuda` in float
-        // 32-bit e double 64-bit, CPU double con `--bench-cpu`). Unità: MPixel/s.
-        (string Label, double Value, Brush Brush)[] bars =
-        [
+        // Historical references, measured with the standardized test (best of 3 runs of
+        // 8 s: DirectX offscreen `--bench-dx`, CUDA `--bench-cuda` float 32-bit and double
+        // 64-bit, CPU double `--bench-cpu`). Unit: MPixel/s. The DirectX and CUDA benchmark
+        // kernels use the same iteration loop (incremental squares), so the bars are a fair
+        // engine-to-engine comparison of the identical workload.
+        var bars = new (string Label, double Value, Brush Brush)[]
+        {
             ("Risultato", _measuredMpixel, actualBrush),
-            ("CUDA 5070 Ti 32-bit", 276.3, cudaBrush),
-            ("CUDA 4070 SUPER 32-bit", 220.7, cudaBrush),
+            ("CUDA 5070 Ti 32-bit", 278.2, cudaBrush),
+            ("CUDA 4070 SUPER 32-bit", 222.1, cudaBrush),
             ("CUDA 5070 Ti 64-bit", 6.7, cudaBrush),
             ("CUDA 4070 S. 64-bit", 5.3, cudaBrush),
-            ("DirectX 5070 Ti", 292.4, dxBrush),
-            ("DirectX 4070 SUPER", 239.2, dxBrush),
-            ("DirectX AMD Radeon", 5.1, dxBrush),
-            ("CPU 9900X", 4.8, cpuBrush),
-        ];
+            ("DirectX 5070 Ti", 337.4, dxBrush),
+            ("DirectX 4070 SUPER", 262.6, dxBrush),
+            ("DirectX AMD Radeon", 5.2, dxBrush),
+            ("CPU 9900X", 4.9, cpuBrush),
+        }.OrderByDescending(b => b.Value).ToArray();
         double maximum = bars.Max(b => b.Value) * 1.15;
 
         e.Graphics.DrawString("Confronto prestazioni (MPixel/s)", titleFont, titleBrush, left, 2);

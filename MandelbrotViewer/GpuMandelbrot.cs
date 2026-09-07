@@ -232,6 +232,12 @@ internal static class GpuMandelbrot
     /// </summary>
     public static (long TotalIters, double Seconds, int Frames) BenchmarkGpu(double centerX, double centerY, double scale, int w, int h, int maxIter, int supersample, bool useDouble, TimeSpan budget, IProgress<BenchmarkProgress>? progress, CancellationToken ct)
     {
+        lock (RenderGate)
+            return BenchmarkGpuCore(centerX, centerY, scale, w, h, maxIter, supersample, useDouble, budget, progress, ct);
+    }
+
+    private static (long TotalIters, double Seconds, int Frames) BenchmarkGpuCore(double centerX, double centerY, double scale, int w, int h, int maxIter, int supersample, bool useDouble, TimeSpan budget, IProgress<BenchmarkProgress>? progress, CancellationToken ct)
+    {
         var accelerator = _accelerator ?? throw new InvalidOperationException("GPU not initialized.");
 
         // Buffers allocated once and reused for all the frames (no extra alloc/copy).
@@ -245,6 +251,20 @@ internal static class GpuMandelbrot
         var kernel = useDouble ? _doubleBenchKernel! : _floatBenchKernel!;
         using var itersBuffer = accelerator.Allocate1D<int>(count);
 
+        // Keep several kernels in flight, like the DirectX benchmark. A
+        // synchronize after every launch measures submit latency and starves
+        // fast GPUs instead of measuring their compute throughput.
+        const int batchMin = 4;
+        const int batchMax = 256;
+        const double safeQueuedSeconds = 0.8;
+        int estimateFrames = batchMin;
+        var estimateWatch = System.Diagnostics.Stopwatch.StartNew();
+        for (int i = 0; i < estimateFrames; i++)
+            kernel(count, itersBuffer.View, pars);
+        accelerator.Synchronize();
+        double frameSeconds = Math.Max(1e-6, estimateWatch.Elapsed.TotalSeconds / estimateFrames);
+        int batchSize = Math.Clamp((int)Math.Round(safeQueuedSeconds / frameSeconds), batchMin, batchMax);
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
         int frames = 0;
         bool first = true;
@@ -253,10 +273,15 @@ internal static class GpuMandelbrot
         while (sw.Elapsed < budget)
         {
             ct.ThrowIfCancellationRequested();
-            kernel(count, itersBuffer.View, pars);
+            int submitted = 0;
+            while (submitted < batchSize && sw.Elapsed < budget)
+            {
+                kernel(count, itersBuffer.View, pars);
+                submitted++;
+            }
             accelerator.Synchronize();
             ct.ThrowIfCancellationRequested();
-            frames++;
+            frames += submitted;
             if (first || sw.Elapsed - lastReport >= BenchmarkProgress.ReportInterval)
             {
                 progress?.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));

@@ -49,7 +49,7 @@ dotnet build MandelbrotViewer\MandelbrotViewer.csproj
 dotnet run --project MandelbrotViewer
 
 # Publish (self-contained single file, ~150 MB)
-dotnet publish MandelbrotViewer\MandelbrotViewer.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o pubblicato
+dotnet publish MandelbrotViewer\MandelbrotViewer.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o published
 ```
 
 ## Keyboard Shortcuts

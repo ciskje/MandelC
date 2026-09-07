@@ -93,11 +93,16 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
 {
     float2 c = float2(cx + (pos.x * invW - 0.5) * scale,
                         cy + (pos.y * invH - 0.5) * scale * aspect);
-    float2 z = 0.0;
+    // Same formulation as the CUDA benchmark kernel (GpuMandelbrot.FloatBenchKernel):
+    // incremental squares, so the two engines measure the identical workload.
+    float zx = 0.0, zy = 0.0, zx2 = 0.0, zy2 = 0.0;
     int iter = 0;
-    while (iter < maxIter && dot(z, z) <= 4.0)
+    while (iter < maxIter && zx2 + zy2 <= 4.0)
     {
-        z = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+        zy = 2.0 * zx * zy + c.y;
+        zx = zx2 - zy2 + c.x;
+        zx2 = zx * zx;
+        zy2 = zy * zy;
         iter++;
     }
     // The output depends on the iterations: the compiler cannot eliminate the loop.
@@ -474,7 +479,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         };
         _benchTarget = _device!.CreateTexture2D(desc);
         _benchRtv = _device.CreateRenderTargetView(_benchTarget);
-        _benchQueries = new ID3D11Query?[BenchmarkFlight];
+        _benchQueries = new ID3D11Query?[BenchFlightMax];
         for (int i = 0; i < _benchQueries.Length; i++)
             _benchQueries[i] = _device.CreateQuery(new QueryDescription(QueryType.Event, QueryFlags.None));
         _benchGridW = width;
@@ -500,43 +505,79 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
     }
 
-    /// <summary>Frames in flight: how many Draws remain queued before waiting
-    /// for the oldest to complete (full pipeline, real throughput).</summary>
-    private const int BenchmarkFlight = 4;
-
-    /// <summary>
-    /// Offscreen benchmark frame: draws with the iterations-only shader on the
-    /// samples grid and queues a completion event. No Present:
-    /// the measure is pure shader compute time, independent of the monitor.
-    /// </summary>
-    private static void RenderBenchmarkOffscreen(double centerX, double centerY, double scale, int width, int height, int maxIter, ID3D11Query query)
-    {
-        var pars = new DxParams
-        {
-            Cx = (float)centerX,
-            Cy = (float)centerY,
-            Scale = (float)scale,
-            Aspect = (float)height / Math.Max(1, width),
-            InvW = 1f / Math.Max(1, width),
-            InvH = 1f / Math.Max(1, height),
-            MaxIter = maxIter,
-            Aa = 1,
-        };
-        DrawFrame(pars, _benchRtv!, _benchPs!, width, height);
-        _context!.End(query);
-    }
+    // Frames in flight: how many Draws stay queued before waiting for the oldest to
+    // complete. A deep queue keeps the GPU saturated so the measured rate is the card's
+    // true compute throughput, not the per-frame submit/wait round-trip (shallow queues
+    // starve the GPU: probe on 5070 Ti, 4 in flight ~150 vs 256 in flight ~337 MPix/s).
+    // The depth is sized at run time from the measured frame time so that slow cards
+    // never queue more than ~BenchTdrSafeSeconds of work (avoids TDR / device-removed),
+    // while fast cards run at full depth.
+    private const int BenchFlightMin = 4;
+    private const int BenchFlightMax = 256;
+    private const double BenchTdrSafeSeconds = 0.8;
+    private static int _benchInflight = BenchFlightMin;
 
     /// <summary>
     /// Standard offscreen measurement loop: renders iterations-only frames on the
     /// samples grid for the given budget and returns the effective seconds and the number
     /// of frames really completed by the GPU (event query). Shared by the benchmark
     /// GUI and by `--bench-dx`. No Present: DWM and cross-GPU copy excluded.
+    /// The pipeline state (constants, shaders, render target, viewport) is set once
+    /// before the loop: the benchmark parameters are constant, and per-frame Map/state
+    /// calls would stall the CPU on the in-flight frames and depress the throughput.
+    /// Per frame only Draw + End(query) remain.
     /// </summary>
     /// <param name="tick">Optional periodic callback (completed frames, seconds).</param>
     public static (double Seconds, int Frames) RunBenchmarkFramesOffscreen(double centerX, double centerY, double scale, int gridW, int gridH, int maxIter, TimeSpan budget, Action<int, double>? tick, CancellationToken ct)
     {
         if (_benchRtv == null || _benchQueries.Length == 0)
             throw new InvalidOperationException("Offscreen benchmark not prepared (BeginBenchmarkOffscreen).");
+
+        var pars = new DxParams
+        {
+            Cx = (float)centerX,
+            Cy = (float)centerY,
+            Scale = (float)scale,
+            Aspect = (float)gridH / Math.Max(1, gridW),
+            InvW = 1f / Math.Max(1, gridW),
+            InvH = 1f / Math.Max(1, gridH),
+            MaxIter = maxIter,
+            Aa = 1,
+        };
+        MappedSubresource mapped = _context!.Map(_cbuffer!, 0, MapMode.WriteDiscard);
+        mapped.AsSpan<DxParams>(1)[0] = pars;
+        _context.Unmap(_cbuffer!, 0);
+        _context.OMSetRenderTargets(_benchRtv);
+        _context.VSSetShader(_vs);
+        _context.PSSetShader(_benchPs!);
+        _context.PSSetConstantBuffer(0, _cbuffer!);
+        _context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
+        _context.RSSetViewport(new Viewport(gridW, gridH));
+
+        // Size the in-flight depth from the measured per-frame time: deep enough to
+        // saturate the GPU (true throughput), but never queueing more than
+        // ~BenchTdrSafeSeconds of work (keeps slow cards clear of TDR). A small
+        // TDR-safe batch (BenchFlightMin frames) is enough to estimate the rate.
+        {
+            int est = Math.Min(BenchFlightMin, _benchQueries.Length);
+            var estQ = new Queue<(ID3D11Query Query, int Seq)>();
+            for (int i = 0; i < est; i++)
+            {
+                _context.Draw(3, 0);
+                _context.End(_benchQueries[i]!);
+                estQ.Enqueue((_benchQueries[i]!, i));
+            }
+            int estCompleted = 0;
+            double estSeconds = 0;
+            var swEst = System.Diagnostics.Stopwatch.StartNew();
+            while (estQ.Count > 0)
+                DrainOne(estQ, swEst, ref estCompleted, ref estSeconds, ct);
+            double frameTime = Math.Max(1e-6, swEst.Elapsed.TotalSeconds / est);
+            _benchInflight = (int)Math.Round(BenchTdrSafeSeconds / frameTime);
+            if (_benchInflight < BenchFlightMin) _benchInflight = BenchFlightMin;
+            if (_benchInflight > BenchFlightMax) _benchInflight = BenchFlightMax;
+        }
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
         int submitted = 0, completed = 0;
         double completedSeconds = 0;
@@ -546,10 +587,11 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         while (sw.Elapsed < budget)
         {
             ct.ThrowIfCancellationRequested();
-            while (pending.Count >= BenchmarkFlight)
+            while (pending.Count >= _benchInflight)
                 DrainOne(pending, sw, ref completed, ref completedSeconds, ct);
             var query = _benchQueries[submitted % _benchQueries.Length]!;
-            RenderBenchmarkOffscreen(centerX, centerY, scale, gridW, gridH, maxIter, query);
+            _context.Draw(3, 0);
+            _context.End(query);
             pending.Enqueue((query, submitted));
             submitted++;
             DrainReady(pending, sw, ref completed, ref completedSeconds);

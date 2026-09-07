@@ -2,6 +2,24 @@
 
 Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 `AGENTS.md`. The version is shown in the window title.
+- **v2.17.6** — Benchmark chart results are now ordered from highest to lowest
+  MPixel/s, including the current measurement, so historical performance is
+  easier to compare at a glance. Files: `BenchmarkForm.cs`, `TODO.md`,
+  `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.17.5** — CUDA benchmark now uses an adaptive in-flight batch, with one
+  synchronization per batch instead of one synchronization per frame, matching
+  the DirectX throughput protocol. CUDA benchmark access is serialized with
+  normal CUDA rendering through the shared render gate, so the MPixel/s result
+  is driven by GPU compute throughput rather than per-frame submit latency.
+  Historical values recalculated in Release with the new protocol: CUDA 5070 Ti
+  278.2/6.7 and 4070 SUPER 222.1/5.3 (32/64-bit); DirectX 5070 Ti 337.4,
+  4070 SUPER 262.6 and Radeon 5.2; CPU 9900X 4.9.
+  Files: `GpuMandelbrot.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`,
+  `AppVersion.cs`, `.csproj`.
+
+- **v2.17.4** — DX benchmark: made it measure the card's true compute throughput. (1) Removed the per-frame submit/wait "contorno" that starved the GPU: the frames-in-flight depth is now sized at run time from a TDR-safe estimate (deep enough to saturate fast cards, capped at ~0.8 s of queued work so slow cards stay clear of TDR). (2) Aligned the DirectX and CUDA benchmark kernels to the same iteration loop (incremental squares), so the bars are a fair engine-to-engine comparison of the identical workload (the coordinate mapping was already identical). History recalculated (best of 3, same session): DirectX 5070 Ti 329.7, 4070 SUPER 261.4, Radeon 5.2; CUDA 5070 Ti 275.5 (32-bit)/6.7 (64-bit), 4070 SUPER 220.0/5.3; CPU 9900X 4.9. Files: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
 - **v2.17.3** — Toolbar: replaced `TableLayoutPanel` with two `FlowLayoutPanel` (one per row); controls scroll to the left without spacing from shared columns. Files: `MandelbrotForm.Designer.cs`, `AppVersion.cs`, `.csproj`.
 
 - **v2.17.2** — App icon replaced with `icon2.png`, converted to a multiresolution `.ico` 16/32/48/256. Files: `app.ico`, `AppVersion.cs`, `.csproj`.
@@ -509,7 +527,7 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 - Pan with dragging on button pressed (throttle 80 ms,
   click/drag threshold 5 px). Removed zoom on rectangle and zoom with wheel.
   Files: `Form1.cs`, `Form1.Designer.cs` (help text updated).
-- Project setup (user-level SDK; self-contained publish in `pubblicato/` so
+- Project setup (user-level SDK; self-contained publish in `published/` so
   the Desktop Runtime doesn't need to be installed; version in source (`AppVersion.cs`
   + `<Version>` in the csproj, shown in the title); project setup (AGENTS.md,
   TODO.md, SPECS.md, `.gitignore`, tracking in the `test/` repo).

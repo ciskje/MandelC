@@ -1,5 +1,10 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] v2.17.6: Sort benchmark chart results by MPixel/s descending — completed
+- [x] Update historical benchmark values in the source using the v2.17.5 protocol — completed
+- [x] v2.17.5: Align CUDA benchmark submission and timing with DirectX so GPU throughput, not per-frame synchronization, determines MPixel/s — completed
+- [x] Benchmark code review: identify points that can block or freeze the application — completed
+- [x] v2.17.4: DX benchmark reflects true card performance (remove per-frame overhead; adaptive in-flight depth; align DX/CUDA kernels to the same loop; recalculate history) — completed
 - [x] v2.17.3: Toolbar FlowLayoutPanel (controls grouped, no column gaps) — completed
 - [x] v2.17.2: App icon from icon2.png — completed
 - [x] v2.17.1: Fix window resize (DX stretch, CUDA/CPU not redrawing) — completed
@@ -120,6 +125,6 @@ Every user request becomes an entry here. Status: `pending` → `completed`/`can
 - [x] Create a simple Mandelbrot set viewer in C# — `completed`
 - [x] Explain how to launch it — `completed`
 - [x] Create launch script (`avvia.bat` + `avvia.ps1`) — `completed`
-- [x] Resolve .NET Desktop Runtime installation request (self-contained publish in `pubblicato/`) — `completed`
+- [x] Resolve .NET Desktop Runtime installation request (self-contained publish in `published/`) — `completed`
 - [x] Clarify if AGENTS.md is read on empty session — `completed`
 - [x] Project setup: git + X.Y.Z version in source + AGENTS.md + TODO.md + SPECS.md — `completed`
