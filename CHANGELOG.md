@@ -2,6 +2,16 @@
 
 Versionamento `X.Y.Z` (se `Z` è 0, notazione breve `X.Y`). Regole di bump in
 `AGENTS.md`. La versione è mostrata nel titolo della finestra.
+- **v2.17.3** — Toolbar: sostituito `TableLayoutPanel` con due `FlowLayoutPanel` (una per riga); i controlli scorrono a sinistra senza spaziatura da colonne condivise. File: `MandelbrotForm.Designer.cs`, `AppVersion.cs`, `.csproj`.
+
+- **v2.17.2** — Icona applicativa sostituita con `icon2.png`, convertita in `.ico` multirisoluzione 16/32/48/256. File: `app.ico`, `AppVersion.cs`, `.csproj`.
+
+- **v2.17.1** — Fix resize finestra: DirectX non ridisegnava dopo il resize (mancava il handler `dxPanel.Resize` che imposta `_dxDirty`); CPU/CUDA attendevano il debounce 300 ms (ora `RenderAsync(preview)` immediato a ogni evento, come DX); `pictureBox.SizeMode` da `Normal` a `Zoom` (l'immagine scala mantenendo l'aspect ratio durante la transizione). File: `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.17.0** — Colore palette allineato al riferimento Python: curva gamma `t = (nu/maxIter)^0.35` al posto della mappatura lineare (smooth iteration gia presente). File: `Palette.cs`, `GpuMandelbrot.cs`, `DxMandelbrot.cs`.
+
+- **v2.16.0** — Menu Genera principale (ex submenu Esporta di File: screenshot, video zoom) e zoom Real Time (animazione sulla vista principale dalla zona corrente all'insieme, 120 frame a 30 fps, Esc per fermare). File: `MandelbrotForm.Designer.cs`, `ZoomVideoForm.cs`, `ZoomVideoForm.Designer.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
 - **v2.15.10** — Fix throughput DX a AA1x: poll event-query di nuovo stretto (lo Sleep/quanto deprimeva i frame da ~1 ms: 5070 Ti 67,4→292,4); controlli anti-blocco ogni 1024 poll. Storici DX aggiornati. File: `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 
 - **v2.15.9** — Benchmark standard a AA1x (griglia 960x540): la metrica resta MPixel/s e la Radeon rientra (niente piu TDR ne skip iGPU); storici ricalcolati via CLI: CUDA 5070 Ti 276,3/6,7 e 4070 SUPER 220,7/5,3, DirectX 5070 Ti 65,9, 4070 SUPER 56,8 e Radeon 4,8, CPU 9900X 4,8 (9 barre). File: `BenchmarkStandard.cs`, `DxMandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECIFICHE.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.

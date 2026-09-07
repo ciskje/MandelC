@@ -4,10 +4,10 @@ namespace MandelbrotViewer;
 
 public partial class MandelbrotForm : Form
 {
-    // Vista iniziale: tutto l'insieme (re in [-2.5, 1], im in [-1.2, 1.2]).
+    // Vista iniziale: tutto l'insieme con margine (re in [-2.68, 1.68], im in [-2.34, 2.34]).
     internal const double StartCenterX = -0.5;
     internal const double StartCenterY = 0.0;
-    internal const double StartScale = 3.2; // larghezza in unità complesse
+    internal const double StartScale = 9.36; // larghezza in unità complesse
 
     private double _centerX = StartCenterX;
     private double _centerY = StartCenterY;
@@ -19,6 +19,8 @@ public partial class MandelbrotForm : Form
 
     private Bitmap? _fractal;
     private CancellationTokenSource? _renderCts;
+    private CancellationTokenSource? _realTimeCts;
+    private bool _realTimeActive;
     private System.Windows.Forms.Timer _resizeTimer = null!;
     private System.Windows.Forms.Timer _dxTimer = null!;
     private bool _dxDirty = true; // prossimo frame DirectX da ridisegnare
@@ -764,6 +766,65 @@ public partial class MandelbrotForm : Form
         dlg.ShowDialog(this);
     }
 
+    private async void RealTimeItem_Click(object? sender, EventArgs e)
+    {
+        if (_realTimeActive) { _realTimeCts?.Cancel(); return; }
+
+        if (StartScale / _scale < 2.0)
+        {
+            MessageBox.Show(this,
+                "Sei già all'insieme completo: inquadra prima una zona.",
+                "Torna all'insieme", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        _realTimeActive = true;
+        _realTimeCts = new CancellationTokenSource();
+        var token = _realTimeCts.Token;
+        const int frames = 120;
+        const int fps = 30;
+        int frameMs = 1000 / fps;
+        double startCx = _centerX, startCy = _centerY, startScale = _scale;
+        realTimeItem.Text = "Stop (Esc)";
+        lblStatus.Text = "Torna all'insieme in corso... (Esc per fermare)";
+
+        try
+        {
+            for (int i = 0; i < frames; i++)
+            {
+                token.ThrowIfCancellationRequested();
+                double t = frames > 1 ? i / (double)(frames - 1) : 1.0;
+                double te = 1.0 - Math.Pow(1.0 - t, 3.0);
+                double scale = startScale * Math.Pow(StartScale / startScale, te);
+                double span = StartScale - startScale;
+                double u = span > 0 ? (scale - startScale) / span : 1.0;
+                _centerX = startCx + (StartCenterX - startCx) * u;
+                _centerY = startCy + (StartCenterY - startCy) * u;
+                _scale = scale;
+                InvalidateView();
+                lblStatus.Text = $"Torna all'insieme {i + 1}/{frames}... (Esc per fermare)";
+                if (i < frames - 1)
+                    await Task.Delay(frameMs, token);
+            }
+            lblStatus.Text = "Torna all'insieme: completato.";
+        }
+        catch (OperationCanceledException)
+        {
+            lblStatus.Text = "Torna all'insieme: interrotto.";
+        }
+        catch (Exception ex)
+        {
+            lblStatus.Text = "Errore: " + ex.Message;
+        }
+        finally
+        {
+            _realTimeCts?.Dispose();
+            _realTimeCts = null;
+            _realTimeActive = false;
+            realTimeItem.Text = "Torna all'insieme (&RealTime)";
+        }
+    }
+
     private void SaveZoneItem_Click(object? sender, EventArgs e) => SaveZone();
 
     private void LoadZoneItem_Click(object? sender, EventArgs e) => LoadZone();
@@ -948,8 +1009,8 @@ public partial class MandelbrotForm : Form
 
     private void PictureBox_Resize(object? sender, EventArgs e)
     {
-        _resizeTimer.Stop();
-        _resizeTimer.Start(); // anti-rimbalzo: renderizza solo a resize finito
+        if (_suspendRender || IsDisposed) return;
+        RenderAsync();
     }
 
     private void PictureBox_MouseDown(object? sender, MouseEventArgs e)
@@ -1034,6 +1095,7 @@ public partial class MandelbrotForm : Form
 
     private void MandelbrotForm_KeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.KeyCode == Keys.Escape && _realTimeActive) { _realTimeCts?.Cancel(); return; }
         if (e.Control || e.Alt) return; // le combinazioni Ctrl+/Alt+ spettano ai menu
         if (e.KeyCode == Keys.R) Reset();
         else if (e.KeyCode == Keys.S) SavePng();
@@ -1062,6 +1124,7 @@ public partial class MandelbrotForm : Form
         SaveSettings();
         _dxTimer.Stop();
         _renderCts?.Cancel();
+        _realTimeCts?.Cancel();
         DxMandelbrot.Dispose();
         GpuMandelbrot.Dispose();
         base.OnFormClosing(e);

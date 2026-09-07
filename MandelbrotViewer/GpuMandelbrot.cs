@@ -324,12 +324,13 @@ internal static class GpuMandelbrot
     /// <summary>
     /// Interpolazione della palette nel kernel CUDA: deve restare allineata con
     /// PaletteColors.ColorFor (CPU) e con la funzione Graded dello shader HLSL
-    /// (DxMandelbrot.cs): stessi 5 stop e stessa mappatura t = iter/maxIter * 1.35 + 0.03.
+    /// (DxMandelbrot.cs): stessi 5 stop e stessa mappatura t = (nu/maxIter)^0.35.
     /// </summary>
     private static int ColorFromIterations(float iterations, int maxIter, GpuPaletteParams p)
     {
-        float t = iterations / (maxIter > 0 ? maxIter : 1) * 1.35f + 0.03f;
-        t = t < 0f ? 0f : t > 1f ? 1f : t;
+        float raw = iterations / (maxIter > 0 ? maxIter : 1);
+        raw = raw < 0f ? 0f : raw > 1f ? 1f : raw;
+        float t = MathF.Pow(raw, 0.35f);
         float segment = t * 4f;
         int i = (int)(segment < 3f ? segment : 3f);
         float f = segment - i;

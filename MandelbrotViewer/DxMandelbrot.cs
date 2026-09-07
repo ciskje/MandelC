@@ -68,7 +68,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
                 float mod2 = max(dot(z, z), 4.0);
                 float smoothIterations = (float)iter + 1.0 - log(log(sqrt(mod2))) / log(2.0);
                 // Mappatura allineata con PaletteColors (CPU) e GpuMandelbrot.ColorFromIterations (CUDA).
-                float t = saturate(smoothIterations / (float)maxIter * 1.35 + 0.03);
+                float t = pow(saturate(smoothIterations / (float)maxIter), 0.35);
                 col = Graded(t);
             }
             acc += col;

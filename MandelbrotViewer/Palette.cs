@@ -13,14 +13,15 @@ public enum Palette
     Foresta
 }
 
-/// <summary>
-/// Gradienti della palette e interpolazione del colore basata sulle iterazioni.
-/// Fonte unica degli stop per i percorsi CPU e DirectX; il kernel CUDA riceve gli
-/// stessi stop tramite <see cref="GpuPaletteParams"/> e li interpola in
-/// GpuMandelbrot.ColorFromIterations, DirectX nella funzione Graded dello shader
-/// HLSL (DxMandelbrot.cs). Le tre implementazioni DEVONO restare allineate:
-/// stessi 5 stop e stessa mappatura t = iter/maxIter * 1.35 + 0.03.
-/// </summary>
+    /// <summary>
+    /// Gradienti della palette e interpolazione del colore basata sulle iterazioni.
+    /// Fonte unica degli stop per i percorsi CPU e DirectX; il kernel CUDA riceve gli
+    /// stessi stop tramite <see cref="GpuPaletteParams"/> e li interpola in
+    /// GpuMandelbrot.ColorFromIterations, DirectX nella funzione Graded dello shader
+    /// HLSL (DxMandelbrot.cs). Le tre implementazioni DEVONO restare allineate:
+    /// stessi 5 stop e stessa mappatura t = (nu/maxIter)^0.35 (gamma, come il
+    /// riferimento Python: smooth iteration + curva tonale).
+    /// </summary>
 internal static class PaletteColors
 {
     // Gradiente (t, r, g, b) per ogni palette. t = iterazioni / maxIter.
@@ -102,10 +103,12 @@ internal static class PaletteColors
     };
 
     /// <summary>Interpolazione del colore per il percorso CPU (allineata con
-    /// GpuMandelbrot.ColorFromIterations e con Graded nello shader HLSL).</summary>
+    /// GpuMandelbrot.ColorFromIterations e con Graded nello shader HLSL).
+    /// Mappatura: t = (nu/maxIter)^0.35 (gamma, smooth iteration gia' applicata
+    /// dal chiamante).</summary>
     internal static int ColorFor(double iterations, int maxIter, Palette palette)
     {
-        double t = Math.Clamp(iterations / Math.Max(1, maxIter) * 1.35 + 0.03, 0.0, 1.0);
+        double t = Math.Pow(Math.Clamp(iterations / Math.Max(1, maxIter), 0.0, 1.0), 0.35);
         var stops = GetStops(palette);
 
         var (t0, r0, g0, b0) = stops[0];

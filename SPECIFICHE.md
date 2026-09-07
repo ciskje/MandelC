@@ -13,14 +13,17 @@ Fuoco, Ghiaccio, Termico, Oceano, Viola, Deserto, Foresta (stop in
 - Click sinistro/destro: zoom 2× sul punto; rotella: zoom 0,7×/1,43× sul
   cursore; trascinamento o frecce: pan (soglia click/trascinamento 5 px,
   throttle 80 ms, anteprima a metà risoluzione senza AA con upscale bilineare,
-  full al rilascio; anti-rimbalzo sul resize di 300 ms; frecce = 1/10 della
-  vista, Shift = 1/100, non attive sul numero iterazioni).
+  full al rilascio; frecce = 1/10 della vista, Shift = 1/100, non attive sul
+  numero iterazioni). Resize finestra: ridisegno immediato in anteprima
+  (metà risoluzione) su tutti i motori, come DirectX; `pictureBox` usa
+  `SizeMode.Zoom` per mantenere l'aspect ratio durante la transizione.
 - `R` = reset vista, `S` = salva PNG, `+`/`-` = ±50 iterazioni (50…50000).
-- Checkbox Auto: iterazioni 2000*(1+log10(1.5/half)) (half = scala/2, clamp 50-50000; ~1944 alla vista iniziale scala 3.2, 10915 alla zona benchmark); il numero mostra il valore usato pur restando disabilitato. Formula centrale in Mandelbrot.AutoIterForScale, usata anche dal video zoom. Il benchmark usa le iterazioni calcolate con la formula auto alla sua scala (10915) (BenchmarkStandard.MaxIter)
+- Checkbox Auto: iterazioni 2000*(1+log10(1.5/half)) (half = scala/2, clamp 50-50000; ~1944 alla vista iniziale scala 9.36, 10915 alla zona benchmark); il numero mostra il valore usato pur restando disabilitato. Formula centrale in Mandelbrot.AutoIterForScale, usata anche dal video zoom. Il benchmark usa le iterazioni calcolate con la formula auto alla sua scala (10915) (BenchmarkStandard.MaxIter)
 - Dropdown AA 1x/2x/4x/8x (1x = off): supersampling k×k e media RGB (costo ~k²)
   su CPU e CUDA; in DirectX dentro lo shader.
 - Menu File: carica/salva zona JSON (Ctrl+O / Ctrl+S: centro, scala,
-  iterazioni), salva immagine (Ctrl+Shift+S), submenu Esporta: screenshot PNG
+  iterazioni), salva immagine (Ctrl+Shift+S), benchmark (Ctrl+B), Esci (Alt+F4).
+- Menu Genera: screenshot PNG
   (Ctrl+Shift+E: dialog da Vista corrente con preset Vista/Full HD/2K/4K/8K/
   Doppio 4K/Personalizzata, dimensioni validate 320…16384, AA selezionabile,
   render offscreen col motore attivo, AA auto-ridotto oltre 128 MPixel di
@@ -31,8 +34,8 @@ Fuoco, Ghiaccio, Termico, Oceano, Viola, Deserto, Foresta (stop in
   a 24/30/60 fps, AA selezionato (auto-ridotto oltre 128 MPixel di campioni),
   iter auto per frame, ffmpeg H.264 (su worker, stderr asincrono, kill su
   annulla, pad a dimensioni pari perché la vista ha spesso lati dispari) o
-  sequenza PNG se assente (tasto Apri per il risultato)),
-  benchmark (Ctrl+B), Esci (Alt+F4).
+  sequenza PNG se assente (tasto Apri per il risultato)), Torna all'insieme (RealTime) (Ctrl+Shift+R: animazione sulla vista principale dalla zona corrente all'insieme, 120 frame a 30 fps, Esc per fermare)
+
 - Menu Vista: cronologia Indietro/Avanti (Alt+Left/Right, max 200 viste: ogni
   zoom, pan, reset e caricamento è committed) e zone preferite nominate
   (Ctrl+D, JSON in `%APPDATA%\MandelbrotViewer\zone\`, con salto ed
@@ -124,8 +127,9 @@ frame × campioni/frame / secondi.
 - `MandelbrotViewer/LogForm.cs` — finestra log/diagnostica.
 - AppLog.cs - log eventi in memoria (ultime 200 righe, errori benchmark).
 - `MandelbrotViewer/AppVersion.cs` — versione X.Y.Z (`Display` breve se Z=0).
-- `MandelbrotViewer/app.ico` — icona exe + finestre (render Fuoco 256 px,
-  16/32/48/256).
+- `MandelbrotViewer/app.ico` — icona exe + finestre (da `icon2.png`, 16/32/48/256).
+- Toolbar: due `FlowLayoutPanel` (riga 0: pulsanti + iterazioni + palette + AA;
+  riga 1: motore + precisione + GPU), controlli ammassati a sinistra.
 - Root: `avvia.bat` (esegue la versione corrente via `dotnet run`, passa gli
   argomenti), `pubblica.bat` / `pubblica.ps1` (publish self-contained
   single-file in `pubblicato/`, ~158 MB), `AGENTS.md`, `TODO.md`,

@@ -1,4 +1,4 @@
-namespace MandelbrotViewer;
+﻿namespace MandelbrotViewer;
 
 partial class ZoomVideoForm
 {
@@ -18,6 +18,7 @@ partial class ZoomVideoForm
     private Button btnStart = null!;
     private Button btnClose = null!;
     private Button btnOpen = null!;
+
 
     protected override void Dispose(bool disposing)
     {
@@ -122,8 +123,8 @@ partial class ZoomVideoForm
         this.bottomPanel.Height = 46;
         this.bottomPanel.Padding = new Padding(12, 8, 12, 10);
         this.bottomPanel.Controls.Add(this.btnStart);
-        this.bottomPanel.Controls.Add(this.btnClose);
         this.bottomPanel.Controls.Add(this.btnOpen);
+        this.bottomPanel.Controls.Add(this.btnClose);
         // btnStart
         this.btnStart.Dock = DockStyle.Right;
         this.btnStart.Width = 90;

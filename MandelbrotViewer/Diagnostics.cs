@@ -59,7 +59,7 @@ internal static class Diagnostics
         {
             try
             {
-                DxMandelbrot.Render(-0.5, 0.0, 3.2, 800, 600, 200, 1, Palette.Fuoco);
+                DxMandelbrot.Render(MandelbrotForm.StartCenterX, MandelbrotForm.StartCenterY, MandelbrotForm.StartScale, 800, 600, 200, 1, Palette.Fuoco);
                 Console.WriteLine("Render: OK");
             }
             catch (Exception ex)
@@ -79,7 +79,7 @@ internal static class Diagnostics
             bool ok = GpuMandelbrot.TryInitialize();
             using var bmp = new Bitmap(320, 240);
             if (ok)
-                GpuMandelbrot.Render(bmp, -0.5, 0, 3.2, 200, Palette.Fuoco, 1, false, CancellationToken.None);
+                GpuMandelbrot.Render(bmp, MandelbrotForm.StartCenterX, MandelbrotForm.StartCenterY, MandelbrotForm.StartScale, 200, Palette.Fuoco, 1, false, CancellationToken.None);
             File.WriteAllText(path, $"Devices: {string.Join(", ", devices)}\nReady: {ok}\nDevice: {GpuMandelbrot.DeviceName}\nError: {GpuMandelbrot.LastError}");
         }
         catch (Exception ex)

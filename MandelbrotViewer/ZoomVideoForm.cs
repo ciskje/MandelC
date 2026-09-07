@@ -184,30 +184,33 @@ public partial class ZoomVideoForm : Form
         double startCx, double startCy, double startScale, int effAa,
         IProgress<int> progress, CancellationToken ct)
     {
-        double endScale = MandelbrotForm.StartScale;
-        double span = endScale - startScale; // > 0 (il caso "già all'insieme" è bloccato sopra)
         for (int i = 0; i < frames; i++)
         {
             ct.ThrowIfCancellationRequested();
-            double t = frames > 1 ? i / (double)(frames - 1) : 1.0;
-            // Ease-out cubica: veloce all'inizio, lento alla fine. Centro e
-            // iterazioni derivano dalla scala, quindi restano coerenti.
-            double te = 1.0 - Math.Pow(1.0 - t, 3.0);
-            double scale = startScale * Math.Pow(endScale / startScale, te);
-            // Il centro segue lo zoom (u), non t: con zoom geometrico + centro lineare
-            // in t il punto di partenza esce subito dall'inquadratura (misurato fino a
-            // 46x la semi-vista); così resta sempre dentro (max ~0,17).
-            double u = span > 0 ? (scale - startScale) / span : 1.0;
-            double cx = startCx + (MandelbrotForm.StartCenterX - startCx) * u;
-            double cy = startCy + (MandelbrotForm.StartCenterY - startCy) * u;
-            // Iterazioni auto come nella vista (stessa formula di AutoIter).
-            int maxIter = Mandelbrot.AutoIterForScale(scale);
+            FrameAt(i, frames, startCx, startCy, startScale,
+                out double cx, out double cy, out double scale, out int maxIter);
             using var bmp = RenderFrame(cx, cy, scale, maxIter, effAa, ct);
             if (bmp == null) throw new InvalidOperationException("Render non riuscito (DirectX non pronto?).");
             bmp.Save(Path.Combine(tmpDir, $"f{i:0000}.png"),
                 System.Drawing.Imaging.ImageFormat.Png);
             progress.Report(i);
         }
+    }
+
+    /// <summary>Parametri del frame i-esimo dello zoom (stessa interpolazione del video:
+    /// scala geometrica ease-out, centro che segue lo zoom, iterazioni auto).</summary>
+    private void FrameAt(int i, int frames, double startCx, double startCy, double startScale,
+        out double cx, out double cy, out double scale, out int maxIter)
+    {
+        double endScale = MandelbrotForm.StartScale;
+        double span = endScale - startScale;
+        double t = frames > 1 ? i / (double)(frames - 1) : 1.0;
+        double te = 1.0 - Math.Pow(1.0 - t, 3.0);
+        scale = startScale * Math.Pow(endScale / startScale, te);
+        double u = span > 0 ? (scale - startScale) / span : 1.0;
+        cx = startCx + (MandelbrotForm.StartCenterX - startCx) * u;
+        cy = startCy + (MandelbrotForm.StartCenterY - startCy) * u;
+        maxIter = Mandelbrot.AutoIterForScale(scale);
     }
 
     private Bitmap? RenderFrame(double cx, double cy, double scale, int maxIter, int effAa, CancellationToken ct)

@@ -1,4 +1,10 @@
-﻿- [x] Domanda: CUDA vs DX, colpa di ILGPU? (analisi) — completed (nessun cambio codice)
+﻿- [x] v2.17.3: Toolbar FlowLayoutPanel (controlli ammassati, niente spazi colonne) — completed
+- [x] v2.17.2: Icona app da icon2.png — completed
+- [x] v2.17.1: Fix resize finestra (stretch DX, CUDA/CPU non ridisegnavano) — completed
+- [x] v2.17.0: Colore palette gamma (allineamento Python) — completed
+- [x] v2.16.0: Zoom Real Time sulla finestra principale — completed
+- [x] v2.16.0: Menu Genera principale (sposta Esporta da File) — completed
+- [x] Domanda: CUDA vs DX, colpa di ILGPU? (analisi) — completed (nessun cambio codice)
 - [x] v2.15.10: Fix poll DX stretto (non V-Sync) + storici — completed
 - [x] Discrepanza bench CPU CLI vs UI: era Debug vs Release, avvia resta Debug — completed
 - [x] v2.15.9: Benchmark standard a AA1x + ricalcolo storici — completed
