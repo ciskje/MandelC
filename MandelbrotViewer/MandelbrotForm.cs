@@ -104,14 +104,14 @@ public partial class MandelbrotForm : Form
 
     private int MaxIter => chkIterAuto.Checked ? AutoIter() : (int)numIter.Value;
 
-    /// <summary>Antialiasing factor from dropdown (1x = disabled, 2x/4x/8x = enabled).</summary>
+    // Antialiasing factor from dropdown (1x = disabled, 2x/4x/8x = enabled).
     private int AaFactor => cmbAA.SelectedIndex > 0 ? 1 << cmbAA.SelectedIndex : 1;
 
     private Palette ActivePalette => cmbPalette.SelectedIndex < 0
         ? Palette.Fire
         : (Palette)cmbPalette.SelectedIndex;
 
-    /// <summary>User-selected CUDA precision: 64-bit (double) if radio 64, otherwise 32-bit (float).</summary>
+    // User-selected CUDA precision: 64-bit (double) if radio 64, otherwise 32-bit (float).
     private bool UseDoublePrecision => radPrec64.Checked;
 
     private int AutoIter()
@@ -124,7 +124,7 @@ public partial class MandelbrotForm : Form
 
     // ---------- Rendering ----------
 
-    /// <param name="preview">True during dragging: no AA and 1/4 of the pixels.</param>
+    // Param preview (bool): True during dragging: no AA and 1/4 of the pixels.
     private async void RenderAsync(bool preview = false)
     {
         if (_suspendRender) return;
@@ -177,20 +177,28 @@ public partial class MandelbrotForm : Form
         catch (OperationCanceledException) { /* rendering superseded, ignore */ }
         finally
         {
-            if (!token.IsCancellationRequested) SetBusyCursor(false);
+            // Only the latest render owns the cursor: stale superseded renders
+            // must not touch it, but the latest one must always restore it,
+            // even when cancelled (otherwise AppStarting stays stuck on).
+            if (ReferenceEquals(_renderCts, cts)) SetBusyCursor(false);
         }
     }
 
-    /// <summary>
-    /// Sets (or restores) the busy cursor on the form and all descendants
-    /// (recursive: covers pictureBox, menus and status bar). Uses AppStarting
-    /// (arrow+hourglass) not Wait, because during async render the UI stays
-    /// interactive (pan/zoom cancel and restart the computation); `UseWaitCursor`
-    /// cannot be used because it forces the full hourglass.
-    /// </summary>
+    // Sets (or restores) the busy cursor on the form and all descendants
+    // (recursive: covers pictureBox, menus and status bar). Uses AppStarting
+    // (arrow+hourglass) not Wait, because during async render the UI stays
+    // interactive (pan/zoom cancel and restart the computation); `UseWaitCursor`
+    // cannot be used because it forces the full hourglass.
+    // On restore, the image panels go back to Cross (their Designer cursor),
+    // not Default, otherwise the crosshair is lost after the first render.
     private void SetBusyCursor(bool busy)
     {
         ApplyCursorRecursive(this, busy ? Cursors.AppStarting : Cursors.Default);
+        if (!busy)
+        {
+            pictureBox.Cursor = Cursors.Cross;
+            dxPanel.Cursor = Cursors.Cross;
+        }
     }
 
     private static void ApplyCursorRecursive(Control root, Cursor cursor)
@@ -200,7 +208,7 @@ public partial class MandelbrotForm : Form
             ApplyCursorRecursive(child, cursor);
     }
 
-    /// <summary>Upscales the preview bitmap to full resolution (bilinear).</summary>
+    // Upscales the preview bitmap to full resolution (bilinear).
     private static Bitmap Upscale(Bitmap small, int fullW, int fullH)
     {
         var up = new Bitmap(fullW, fullH);
@@ -213,7 +221,7 @@ public partial class MandelbrotForm : Form
         return up;
     }
 
-    /// <summary>Redraws: realtime if DirectX engine, otherwise bitmap render (optional preview).</summary>
+    // Redraws: realtime if DirectX engine, otherwise bitmap render (optional preview).
     private void InvalidateView(bool preview = false)
     {
         if (_engine == RenderEngine.DirectX && DxMandelbrot.IsReady)
@@ -301,7 +309,7 @@ public partial class MandelbrotForm : Form
         InvalidateView();
     }
 
-    /// <summary>Active view dimensions (DirectX panel or bitmap pictureBox).</summary>
+    // Active view dimensions (DirectX panel or bitmap pictureBox).
     private Size ActiveViewSize =>
         (_engine == RenderEngine.DirectX && DxMandelbrot.IsReady) ? dxPanel.Size : pictureBox.Size;
 
@@ -357,8 +365,8 @@ public partial class MandelbrotForm : Form
 
     // ---------- Zones (saving/loading view as JSON) ----------
 
-    /// <summary>Saved view: center, complex width, iterations and Julia mode
-    /// (Julia fields have defaults: old files load as Mandelbrot).</summary>
+    // Saved view: center, complex width, iterations and Julia mode
+    // (Julia fields have defaults: old files load as Mandelbrot).
     private sealed record ViewZone(double CenterX, double CenterY, double Scale, int MaxIter,
         bool Julia = false, double Jcx = DefaultJcx, double Jcy = DefaultJcy);
 
@@ -431,7 +439,7 @@ public partial class MandelbrotForm : Form
         MessageBox.Show(this, $"Cannot load zone:\n{message}",
             title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
-    /// <summary>Applies a zone (history, favorites, file): explicit iterations.</summary>
+    // Applies a zone (history, favorites, file): explicit iterations.
     private void ApplyZone(ViewZone zone)
     {
         _centerX = zone.CenterX;
@@ -450,7 +458,7 @@ public partial class MandelbrotForm : Form
 
     private ViewZone CurrentZone() => new(_centerX, _centerY, _scale, MaxIter, _julia, _jcx, _jcy);
 
-    /// <summary>Records the current view before a committed change (max 200).</summary>
+    // Records the current view before a committed change (max 200).
     private void PushHistory()
     {
         _backZones.Push(CurrentZone());
@@ -481,7 +489,7 @@ public partial class MandelbrotForm : Form
         UpdateHistoryMenu();
     }
 
-    /// <summary>Toggles Julia mode (CheckOnClick has already updated the check).</summary>
+    // Toggles Julia mode (CheckOnClick has already updated the check).
     private void ToggleJulia()
     {
         PushHistory();
@@ -500,8 +508,8 @@ public partial class MandelbrotForm : Form
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "MandelbrotViewer", "zone");
 
-    /// <summary>View menu: history + favorites (built in code because
-    /// the favorites list is dynamic).</summary>
+    // View menu: history + favorites (built in code because
+    // the favorites list is dynamic).
     private void BuildViewMenu()
     {
         var vista = new ToolStripMenuItem("&View");
@@ -691,7 +699,7 @@ public partial class MandelbrotForm : Form
         _ => "CPU multicore",
     };
 
-    /// <summary>Applies saved settings (without rendering: Shown handles that).</summary>
+    // Applies saved settings (without rendering: Shown handles that).
     private void LoadSettings()
     {
         _settings = AppSettings.Load();
@@ -926,7 +934,7 @@ public partial class MandelbrotForm : Form
 
     private void PrecRadio_CheckedChanged(object? sender, EventArgs e) => InvalidateView();
 
-    /// <summary>Label of the GPU selected in the dropdown ("Auto" if index 0).</summary>
+    // Label of the GPU selected in the dropdown ("Auto" if index 0).
     private string GpuLabel() => cmbGpu.SelectedIndex > 0 ? cmbGpu.SelectedItem?.ToString() ?? "Auto" : "Auto";
 
     private void CmbGpu_SelectedIndexChanged(object? sender, EventArgs e)

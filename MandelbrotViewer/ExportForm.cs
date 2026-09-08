@@ -2,16 +2,13 @@ using System.Drawing.Imaging;
 
 namespace MandelbrotViewer;
 
-/// <summary>
-/// Export PNG ad alta risoluzione della vista corrente: rende offscreen con il
-/// motore attivo (CPU/CUDA/DirectX) alla larghezza scelta e salva il PNG.
-/// L'AA impostato viene ridotto in automatico se i campioni totali superano il
-/// tetto (per non esaurire la VRAM); annullabile durante il render.
-/// </summary>
+// Export PNG ad alta risoluzione della vista corrente: rende offscreen con il
+// motore attivo (CPU/CUDA/DirectX) alla larghezza scelta e salva il PNG.
+// Il supersampling viene calcolato a tile per mantenere limitata la memoria
+// temporanea; annullabile durante il render.
 public partial class ExportForm : Form
 {
-    /// <summary>Tetto campioni totali (larghezza×AA · altezza×AA): oltre, l'AA scende.</summary>
-    private const long MaxSamples = 134_217_728; // 128 MPixel (4x la griglia benchmark)
+    private const int TileSize = 512;
 
     private readonly double _cx, _cy, _scale;
     private readonly int _maxIter;
@@ -59,12 +56,11 @@ public partial class ExportForm : Form
             : _useDirectX ? "DirectX" : "CPU";
         string modeLabel = _julia ? $"Julia c={_jcx:+0.000000;-0.000000} {_jcy:+0.000000;-0.000000}i" : "Mandelbrot";
         lblInfo.Text = $"Motore: {engineLabel} — {modeLabel}, {_palette}, {maxIter} iterazioni. " +
-            "L'AA viene ridotto in automatico oltre 128 MPixel di campioni.";
+            $"Render tiled {TileSize}×{TileSize}: AA invariato anche alle alte risoluzioni.";
         UpdateInfo();
     }
 
-    /// <summary>Risoluzione e AA richiesti: preset, o caselle custom validate
-    /// (interi 320…16384); l'AA effettivo scende a potenze di 2 oltre il tetto.</summary>
+    // Risoluzione e AA richiesti: preset o caselle custom validate.
     private bool ResolveSettings(out int w, out int h, out int reqAa, out int effAa)
     {
         w = h = reqAa = effAa = 0;
@@ -85,8 +81,6 @@ public partial class ExportForm : Form
         }
         reqAa = cmbAAExp.SelectedIndex <= 0 ? _aa : 1 << (cmbAAExp.SelectedIndex - 1);
         effAa = reqAa;
-        while ((long)w * effAa * h * effAa > MaxSamples && effAa > 1)
-            effAa /= 2;
         return true;
     }
 
@@ -98,8 +92,7 @@ public partial class ExportForm : Form
             return;
         }
         double mpixel = w * (double)h / 1e6;
-        string aaNote = effAa < reqAa ? $" (AA ridotto da {reqAa}x: oltre il tetto)" : "";
-        lblResult.Text = $"{w}×{h} ({mpixel:0.#} MPixel), AA{effAa}x{aaNote} — " +
+        lblResult.Text = $"{w}×{h} ({mpixel:0.#} MPixel), AA{effAa}x — " +
             $"{w * (long)effAa * h * effAa / 1e6:0.#} MPixel di campioni.";
     }
 
@@ -181,38 +174,74 @@ public partial class ExportForm : Form
         }
     }
 
-    /// <summary>Rende la vista alla risoluzione scelta col motore attivo
-    /// (null se DirectX non pronto; la preview DX è sincrona e non cancellabile
-    /// — la chiusura scarta il risultato).</summary>
+    // Rende la vista alla risoluzione scelta col motore attivo
+    // (null se DirectX non pronto; la preview DX è sincrona e non cancellabile
+    // — la chiusura scarta il risultato).
     private Bitmap? RenderExport(int w, int h, int aa, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        if (_useCuda)
-        {
-            var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
-            try
-            {
-                GpuMandelbrot.Render(bmp, _cx, _cy, _scale, _maxIter, _palette, aa, _useDouble, ct, _jcx, _jcy, _julia);
-                return bmp;
-            }
-            catch
-            {
-                bmp.Dispose();
-                throw;
-            }
-        }
-        if (_useDirectX)
-            return DxMandelbrot.RenderPreviewToBitmap(_cx, _cy, _scale, w, h, _maxIter, aa, _palette, _jcx, _jcy, _julia);
-        var cpu = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+        var result = new Bitmap(w, h, PixelFormat.Format32bppArgb);
         try
         {
-            Mandelbrot.Render(cpu, _cx, _cy, _scale, _maxIter, _palette, aa, ct, _jcx, _jcy, _julia);
-            return cpu;
+            for (int y = 0; y < h; y += TileSize)
+            {
+                int tileH = Math.Min(TileSize, h - y);
+                for (int x = 0; x < w; x += TileSize)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    int tileW = Math.Min(TileSize, w - x);
+                    using var tile = new Bitmap(tileW, tileH, PixelFormat.Format32bppArgb);
+                    if (_useCuda)
+                    {
+                        GpuMandelbrot.RenderTile(tile, _cx, _cy, _scale, _maxIter, _palette, aa, _useDouble,
+                            ct, x, y, w, h, _jcx, _jcy, _julia);
+                    }
+                    else if (_useDirectX)
+                    {
+                        using Bitmap? rendered = DxMandelbrot.RenderPreviewToBitmap(_cx, _cy, _scale, tileW, tileH,
+                            _maxIter, aa, _palette, w, h, x, y, _jcx, _jcy, _julia);
+                        if (rendered == null)
+                            throw new InvalidOperationException("DirectX tile render failed.");
+                        CopyTile(rendered, tile, 0, 0);
+                    }
+                    else
+                    {
+                        Mandelbrot.RenderTile(tile, _cx, _cy, _scale, _maxIter, _palette, aa, ct,
+                            x, y, w, h, _jcx, _jcy, _julia);
+                    }
+                    CopyTile(tile, result, x, y);
+                }
+            }
+            return result;
         }
         catch
         {
-            cpu.Dispose();
+            result.Dispose();
             throw;
+        }
+    }
+
+    private static void CopyTile(Bitmap source, Bitmap destination, int destinationX, int destinationY)
+    {
+        var sourceRect = new Rectangle(0, 0, source.Width, source.Height);
+        var destinationRect = new Rectangle(destinationX, destinationY, source.Width, source.Height);
+        BitmapData sourceData = source.LockBits(sourceRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        BitmapData destinationData = destination.LockBits(destinationRect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            int rowBytes = source.Width * 4;
+            var row = new byte[rowBytes];
+            for (int y = 0; y < source.Height; y++)
+            {
+                System.Runtime.InteropServices.Marshal.Copy(sourceData.Scan0 + y * sourceData.Stride, row, 0, rowBytes);
+                System.Runtime.InteropServices.Marshal.Copy(row, 0,
+                    destinationData.Scan0 + y * destinationData.Stride, rowBytes);
+            }
+        }
+        finally
+        {
+            destination.UnlockBits(destinationData);
+            source.UnlockBits(sourceData);
         }
     }
 

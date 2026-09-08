@@ -1,9 +1,7 @@
 ﻿namespace MandelbrotViewer;
 
-/// <summary>
-/// Benchmark standard: zona fissa ad alte iterazioni per 8 secondi, misura le
-/// iterazioni al secondo del motore selezionato (con fallback CPU).
-/// </summary>
+// Benchmark standard: zona fissa ad alte iterazioni per 8 secondi, misura le
+// iterazioni al secondo del motore selezionato (con fallback CPU).
 public partial class BenchmarkForm : Form
 {
     // Parametri standard del test (condivisi, così i risultati sono confrontabili):
@@ -260,7 +258,7 @@ public partial class BenchmarkForm : Form
 
     private void BtnClose_Click(object? sender, EventArgs e) => Close();
 
-    /// <summary>Accoda il risultato misurato a un CSV (una riga per misura).</summary>
+    // Accoda il risultato misurato a un CSV (una riga per misura).
     private void BtnCsv_Click(object? sender, EventArgs e)
     {
         using var dlg = new SaveFileDialog
@@ -292,11 +290,9 @@ public partial class BenchmarkForm : Form
         return ("CPU", Diagnostics.CpuName(), "double");
     }
 
-    /// <summary>
-    /// Primo frame della zona di benchmark (960x540, AA1x) reso visibile per i
-    /// motori che non disegnano su una swapchain (CUDA e CPU): mostra la zona
-    /// testata, come DirectX fa già con il primo frame sulla swapchain.
-    /// </summary>
+    // Primo frame della zona di benchmark (960x540, AA1x) reso visibile per i
+    // motori che non disegnano su una swapchain (CUDA e CPU): mostra la zona
+    // testata, come DirectX fa già con il primo frame sulla swapchain.
     private Bitmap? RenderBenchmarkPreview(CancellationToken ct)
     {
         var bmp = new Bitmap(BW, BH, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
@@ -315,14 +311,12 @@ public partial class BenchmarkForm : Form
         }
     }
 
-    /// <summary>
-    /// Benchmark DirectX standardizzato offscreen: rende la griglia dei campioni
-    /// elementari (960x540 AA1x) con lo shader solo-iterazioni su
-    /// una render target in memoria, senza media dei campioni e senza Present.
-    /// Il completamento dei frame è rilevato con event query: il lavoro per frame
-    /// è quindi identico a quello dei benchmark CUDA e CPU, e DWM/copia inter-GPU
-    /// non falsano le schede senza monitor.
-    /// </summary>
+    // Benchmark DirectX standardizzato offscreen: rende la griglia dei campioni
+    // elementari (960x540 AA1x) con lo shader solo-iterazioni su
+    // una render target in memoria, senza media dei campioni e senza Present.
+    // Il completamento dei frame è rilevato con event query: il lavoro per frame
+    // è quindi identico a quello dei benchmark CUDA e CPU, e DWM/copia inter-GPU
+    // non falsano le schede senza monitor.
     private static async Task<(double Seconds, int Frames)> BenchmarkDirectX(IProgress<BenchmarkProgress> progress, CancellationToken ct)
     {
         int gridW = BW * BAA;

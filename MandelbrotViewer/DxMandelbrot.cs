@@ -9,13 +9,15 @@ using DxgiFormat = Vortice.DXGI.Format;
 
 namespace MandelbrotViewer;
 
-/// <summary>
-/// Realtime DirectX 11 backend: fullscreen triangle + HLSL pixel shader that computes
-/// the fractal every frame (float). Presents to a swapchain bound to the panel's handle.
-/// </summary>
+// Realtime DirectX 11 backend: fullscreen triangle + HLSL pixel shader that computes
+// the fractal every frame (float). Presents to a swapchain bound to the panel's handle.
 internal static class DxMandelbrot
 {
     // Fullscreen triangle without a vertex buffer (SV_VertexID).
+    // VS inputs/outputs: input id (uint, SV_VertexID: 0, 1, 2 for the three
+    // triangle corners, no vertex buffer bound); output SV_Position clip-space
+    // position covering the whole render target (the pixel shader then runs once
+    // per pixel). The bit trick expands the 3 ids to (-1,+1), (+3,+1), (-1,-3).
     private const string VsSource = @"
 float4 VS(uint id : SV_VertexID) : SV_Position
 {
@@ -23,15 +25,27 @@ float4 VS(uint id : SV_VertexID) : SV_Position
     return float4(p * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
 }";
 
+    // Render pixel shader with on-chip SSAA. Cbuffer Params inputs: cx/cy (view
+    // center, complex units), scale (complex width), aspect (fullH/fullW, keeps the
+    // complex height proportional), invW/invH (1/fullW, 1/fullH for pixel mapping),
+    // maxIter (escape loop bound), aa (SSAA factor n, >=1), fullW/fullH + offsetX/offsetY
+    // (tile -> whole-image mapping, keeps tiled export pixel-identical), jcx/jcy + julia
+    // (Julia mode: z(0) = pixel, c = constant; else Mandelbrot), stops[5] (palette).
+    // Output: SV_Target float4, RGB = average of the n x n subsamples, A = 1.
     private const string PsSource = @"
 cbuffer Params : register(b0)
 {
     float cx; float cy; float scale; float aspect;
     float invW; float invH; int maxIter; int aa;
+    int fullW; int fullH; int offsetX; int offsetY;
     float jcx; float jcy; int julia; int jpad;
     float3 stops[5];
 };
 
+// Graded: palette interpolation, aligned with PaletteColors.ColorFor (CPU) and
+// GpuMandelbrot.ColorFromIterations (CUDA).
+// Input t (float: normalized position 0..1 along the gradient, saturated inside).
+// Output float3: lerped RGB between stops[i] and stops[i+1] (5 stops -> 4 segments).
 float3 Graded(float t)
 {
     t = saturate(t);
@@ -41,6 +55,14 @@ float3 Graded(float t)
     return lerp(stops[i], stops[i + 1], f);
 }
 
+// PS: full on-chip SSAA color of one output pixel.
+// Input pos (float4, SV_Position: pixel coordinates within the current render
+// target, i.e. the tile when exporting). Centered sub-pixel offsets
+// ((jx,jy)+0.5)/n-0.5 distribute the n x n samples around the pixel center.
+// Output SV_Target float4: acc/(n*n) averaged RGB (interior = black), A = 1.
+// Per subsample: pixel -> complex (px), escape loop with smooth log/log correction,
+// gamma mapping pow(nu/maxIter, 0.35), palette via Graded. No W*n x H*n target:
+// VRAM stays O(W x H).
 float4 PS(float4 pos : SV_Position) : SV_Target
 {
     int n = max(aa, 1);
@@ -50,7 +72,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
         for (int jx = 0; jx < n; jx++)
         {
             float2 sub = (float2((float)jx, (float)jy) + 0.5) / (float)n - 0.5;
-            float2 p = pos.xy + sub;
+            float2 p = float2((float)offsetX, (float)offsetY) + pos.xy + sub;
             float2 px = float2(cx + (p.x * invW - 0.5) * scale,
                                cy + (p.y * invH - 0.5) * scale * aspect);
             // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
@@ -77,12 +99,19 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     return float4(acc / (float)(n * n), 1.0);
 }";
 
-    /// <summary>
-    /// Benchmark shader: only the iteration count of the fractal, no
-    /// coloring, no smooth and no sample averaging. Each pixel of the
-    /// grid is an elementary sample: identical to the work of the CUDA/CPU kernels.
-    /// </summary>
+    // Benchmark shader: only the iteration count of the fractal, no
+    // coloring, no smooth and no sample averaging. Each pixel of the
+    // grid is an elementary sample: identical to the work of the CUDA/CPU kernels.
     private const string BenchPsSource = @"
+// BenchPS: iterations-only benchmark shader, no coloring, no smoothing, no SSAA.
+// Cbuffer Params inputs: cx/cy (zone center), scale (complex width), aspect
+// (gridH/gridW), invW/invH (1/gridW, 1/gridH for sample mapping), maxIter
+// (loop bound); aa unused, always 1 (each grid pixel is one elementary sample).
+// Input pos (float4, SV_Position: sample coordinates within the grid target).
+// Output SV_Target float4: grayscale frac(iter*0.125) (black when iter >= maxIter).
+// The value only pins the loop against dead-code elimination; the benchmark counts
+// frames completed (event queries), not pixel values. Same incremental-squares loop
+// as GpuMandelbrot.FloatBenchKernel, so both engines measure the identical workload.
 cbuffer Params : register(b0)
 {
     float cx; float cy; float scale; float aspect;
@@ -123,6 +152,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         public float Cx, Cy, Scale, Aspect;
         public float InvW, InvH;
         public int MaxIter, Aa;
+        public int FullW, FullH, OffsetX, OffsetY;
         public float JuliaCx, JuliaCy;
         public int JuliaOn, JuliaPad;
         public DxStop S0, S1, S2, S3, S4;
@@ -150,25 +180,24 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
 
     public static bool IsReady => _device != null;
     public static string LastError { get; private set; } = "";
-    /// <summary>Name of the video card currently in use ("" if not initialized).</summary>
+    // Name of the video card currently in use ("" if not initialized).
     public static string AdapterName { get; private set; } = "";
 
-    /// <summary>Dedicated + shared memory of the adapter in use (ulong.MaxValue if unknown).</summary>
+    // Dedicated + shared memory of the adapter in use (ulong.MaxValue if unknown).
     public static ulong AdapterDedicatedBytes { get; private set; } = ulong.MaxValue;
     public static ulong AdapterSharedBytes { get; private set; } = ulong.MaxValue;
 
-    /// <summary>Error of the last failed enumeration (diagnostic), empty if OK.</summary>
+    // Error of the last failed enumeration (diagnostic), empty if OK.
     public static string EnumerationError { get; private set; } = "";
 
-    /// <summary>Available hardware video cards (software WARP renderers excluded).</summary>
-    /// <remarks>
-    /// Do NOT read or compare DedicatedVideoMemory directly: it is a
-    /// PointerUSize (SIZE_T) and the implicit conversion of SharpGen goes through 32 bits
-    /// (UIntPtr.ToUInt32), which throws OverflowException with GPUs of more than 4 GB — that is
-    /// why the enumeration stayed empty on machines with modern GPUs
-    /// (cf. note v2.3.8 "wrapper overflow"). The software renderers are
-    /// excluded by name: "Microsoft Basic Render Driver" is the WARP of D3D11.
-    /// </remarks>
+    // Available hardware video cards (software WARP renderers excluded).
+    // Note:
+    // Do NOT read or compare DedicatedVideoMemory directly: it is a
+    // PointerUSize (SIZE_T) and the implicit conversion of SharpGen goes through 32 bits
+    // (UIntPtr.ToUInt32), which throws OverflowException with GPUs of more than 4 GB — that is
+    // why the enumeration stayed empty on machines with modern GPUs
+    // (cf. note v2.3.8 "wrapper overflow"). The software renderers are
+    // excluded by name: "Microsoft Basic Render Driver" is the WARP of D3D11.
     public static IReadOnlyList<string> AdapterNames()
     {
         var names = new List<string>();
@@ -194,10 +223,10 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         return names;
     }
 
-    /// <summary>Reads the memory of the chosen adapter (or of the first hardware one if auto).
-    /// DXGI sizes above 4 GB overflow the wrapper's 32-bit conversion:
-    /// in that case (or if the adapter is not found) it stays ulong.MaxValue
-    /// = abundant/unknown memory and the VRAM check is skipped.</summary>
+    // Reads the memory of the chosen adapter (or of the first hardware one if auto).
+    // DXGI sizes above 4 GB overflow the wrapper's 32-bit conversion:
+    // in that case (or if the adapter is not found) it stays ulong.MaxValue
+    // = abundant/unknown memory and the VRAM check is skipped.
     private static void RefreshAdapterMemory(string? adapterName)
     {
         AdapterDedicatedBytes = ulong.MaxValue;
@@ -230,8 +259,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         catch { return ulong.MaxValue; }
     }
 
-    /// <param name="adapterName">Card to use (exact DXGI name); null = default hardware adapter.
-    /// With a requested card, the device is created explicitly on the chosen adapter.</param>
+    // Param adapterName (string?): Card to use (exact DXGI name); null = default hardware adapter.
+    //   With a requested card, the device is created explicitly on the chosen adapter.
     public static bool TryInitialize(IntPtr hwnd, int width, int height, string? adapterName = null)
     {
         if (!EnsureDevice(adapterName))
@@ -273,18 +302,14 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
     }
 
-    /// <summary>
-    /// Initializes device, context and shaders on the chosen card without a window or a
-    /// swapchain (headless): for the offscreen benchmark, which presents nothing.
-    /// </summary>
-    /// <param name="adapterName">Card to use (exact DXGI name); null = default.</param>
+    // Initializes device, context and shaders on the chosen card without a window or a
+    // swapchain (headless): for the offscreen benchmark, which presents nothing.
+    // Param adapterName (string?): Card to use (exact DXGI name); null = default.
     public static bool TryInitializeHeadless(string? adapterName = null) =>
         EnsureDevice(adapterName);
 
-    /// <summary>
-    /// Creates (or reuses) device, context and shaders on the chosen adapter. The swapchain
-    /// stays the responsibility of <see cref="TryInitialize"/> (it needs a window).
-    /// </summary>
+    // Creates (or reuses) device, context and shaders on the chosen adapter. The swapchain
+    // stays the responsibility of TryInitialize (it needs a window).
     private static bool EnsureDevice(string? adapterName)
     {
         bool same = adapterName == null ||
@@ -389,20 +414,28 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         CreateViews(width, height);
     }
 
-    /// <summary>Builds the parameters of a colored frame (with the palette stops).</summary>
-    private static DxParams BuildParams(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette, double juliaCx = 0, double juliaCy = 0, bool julia = false)
+    // Builds the parameters of a colored frame (with the palette stops).
+    private static DxParams BuildParams(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette,
+        int fullWidth = 0, int fullHeight = 0, int offsetX = 0, int offsetY = 0,
+        double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
+        fullWidth = fullWidth > 0 ? fullWidth : width;
+        fullHeight = fullHeight > 0 ? fullHeight : height;
         var stops = PaletteColors.GetStops(palette);
         return new DxParams
         {
             Cx = (float)centerX,
             Cy = (float)centerY,
             Scale = (float)scale,
-            Aspect = (float)height / Math.Max(1, width),
-            InvW = 1f / Math.Max(1, width),
-            InvH = 1f / Math.Max(1, height),
+            Aspect = (float)fullHeight / Math.Max(1, fullWidth),
+            InvW = 1f / Math.Max(1, fullWidth),
+            InvH = 1f / Math.Max(1, fullHeight),
             MaxIter = maxIter,
             Aa = Math.Max(1, aa),
+            FullW = fullWidth,
+            FullH = fullHeight,
+            OffsetX = offsetX,
+            OffsetY = offsetY,
             JuliaCx = (float)juliaCx,
             JuliaCy = (float)juliaCy,
             JuliaOn = julia ? 1 : 0,
@@ -414,10 +447,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         };
     }
 
-    /// <summary>
-    /// Pipeline common to all frames (Render, offscreen benchmark, RenderPreviewToBitmap):
-    /// constants, shaders, render target, viewport and draw of the fullscreen triangle.
-    /// </summary>
+    // Pipeline common to all frames (Render, offscreen benchmark, RenderPreviewToBitmap):
+    // constants, shaders, render target, viewport and draw of the fullscreen triangle.
     private static void DrawFrame(DxParams pars, ID3D11RenderTargetView rtv, ID3D11PixelShader ps, int width, int height)
     {
         MappedSubresource mapped = _context!.Map(_cbuffer!, 0, MapMode.WriteDiscard);
@@ -436,16 +467,15 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     public static void Render(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         if (!IsReady) return;
-        DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette, juliaCx, juliaCy, julia), _rtv!, _ps!, width, height);
+        DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette,
+            juliaCx: juliaCx, juliaCy: juliaCy, julia: julia), _rtv!, _ps!, width, height);
         _swapChain!.Present(0, PresentFlags.None);
     }
 
-    /// <summary>
-    /// Prepares the offscreen benchmark: render target in the GPU memory at the
-    /// dimensions of the elementary samples grid (e.g. 960x540 AA1x =
-    /// 960x540, ~2 MB in R8G8B8A8) plus a ring of event queries to detect
-    /// the real completion of the frames. No swapchain, no Present.
-    /// </summary>
+    // Prepares the offscreen benchmark: render target in the GPU memory at the
+    // dimensions of the elementary samples grid (e.g. 960x540 AA1x =
+    // 960x540, ~2 MB in R8G8B8A8) plus a ring of event queries to detect
+    // the real completion of the frames. No swapchain, no Present.
     public static void BeginBenchmarkOffscreen(int width, int height)
     {
         if (!IsReady) throw new InvalidOperationException("DirectX not initialized.");
@@ -486,7 +516,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         _benchGridH = height;
     }
 
-    /// <summary>Releases the offscreen benchmark resources.</summary>
+    // Releases the offscreen benchmark resources.
     public static void EndBenchmarkOffscreen()
     {
         if (_benchQueries != null)
@@ -517,17 +547,15 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     private const double BenchTdrSafeSeconds = 0.8;
     private static int _benchInflight = BenchFlightMin;
 
-    /// <summary>
-    /// Standard offscreen measurement loop: renders iterations-only frames on the
-    /// samples grid for the given budget and returns the effective seconds and the number
-    /// of frames really completed by the GPU (event query). Shared by the benchmark
-    /// GUI and by `--bench-dx`. No Present: DWM and cross-GPU copy excluded.
-    /// The pipeline state (constants, shaders, render target, viewport) is set once
-    /// before the loop: the benchmark parameters are constant, and per-frame Map/state
-    /// calls would stall the CPU on the in-flight frames and depress the throughput.
-    /// Per frame only Draw + End(query) remain.
-    /// </summary>
-    /// <param name="tick">Optional periodic callback (completed frames, seconds).</param>
+    // Standard offscreen measurement loop: renders iterations-only frames on the
+    // samples grid for the given budget and returns the effective seconds and the number
+    // of frames really completed by the GPU (event query). Shared by the benchmark
+    // GUI and by `--bench-dx`. No Present: DWM and cross-GPU copy excluded.
+    // The pipeline state (constants, shaders, render target, viewport) is set once
+    // before the loop: the benchmark parameters are constant, and per-frame Map/state
+    // calls would stall the CPU on the in-flight frames and depress the throughput.
+    // Per frame only Draw + End(query) remain.
+    // Param tick: Optional periodic callback (completed frames, seconds).
     public static (double Seconds, int Frames) RunBenchmarkFramesOffscreen(double centerX, double centerY, double scale, int gridW, int gridH, int maxIter, TimeSpan budget, Action<int, double>? tick, CancellationToken ct)
     {
         if (_benchRtv == null || _benchQueries.Length == 0)
@@ -611,11 +639,9 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         return (completedSeconds > 0 ? completedSeconds : sw.Elapsed.TotalSeconds, completed);
     }
 
-    /// <summary>
-    /// True if the event query fired (the GPU passed the matching `End`).
-    /// With pData NULL, `GetData` only does the status check: S_OK = ready, S_FALSE
-    /// = still queued; with `DoNotFlush` it does not send queued work to the GPU.
-    /// </summary>
+    // True if the event query fired (the GPU passed the matching `End`).
+    // With pData NULL, `GetData` only does the status check: S_OK = ready, S_FALSE
+    // = still queued; with `DoNotFlush` it does not send queued work to the GPU.
     private static bool QuerySignaled(ID3D11Query query, AsyncGetDataFlags flags)
     {
         try
@@ -634,7 +660,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
     }
 
-    /// <summary>Counts the frames whose event query already fired (without flush).</summary>
+    // Counts the frames whose event query already fired (without flush).
     private static void DrainReady(Queue<(ID3D11Query Query, int Seq)> pending,
         System.Diagnostics.Stopwatch sw, ref int completed, ref double completedSeconds)
     {
@@ -646,10 +672,10 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
     }
 
-    /// <summary>Maximum wait of a single frame before declaring the GPU hung.</summary>
+    // Maximum wait of a single frame before declaring the GPU hung.
     private static readonly TimeSpan BenchmarkFrameTimeout = TimeSpan.FromSeconds(60);
 
-    /// <summary>Waits for the oldest frame in the queue (blocking, interruptible).</summary>
+    // Waits for the oldest frame in the queue (blocking, interruptible).
     private static void DrainOne(Queue<(ID3D11Query Query, int Seq)> pending,
         System.Diagnostics.Stopwatch sw, ref int completed, ref double completedSeconds, CancellationToken ct)
     {
@@ -684,15 +710,15 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         completedSeconds = sw.Elapsed.TotalSeconds;
     }
 
-    /// <summary>Compressed name for the UI and the history: "NVIDIA GeForce RTX 5070 Ti"
-    /// → "RTX 5070 Ti", "AMD Radeon(TM) Graphics" → "AMD Radeon Graphics".</summary>
+    // Compressed name for the UI and the history: "NVIDIA GeForce RTX 5070 Ti"
+    // → "RTX 5070 Ti", "AMD Radeon(TM) Graphics" → "AMD Radeon Graphics".
     public static string ShortAdapterName(string fullName) =>
         fullName.Replace("NVIDIA GeForce ", "").Replace("(TM)", "").Trim();
 
     private static DxStop ToStop((double T, byte R, byte G, byte B) s) =>
         new() { R = s.R / 255f, G = s.G / 255f, B = s.B / 255f };
 
-    /// <summary>Captures the backbuffer in a Bitmap (for Save PNG).</summary>
+    // Captures the backbuffer in a Bitmap (for Save PNG).
     public static Bitmap Capture()
     {
         if (!IsReady) throw new InvalidOperationException("DirectX not initialized.");
@@ -700,12 +726,17 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         return ReadTextureToBitmap(backbuffer, _backWidth, _backHeight);
     }
 
-    /// <summary>
-    /// Renders a COLORED frame of the area onto a render-target outside the
-    /// swapchain and returns it as a Bitmap: the benchmark preview for the
-    /// DirectX engine (without presenting anything on the main window).
-    /// </summary>
-    public static Bitmap? RenderPreviewToBitmap(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette, double juliaCx = 0, double juliaCy = 0, bool julia = false)
+    // Renders a COLORED frame of the area onto a render-target outside the
+    // swapchain and returns it as a Bitmap: the benchmark preview for the
+    // DirectX engine (without presenting anything on the main window).
+    public static Bitmap? RenderPreviewToBitmap(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette,
+        double juliaCx = 0, double juliaCy = 0, bool julia = false) =>
+        RenderPreviewToBitmap(centerX, centerY, scale, width, height, maxIter, aa, palette,
+            0, 0, 0, 0, juliaCx, juliaCy, julia);
+
+    public static Bitmap? RenderPreviewToBitmap(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette,
+        int fullWidth, int fullHeight, int offsetX, int offsetY,
+        double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         if (!IsReady || _context is null) return null;
         try
@@ -728,7 +759,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             using ID3D11Texture2D target = _device!.CreateTexture2D(desc);
             using ID3D11RenderTargetView rtv = _device.CreateRenderTargetView(target);
 
-            DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette, juliaCx, juliaCy, julia), rtv, _ps!, width, height);
+            DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette,
+                fullWidth, fullHeight, offsetX, offsetY, juliaCx, juliaCy, julia), rtv, _ps!, width, height);
 
             var bmp = ReadTextureToBitmap(target, width, height);
 
@@ -747,7 +779,7 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         }
     }
 
-    /// <summary>Copies the content of a texture in a Bitmap (for capture/preview).</summary>
+    // Copies the content of a texture in a Bitmap (for capture/preview).
     private static Bitmap ReadTextureToBitmap(ID3D11Texture2D source, int width, int height)
     {
         Texture2DDescription stg = source.Description;

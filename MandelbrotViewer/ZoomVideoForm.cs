@@ -1,15 +1,14 @@
 ﻿namespace MandelbrotViewer;
 
-/// <summary>
-/// Zoom video MP4: interpolates from the current view to the full set (scale in
-/// logarithm, linear center, auto iterations per frame) and renders every frame with
-/// the active engine at view resolution and AA1x. Encodes with ffmpeg if present
-/// (otherwise the PNG sequence remains). Cancelable.
-/// </summary>
+// Zoom video MP4: interpolates from the current view to the full set (scale in
+// logarithm, linear center, auto iterations per frame) and renders every frame with
+// the active engine at view resolution and AA1x. Encodes with ffmpeg if present
+// (otherwise the PNG sequence remains). Cancelable.
 public partial class ZoomVideoForm : Form
 {
-    /// <summary>Ceiling of total samples per frame (like ExportForm): beyond it, AA drops.</summary>
-    private const long MaxSamples = 134_217_728; // 128 MPixel
+    // Option B: no sample ceiling. On-chip SSAA never materializes the
+    // W*aa x H*aa grid, so AA stays as selected even on large views;
+    // the cost is render time (~aa^2), shown by the frame progress.
 
     private readonly double _endCx, _endCy, _endScale;
     private readonly Palette _palette;
@@ -48,7 +47,7 @@ public partial class ZoomVideoForm : Form
         UpdateInfo();
     }
 
-    /// <summary>AA chosen in the dialog (As view = the active one) or of the view.</summary>
+    // AA chosen in the dialog (As view = the active one) or of the view.
     private int SelectedAa() =>
         cmbAAVid.SelectedIndex <= 0 ? _aa : 1 << (cmbAAVid.SelectedIndex - 1);
 
@@ -57,27 +56,18 @@ public partial class ZoomVideoForm : Form
         string engineLabel = _useCuda ? $"CUDA {(_useDouble ? "64-bit" : "32-bit")}"
             : _useDirectX ? "DirectX" : "CPU";
         string mode = _julia ? "Julia" : "Mandelbrot";
-        int reqAa = SelectedAa();
         int effAa = EffectiveAa();
-        string aaNote = effAa < reqAa ? $" (AA reduced from {reqAa}x: over the ceiling)" : "";
-        lblInfo.Text = $"From the current view to the full set ({_viewW}×{_viewH} AA{effAa}x{aaNote}, {mode}, " +
+        lblInfo.Text = $"From the current view to the full set ({_viewW}×{_viewH} AA{effAa}x, {mode}, " +
             $"{engineLabel}, auto iter): ffmpeg " +
             (FindFfmpeg() != null ? "found → direct MP4." : "absent → PNG sequence remains.");
     }
 
     private void CmbAAVid_Changed(object? sender, EventArgs e) => UpdateInfo();
 
-    /// <summary>Effective AA: the selected one, reduced to powers of 2 until the
-    /// total samples of the frame fit within the ceiling.</summary>
-    private int EffectiveAa()
-    {
-        int a = SelectedAa();
-        while ((long)_viewW * a * _viewH * a > MaxSamples && a > 1)
-            a /= 2;
-        return a;
-    }
+    // Effective AA: always the selected one (no auto-reduction).
+    private int EffectiveAa() => SelectedAa();
 
-    /// <summary>Path of ffmpeg (PATH) or null if absent.</summary>
+    // Path of ffmpeg (PATH) or null if absent.
     internal static string? FindFfmpeg()
     {
         foreach (string dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
@@ -197,8 +187,8 @@ public partial class ZoomVideoForm : Form
         }
     }
 
-    /// <summary>Parameters of the i-th frame of the zoom (same interpolation as the video:
-    /// geometric scale ease-out, center following the zoom, auto iterations).</summary>
+    // Parameters of the i-th frame of the zoom (same interpolation as the video:
+    // geometric scale ease-out, center following the zoom, auto iterations).
     private void FrameAt(int i, int frames, double startCx, double startCy, double startScale,
         out double cx, out double cy, out double scale, out int maxIter)
     {
@@ -245,12 +235,10 @@ public partial class ZoomVideoForm : Form
         }
     }
 
-    /// <summary>
-    /// Encodes the PNGs with ffmpeg (on a worker thread: never on the UI thread). The stderr
-    /// is drained asynchronously DURING the wait: reading it after the WaitForExit
-    /// deadlocks as soon as the pipe fills (ffmpeg logs every frame). On
-    /// cancellation the process is killed.
-    /// </summary>
+    // Encodes the PNGs with ffmpeg (on a worker thread: never on the UI thread). The stderr
+    // is drained asynchronously DURING the wait: reading it after the WaitForExit
+    // deadlocks as soon as the pipe fills (ffmpeg logs every frame). On
+    // cancellation the process is killed.
     private static void RunFfmpeg(string ffmpeg, string tmpDir, int frames, int fps,
         string output, CancellationToken ct)
     {
@@ -293,7 +281,7 @@ public partial class ZoomVideoForm : Form
         return string.Join(" | ", lines.Skip(Math.Max(0, lines.Length - n)));
     }
 
-    /// <summary>Opens the result (MP4 with the default player, PNG folder in Explorer).</summary>
+    // Opens the result (MP4 with the default player, PNG folder in Explorer).
     private void BtnOpen_Click(object? sender, EventArgs e)
     {
         if (string.IsNullOrEmpty(_resultPath)) return;

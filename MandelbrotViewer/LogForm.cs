@@ -1,6 +1,6 @@
 namespace MandelbrotViewer;
 
-/// <summary>Dialog di sola lettura per il log/diagnostica, con pulsante per copiare negli appunti.</summary>
+// Dialog di sola lettura per il log/diagnostica, con pulsante per copiare negli appunti.
 internal sealed class LogForm : Form
 {
     public LogForm(string text)

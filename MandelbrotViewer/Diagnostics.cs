@@ -3,11 +3,9 @@ using Vortice.DXGI;
 
 namespace MandelbrotViewer;
 
-/// <summary>
-/// Command-line diagnostics without UI (MandelbrotViewer --diag-dx | --diag-gpu):
-/// verifies the initialization of the DirectX and CUDA engines. Useful for troubleshooting
-/// when the main window does not start or an engine does not initialize.
-/// </summary>
+// Command-line diagnostics without UI (MandelbrotViewer --diag-dx | --diag-gpu):
+// verifies the initialization of the DirectX and CUDA engines. Useful for troubleshooting
+// when the main window does not start or an engine does not initialize.
 internal static class Diagnostics
 {
     public static void DiagDx(string? adapterName = null)
@@ -92,14 +90,16 @@ internal static class Diagnostics
         }
     }
 
-    /// <summary>
-    /// Standard triple test on every available DirectX card (or only on the
-    /// given one): per card runs <paramref name="runs"/> runs of the
-    /// standardized benchmark and prints the values in MPixel/s with the best one — the measure
-    /// used for the benchmark graph history (compressed name).
-    /// Offscreen without window nor Present (headless): only shader + event query,
-    /// so DWM and cross-GPU copy do not skew the headless cards.
-    /// </summary>
+    // Standard triple test on every available DirectX card (or only on the
+    // given one): per card runs the standardized benchmark and prints the values
+    // in MPixel/s with the best one — the measure used for the benchmark graph
+    // history (compressed name).
+    // Offscreen without window nor Present (headless): only shader + event query,
+    // so DWM and cross-GPU copy do not skew the headless cards.
+    // Param adapterName (string?): Input, card filter (exact DXGI name); null = all cards.
+    // Param runs (int): Input, repetitions per card.
+    // Param budget (TimeSpan): Input, time budget of each single run.
+    // Param csvPath (string?): Input, CSV file for one row per run; null = no CSV output.
     public static void BenchDx(string? adapterName, int runs, TimeSpan budget, string? csvPath = null)
     {
         int gridW = BenchmarkStandard.Width * BenchmarkStandard.Aa;
@@ -184,13 +184,14 @@ internal static class Diagnostics
             Console.WriteLine($"  {shortName}: {best:0.#}");
     }
 
-    /// <summary>
-    /// Standard triple test on every available CUDA device (or only on the
-    /// given one): per device runs <paramref name="runs"/> runs of the
-    /// standardized benchmark in float 32-bit and in double 64-bit and prints the values in
-    /// MPixel/s with the best one — the measure used for the benchmark graph
-    /// history. CUDA counterpart of <see cref="BenchDx"/> for the CUDA engine.
-    /// </summary>
+    // Standard triple test on every available CUDA device (or only on the
+    // given one): per device runs the standardized benchmark in float 32-bit and
+    // in double 64-bit and prints the values in MPixel/s with the best one —
+    // the measure used for the benchmark graph history. CUDA counterpart of BenchDx.
+    // Param deviceName (string?): Input, device filter (exact CUDA name); null = all devices.
+    // Param runs (int): Input, repetitions per device and precision.
+    // Param budget (TimeSpan): Input, time budget of each single run.
+    // Param csvPath (string?): Input, CSV file for one row per run; null = no CSV output.
     public static void BenchCuda(string? deviceName, int runs, TimeSpan budget, string? csvPath = null)
     {
         Console.WriteLine($"Standardized CUDA benchmark: {runs} runs of {budget.TotalSeconds:0} s per device, " +
@@ -263,8 +264,8 @@ internal static class Diagnostics
             Console.WriteLine($"  {shortName}: 32-bit {best32:0.#} | 64-bit {best64:0.#}");
     }
 
-    /// <summary>CPU model name (from registry, without suffixes), e.g.
-    /// "AMD Ryzen 9 9900X" or "Intel Core i7-14700K".</summary>
+    // CPU model name (from registry, without suffixes), e.g.
+    // "AMD Ryzen 9 9900X" or "Intel Core i7-14700K".
     public static string CpuName()
     {
         try
@@ -286,12 +287,13 @@ internal static class Diagnostics
         }
     }
 
-    /// <summary>
-    /// Standard triple test on the CPU: runs <paramref name="runs"/> runs of the
-    /// standardized benchmark (`Mandelbrot.BenchmarkCpu`, double) and prints the
-    /// values in MPixel/s with the best one — the measure used for the CPU history
-    /// of the benchmark graph (with model name).
-    /// </summary>
+    // Standard triple test on the CPU: runs the standardized benchmark
+    // (Mandelbrot.BenchmarkCpu, double) and prints the values in MPixel/s with
+    // the best one — the measure used for the CPU history of the benchmark graph
+    // (with model name).
+    // Param runs (int): Input, repetitions.
+    // Param budget (TimeSpan): Input, time budget of each single run.
+    // Param csvPath (string?): Input, CSV file for one row per run; null = no CSV output.
     public static void BenchCpu(int runs, TimeSpan budget, string? csvPath = null)
     {
         Console.WriteLine($"Standardized CPU benchmark ({CpuName()}): {runs} runs of {budget.TotalSeconds:0} s, " +
@@ -323,7 +325,7 @@ internal static class Diagnostics
         Console.WriteLine($"=== Summary (best, MPixel/s): {CpuName()}: {best:0.#} ===");
     }
 
-    /// <summary>Writes a CSV row if requested (non-fatal errors: warn and continue).</summary>
+    // Writes a CSV row if requested (non-fatal errors: warn and continue).
     private static void WriteCsvRow(string? csvPath, string engine, string device, string precision,
         int run, int frames, double seconds, double mps)
     {

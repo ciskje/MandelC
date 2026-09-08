@@ -2,9 +2,7 @@
 
 static class Program
 {
-    /// <summary>
-    ///  The main entry point for the application.
-    /// </summary>
+    // The main entry point for the application.
     [STAThread]
     static void Main(string[] args)
     {
@@ -45,10 +43,8 @@ static class Program
         Application.Run(new MandelbrotForm());
     }
 
-    /// <summary>
-    /// App icon (embedded app.ico) on the given window; optional,
-    /// never blocking.
-    /// </summary>
+    // App icon (embedded app.ico) on the given window; optional,
+    // never blocking.
     internal static void ApplyIcon(Form form)
     {
         try
@@ -63,10 +59,8 @@ static class Program
         }
     }
 
-    /// <summary>
-    /// Arguments of the --bench-* commands: first positional = card/device,
-    /// `--csv file` anywhere after the flag. Returns (device, csvPath).
-    /// </summary>
+    // Arguments of the --bench-* commands: first positional = card/device,
+    // `--csv file` anywhere after the flag. Returns (device, csvPath).
     private static (string? Device, string? Csv) ParseBenchArgs(string[] args)
     {
         string? device = null, csv = null;

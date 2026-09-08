@@ -1,10 +1,8 @@
 namespace MandelbrotViewer;
 
-/// <summary>
-/// Export CSV dei risultati benchmark (GUI e CLI): una riga per run con
-/// timestamp, motore, device, precisione, frame, secondi e MPixel/s.
-/// Colonne: timestamp,engine,device,precision,run,frames,seconds,mpixel_s.
-/// </summary>
+// Export CSV dei risultati benchmark (GUI e CLI): una riga per run con
+// timestamp, motore, device, precisione, frame, secondi e MPixel/s.
+// Colonne: timestamp,engine,device,precision,run,frames,seconds,mpixel_s.
 internal static class BenchmarkCsv
 {
     private const string Header = "timestamp,engine,device,precision,run,frames,seconds,mpixel_s";

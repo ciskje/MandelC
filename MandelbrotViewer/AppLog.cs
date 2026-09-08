@@ -1,9 +1,7 @@
 ﻿namespace MandelbrotViewer;
 
-/// <summary>
-/// In-memory event log (last 200 lines with timestamp): benchmark errors
-/// and other reports, visible in the log/diagnostics dialog (Help menu).
-/// </summary>
+// In-memory event log (last 200 lines with timestamp): benchmark errors
+// and other reports, visible in the log/diagnostics dialog (Help menu).
 internal static class AppLog
 {
     private static readonly object _gate = new();

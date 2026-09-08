@@ -19,19 +19,24 @@ black). Palettes: Fire, Ice, Thermal, Ocean, Purple, Desert, Forest (stops in
   `SizeMode.Zoom` to keep the aspect ratio during the transition.
 - `R` = reset view, `S` = save PNG, `+`/`-` = ±50 iterations (50…50000).
 - Auto checkbox: iterations 2000*(1+log10(1.5/half)) (half = scale/2, clamp 50-50000; ~1944 at the initial view scale 9.36, 10915 at the benchmark zone); the number shows the value used while staying disabled. Central formula in Mandelbrot.AutoIterForScale, also used by the zoom video. The benchmark uses the iterations computed with the auto formula at its scale (10915) (BenchmarkStandard.MaxIter)
-- AA dropdown 1x/2x/4x/8x (1x = off): supersampling k×k and RGB averaging (cost ~k²)
-  on CPU and CUDA; in DirectX inside the shader.
+- AA dropdown 1x/2x/4x/8x (1x = off): on-chip SSAA, k×k subsamples per
+  output pixel with RGB averaging (cost ~k², memory O(W×H): no W*k×H*k
+  buffer on any engine — CPU accumulates locally like the CUDA kernel and
+  the DirectX shader).
 - File menu: load/save zone JSON (Ctrl+O / Ctrl+S: center, scale,
   iterations), save image (Ctrl+Shift+S), benchmark (Ctrl+B), Exit (Alt+F4).
 - Generate menu: PNG screenshot
   (Ctrl+Shift+E: dialog from current view with View/Full HD/2K/4K/8K/
   Double 4K/Custom presets, validated dimensions 320…16384, selectable AA,
-  offscreen render with the active engine, AA auto-reduced beyond 128 MPixel of
-  samples), zoom video MP4 (Ctrl+Shift+V:
+  offscreen tiled render with the active engine, 512×512 working tiles and
+  global coordinates/sample order preserved so the result is pixel-identical
+  to a whole-frame render; AA is not reduced for large outputs), zoom video
+  MP4 (Ctrl+Shift+V:
   from the current view to the set (error if already at the set; center
   proportional to the zoom so the starting point stays in frame;
   ease-out transition: fast at the start, slow at the end), 60…480 frames
-  at 24/30/60 fps, selected AA (auto-reduced beyond 128 MPixel of samples),
+  at 24/30/60 fps, selected AA (never reduced: on-chip SSAA keeps memory
+  flat, the price is render time ~k²),
   auto iterations per frame, ffmpeg H.264 (on worker, async stderr, kill on
   cancel, pad to even dimensions because the view often has odd sides) or
   PNG sequence if absent (Open button for the result)), Back to set (RealTime) (Ctrl+Shift+R: animation on the main view from the current zone to the set, 120 frames at 30 fps, Esc to stop)
@@ -47,7 +52,9 @@ black). Palettes: Fire, Ice, Thermal, Ocean, Purple, Desert, Forest (stops in
 - Status bar: center, width, iterations, palette, engine (+AA/preview);
   fixed commands guide. Tooltips on controls and menu items.
 - AppStarting cursor (arrow+clock) during async renders — the UI stays
-  interactive — assigned recursively to all controls; Wait only for
+  interactive — assigned recursively to all controls and owned by the latest
+  render only (stale renders never touch it, so it cannot stay stuck on);
+  on restore the image panels go back to Crosshair; Wait only for
   the synchronous CUDA init with frozen UI.
 - Window 1152×720 (position/size persisted), version in the title.
 
@@ -115,13 +122,16 @@ frames × samples/frame / seconds.
 
 ## Files
 
-- `MandelbrotViewer/Mandelbrot.cs` — CPU computation and benchmark.
+- `MandelbrotViewer/Mandelbrot.cs` — CPU computation and benchmark (all compute
+  functions documented with extensive input/output parameter docs).
 - `MandelbrotViewer/Palette.cs` — `PaletteColors` (stops/gradients, single source).
 - `MandelbrotViewer/GpuMandelbrot.cs` — CUDA backend (ILGPU 1.5.3): render
-  kernel float/double + benchmark kernel iterations-only, `DeviceNames()`,
+  kernel float/double + benchmark kernel iterations-only (all kernel functions
+  carry extensive input/output parameter docs), `DeviceNames()`,
   `TryInitialize(deviceName)`, diagnostic `LastError`.
 - `MandelbrotViewer/DxMandelbrot.cs` — DirectX 11 backend (Vortice 3.8.3):
-  realtime shader + benchmark shader, swapchain on the panel, `Capture`,
+  realtime shader + benchmark shader (HLSL entry points `VS`, `Graded`, `PS`,
+  `BenchPS` documented with cbuffer inputs and shader outputs), swapchain on the panel, `Capture`,
   `RenderPreviewToBitmap`, offscreen headless benchmark (`EnsureDevice`,
   `TryInitializeHeadless`, `BeginBenchmarkOffscreen`,
   `RunBenchmarkFramesOffscreen`, `EndBenchmarkOffscreen`), `AdapterNames()`
@@ -147,7 +157,8 @@ frames × samples/frame / seconds.
 - Root: `run.bat` (runs the current version via `dotnet run`, forwards the
   arguments), `publish.bat` / `publish.ps1` (self-contained publish
   single-file in `published/`, ~158 MB), `AGENTS.md`, `TODO.md`,
-  `CHANGELOG.md`, `.gitignore` (excludes `bin/`, `obj/`, `published/`, `*.user`).
+  `QUESTIONS.md` (generic Q&A, not about the source), `CHANGELOG.md`,
+  `.gitignore` (excludes `bin/`, `obj/`, `published/`, `*.user`).
 
 ## Changelog
 
@@ -165,9 +176,25 @@ Release v2.17.6 is published on GitHub with the self-contained
   to .NET 10 LTS).
 - The CUDA backend requires an NVIDIA GPU + driver on the target machine (the
   CUDA toolkit is not needed at runtime); without a GPU the app uses the CPU automatically.
+- Code comments use plain `//` (no XML doc tags); method params are documented
+  as `Param name (Type): meaning` with `Returns (Type):` where applicable.
+
+## Antialias via dithering + stacking (evaluated 2026-09-08, no code change)
+
+- Proposal: render N standard-resolution frames with sub-pixel jitter
+  (astrophotography-style dithering) and average them, instead of one kxk
+  supersampled buffer (N = 4/16/64 matches AA 2x/4x/8x sample counts).
+- Verdict: valid technique (jittered supersampling / accumulation). With a
+  regular sub-pixel grid it is mathematically equivalent to the current box
+  SSAA (on-chip per-pixel average in `Mandelbrot.RenderTile`); with random offsets it
+  converts aliasing into noise and needs more samples for the same edge
+  quality, so ordered offsets are preferred for filaments thinner than 1 px.
+- Trade-off: identical total iteration cost (N = kxk), but memory drops from
+  O(kxk x W x H) to O(W x H) plus a float accumulator, and stacking allows a
+  progressive preview. Requires accumulating in float/linear space, not by
+  averaging 8-bit sRGB frames, to avoid quantization and darkening.
 
 ## Benchmark blocking-risk audit (2026-09-07)
-
 - **High risk — CUDA has no bounded wait.** `GpuMandelbrot.BenchmarkGpu`
   calls `accelerator.Synchronize()` for every frame. Cancellation is checked
   before launch and after synchronization, so a CUDA driver/device hang can

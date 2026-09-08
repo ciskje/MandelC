@@ -2,10 +2,8 @@ using System.Text.Json;
 
 namespace MandelbrotViewer;
 
-/// <summary>
-/// Impostazioni persistite tra un lancio e l'altro
-/// (%APPDATA%\MandelbrotViewer\settings.json).
-/// </summary>
+// Impostazioni persistite tra un lancio e l'altro
+// (%APPDATA%\MandelbrotViewer\settings.json).
 public sealed class AppSettings
 {
     public bool IterAuto { get; set; }
@@ -13,15 +11,15 @@ public sealed class AppSettings
     public int Palette { get; set; }
     public int AaIndex { get; set; }
     public string Engine { get; set; } = nameof(RenderEngine.Cuda);
-    /// <summary>Scheda video scelta ("" = auto).</summary>
+    // Scheda video scelta ("" = auto).
     public string Gpu { get; set; } = "";
-    /// <summary>Precisione CUDA: true = single 32-bit (float), false = double 64-bit (default).</summary>
+    // Precisione CUDA: true = single 32-bit (float), false = double 64-bit (default).
     public bool Single { get; set; }
-    /// <summary>Modalità Julia attiva.</summary>
+    // Modalità Julia attiva.
     public bool Julia { get; set; }
-    /// <summary>Costante c di Julia (parte reale).</summary>
+    // Costante c di Julia (parte reale).
     public double Jcx { get; set; } = -0.7;
-    /// <summary>Costante c di Julia (parte immaginaria).</summary>
+    // Costante c di Julia (parte immaginaria).
     public double Jcy { get; set; } = 0.27015;
     public int WinX { get; set; }
     public int WinY { get; set; }

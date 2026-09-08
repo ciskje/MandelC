@@ -1,5 +1,14 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] Question: where the blocks/warps split is in the program — completed (no code change, see QUESTIONS.md)
+- [x] v2.18.5: Move generic Q&A out of TODO.md into QUESTIONS.md — completed
+- [x] Question: generic questions in .md files not about the program source — completed (no code change, see QUESTIONS.md)
+- [x] v2.18.4: Plain comments instead of XML doc tags, params annotated with type — completed
+- [x] v2.18.3: Extensive input/output comments on CPU compute functions too — completed
+- [x] v2.18.2: Extensive input/output comments on all kernel functions — completed
+- [x] v2.18.1: On-chip SSAA without huge image (option B, no video AA cap) + busy cursor recheck — completed
+- [x] Question: AA via astrophotography-style dithering + stacking N standard-res frames (N = 4/16/64) — completed (no code change)
+- [x] v2.18.0: Tiled high-resolution export with pixel-identical AA8x output — completed
 - [x] v2.17.6: Publish the self-contained executable in GitHub Releases and update README download instructions — completed
 - [x] v2.17.6: Sort benchmark chart results by MPixel/s descending — completed
 - [x] Update historical benchmark values in the source using the v2.17.5 protocol — completed
@@ -48,9 +57,7 @@ Every user request becomes an entry here. Status: `pending` → `completed`/`can
 - [x] v2.11.0: High-resolution PNG export — `completed`
 - [x] v2.12.0: Julia mode — `completed`
 - [x] v2.13.1: Video export hang + inverted direction + proportional center to zoom + ease-out transition — `completed`
-- [x] ffmpeg 7.1 installation in %USERPROFILE%\ffmpeg + user PATH (via imageio-ffmpeg/PyPI: gyan.dev was at 100 KB/s) — `completed`
 - [x] v2.13.0: Zoom video MP4 via ffmpeg — `completed`
-- [x] Safe updates audit (SDK/runtime/NuGet): all already at latest stable, no changes — `completed`
 - [x] v2.5.22: AppStarting (arrow+clock) instead of Wait where UI stays interactive — `completed`
 - [x] v2.5.21: Wait cursor not visible during long renders if mouse is on the image (pictureBox missing from SetBusyCursor list) — `completed`
 - [x] v2.5.20: DirectX benchmark offscreen without Present (headless + event query) so headless cards don't pay the inter-GPU copy — `completed`
@@ -59,7 +66,6 @@ Every user request becomes an entry here. Status: `pending` → `completed`/`can
 - [x] v2.5.17: DXGI: AdapterNames returned empty list (overflow on GPU >4GB via PointerUSize→uint); actually list the DirectX cards — `completed`
 - [x] v2.5.16: DirectX: actually apply the card chosen from the dropdown (create the device on the selected DXGI adapter) — `completed`
 - [x] v2.5.15: Code review and cleanup (dead code, deduplication, file reorganization) — `completed`
-- [x] v2.5.14: Theoretical performance comparison RTX 4070 SUPER vs RTX 5070 Ti (tensor, memory, FP32/FP64) — `completed`
 - [x] v2.5.13: DirectX benchmark fix: unrealistic results (swapchain resize not done) and black preview (CopyResource reversed) — `completed`
 - [x] v2.5.12: Colored benchmark preview also for DirectX and DX panel hidden during test — `completed`
 - [x] v2.5.11: Show the first benchmark frame also in CUDA (and CPU) — `completed`
@@ -123,9 +129,4 @@ Every user request becomes an entry here. Status: `pending` → `completed`/`can
 - [x] Align iteration count with label + auto iterations radio from zoom — `completed`
 - [x] File menu (load/save zone JSON, save named image), Help menu with info, mouse wheel zoom — `completed`
 - [x] Zoom only with mouse click, holding does pan/scroll — `completed`
-- [x] Create a simple Mandelbrot set viewer in C# — `completed`
-- [x] Explain how to launch it — `completed`
-- [x] Create launch script (`avvia.bat` + `avvia.ps1`) — `completed`
-- [x] Resolve .NET Desktop Runtime installation request (self-contained publish in `published/`) — `completed`
-- [x] Clarify if AGENTS.md is read on empty session — `completed`
 - [x] Project setup: git + X.Y.Z version in source + AGENTS.md + TODO.md + SPECS.md — `completed`

@@ -6,7 +6,7 @@ using ILGPU.Runtime.Cuda;
 
 namespace MandelbrotViewer;
 
-/// <summary>View parameters passed to the kernels (blittable struct, must be public for ILGPU).</summary>
+// View parameters passed to the kernels (blittable struct, must be public for ILGPU).
 public readonly struct GpuViewParams
 {
     public readonly double CenterX;
@@ -20,8 +20,12 @@ public readonly struct GpuViewParams
     public readonly int JuliaOn;
     public readonly double Jcx;
     public readonly double Jcy;
+    public readonly int FullW;
+    public readonly int FullH;
+    public readonly int OffsetX;
+    public readonly int OffsetY;
 
-    public GpuViewParams(double centerX, double centerY, double pixelSize, double topY, int w, int h, int maxIter, int supersample = 1, int juliaOn = 0, double jcx = 0, double jcy = 0)
+    public GpuViewParams(double centerX, double centerY, double pixelSize, double topY, int w, int h, int maxIter, int supersample = 1, int juliaOn = 0, double jcx = 0, double jcy = 0, int fullW = 0, int fullH = 0, int offsetX = 0, int offsetY = 0)
     {
         CenterX = centerX;
         CenterY = centerY;
@@ -34,6 +38,10 @@ public readonly struct GpuViewParams
         JuliaOn = juliaOn;
         Jcx = jcx;
         Jcy = jcy;
+        FullW = fullW > 0 ? fullW : w;
+        FullH = fullH > 0 ? fullH : h;
+        OffsetX = offsetX;
+        OffsetY = offsetY;
     }
 }
 
@@ -51,10 +59,8 @@ public readonly struct GpuPaletteParams
     }
 }
 
-/// <summary>
-/// CUDA backend via ILGPU: one thread per pixel computes the escape, the smooth
-/// coloring and the AA downsampling directly on the GPU.
-/// </summary>
+// CUDA backend via ILGPU: one thread per pixel computes the escape, the smooth
+// coloring and the AA downsampling directly on the GPU.
 internal static class GpuMandelbrot
 {
     private static Context? _context;
@@ -72,13 +78,13 @@ internal static class GpuMandelbrot
     public static bool IsReady => _accelerator != null;
     public static string DeviceName { get; private set; } = "";
     public static string DeviceShortName => DeviceName.Replace("NVIDIA GeForce ", "");
-    /// <summary>Reason of the last failed initialization (diagnostic).</summary>
+    // Reason of the last failed initialization (diagnostic).
     public static string LastError { get; private set; } = "";
 
-    /// <summary>True if the scale requires double (float does not have enough digits).</summary>
+    // True if the scale requires double (float does not have enough digits).
     public static bool WantsDouble(double scale) => scale < 1e-3;
 
-    /// <summary>CUDA devices available (ILGPU names); empty if no CUDA.</summary>
+    // CUDA devices available (ILGPU names); empty if no CUDA.
     public static IReadOnlyList<string> DeviceNames()
     {
         try
@@ -97,11 +103,9 @@ internal static class GpuMandelbrot
         }
     }
 
-    /// <summary>
-    /// Initializes the context, the CUDA device and the kernels. With <paramref name="deviceName"/>
-    /// it uses that card; without it, it tries the CUDA devices from the largest.
-    /// Returns false if none works (the CPU is used).
-    /// </summary>
+    // Initializes the context, the CUDA device and the kernels. With deviceName
+    // it uses that card; without it, it tries the CUDA devices from the largest.
+    // Returns false if none works (the CPU is used).
     public static bool TryInitialize(string? deviceName = null)
     {
         if (IsReady && (deviceName == null || DeviceName == deviceName)) return true;
@@ -156,7 +160,7 @@ internal static class GpuMandelbrot
         }
     }
 
-    /// <summary>Unloads accelerator+kernels (the CUDA context stays reusable).</summary>
+    // Unloads accelerator+kernels (the CUDA context stays reusable).
     private static void ResetAccelerator()
     {
         lock (RenderGate)
@@ -178,24 +182,33 @@ internal static class GpuMandelbrot
         DeviceName = "";
     }
 
-    /// <summary>Computes the frame on the GPU (kernel launch + copy back to RAM).</summary>
-    /// <param name="supersample">Antialias: resolution k times greater (1 = none).</param>
-    /// <param name="useDouble">True for the double 64-bit kernel, false for single 32-bit (float).</param>
-    /// <param name="juliaCx">Constant c (real part) in Julia mode.</param>
-    /// <param name="juliaCy">Constant c (imaginary part) in Julia mode.</param>
-    /// <param name="julia">True = Julia set with fixed c, false = Mandelbrot.</param>
+    // Computes the frame on the GPU (kernel launch + copy back to RAM).
+    // Param supersample (int): Antialias: resolution k times greater (1 = none).
+    // Param useDouble (bool): True for the double 64-bit kernel, false for single 32-bit (float).
+    // Param juliaCx (double): Constant c (real part) in Julia mode.
+    // Param juliaCy (double): Constant c (imaginary part) in Julia mode.
+    // Param julia (bool): True = Julia set with fixed c, false = Mandelbrot.
     public static bool Render(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette, int supersample, bool useDouble, CancellationToken ct, double juliaCx = 0, double juliaCy = 0, bool julia = false)
+    {
+        return RenderTile(bmp, centerX, centerY, scale, maxIter, palette, supersample, useDouble, ct,
+            0, 0, bmp.Width, bmp.Height, juliaCx, juliaCy, julia);
+    }
+
+    // Renders one output tile with global image coordinates.
+    public static bool RenderTile(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette,
+        int supersample, bool useDouble, CancellationToken ct, int offsetX, int offsetY, int fullWidth, int fullHeight,
+        double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         lock (RenderGate)
         {
             var accelerator = _accelerator ?? throw new InvalidOperationException("GPU not initialized.");
             int k = Math.Max(1, supersample);
-            int bigW = bmp.Width * k;
-            int bigH = bmp.Height * k;
+            int bigW = fullWidth * k;
+            int bigH = fullHeight * k;
             double pixelSize = scale / bigW;
             double topY = centerY - (bigH * 0.5) * pixelSize;
             var view = new GpuViewParams(centerX, centerY, pixelSize, topY, bmp.Width, bmp.Height, maxIter, k,
-                julia ? 1 : 0, juliaCx, juliaCy);
+                julia ? 1 : 0, juliaCx, juliaCy, fullWidth, fullHeight, offsetX, offsetY);
             var paletteParams = new GpuPaletteParams(PaletteColors.GetStops(palette));
             int count = bmp.Width * bmp.Height;
             if (_renderCount != count)
@@ -228,8 +241,7 @@ internal static class GpuMandelbrot
         }
     }
 
-    /// The progress to the UI is limited (every 3 s) to not skew the measure.
-    /// </summary>
+    // The progress to the UI is limited (every 3 s) to not skew the measure.
     public static (long TotalIters, double Seconds, int Frames) BenchmarkGpu(double centerX, double centerY, double scale, int w, int h, int maxIter, int supersample, bool useDouble, TimeSpan budget, IProgress<BenchmarkProgress>? progress, CancellationToken ct)
     {
         lock (RenderGate)
@@ -303,6 +315,20 @@ internal static class GpuMandelbrot
 
     // ---------- Benchmark kernel: only iterations (no |z|², a third of the traffic) ----------
 
+    // CUDA benchmark kernel, single precision (float 32-bit): escape-iteration
+    // count of one elementary sample, no coloring, no smoothing, no SSAA averaging.
+    // One GPU thread handles exactly one grid cell; the measured throughput is
+    // pure Mandelbrot iteration compute.
+    // Param index (Index1D): Input: linear thread index (0 … W*H-1). Decoded inside
+    //   as x = index % W (column on the samples grid) and y = index / W (row).
+    // Param iters (ArrayView<int>): Output: device buffer of W*H ints. Element [index] receives
+    //   the escape-iteration count of this sample (0 … MaxIter). Read back by the host
+    //   only for validation; the benchmark counts frames, not values.
+    // Param p (GpuViewParams): Input: view parameters. Used here: W/H (grid size), CenterX,
+    //   PixelSize, TopY (sample → complex mapping), MaxIter (loop bound). Ignored here:
+    //   Supersample, palette, Julia fields, tile offsets (the benchmark grid is whole-frame).
+    // Note: Coordinate mapping and incremental-squares loop are identical to the
+    // DirectX benchmark shader, so the two engines measure the same workload.
     private static void FloatBenchKernel(Index1D index, ArrayView<int> iters, GpuViewParams p)
     {
         int i = index.X;
@@ -325,6 +351,18 @@ internal static class GpuMandelbrot
         iters[index] = iter;
     }
 
+    // CUDA benchmark kernel, double precision (float 64-bit): escape-iteration
+    // count of one elementary sample, no coloring, no smoothing, no SSAA averaging.
+    // One GPU thread handles exactly one grid cell; used when deep zoom needs more
+    // digits than float provides (about 6x slower than the float kernel).
+    // Param index (Index1D): Input: linear thread index (0 … W*H-1). Decoded inside
+    //   as x = index % W (column on the samples grid) and y = index / W (row).
+    // Param iters (ArrayView<int>): Output: device buffer of W*H ints. Element [index] receives
+    //   the escape-iteration count of this sample (0 … MaxIter).
+    // Param p (GpuViewParams): Input: view parameters. Used here: W/H (grid size), CenterX,
+    //   CenterY-independent TopY, PixelSize (sample → complex mapping in double),
+    //   MaxIter (loop bound). Ignored here: Supersample, palette, Julia fields,
+    //   tile offsets.
     private static void DoubleBenchKernel(Index1D index, ArrayView<int> iters, GpuViewParams p)
     {
         int i = index.X;
@@ -346,11 +384,19 @@ internal static class GpuMandelbrot
         iters[index] = iter;
     }
 
-    /// <summary>
-    /// Palette interpolation in the CUDA kernel: it must stay aligned with
-    /// PaletteColors.ColorFor (CPU) and with the Graded function of the HLSL shader
-    /// (DxMandelbrot.cs): same 5 stops and same mapping t = (nu/maxIter)^0.35.
-    /// </summary>
+    // Palette interpolation in the CUDA kernel: it must stay aligned with
+    // PaletteColors.ColorFor (CPU) and with the Graded function of the HLSL shader
+    // (DxMandelbrot.cs): same 5 stops and same mapping t = (nu/maxIter)^0.35.
+    // Device-only helper, called once per subsample by FloatKernel/DoubleKernel.
+    // Param iterations (float): Input: smoothed escape value nu (float). Interior
+    //   points pass MaxIter and are clamped to the last stop; exterior points carry
+    //   the fractional log/log correction.
+    // Param maxIter (int): Input: reference iteration budget of the view. Normalizes
+    //   nu to raw = nu/maxIter before the gamma curve; values outside [0,1] are clamped.
+    // Param p (GpuPaletteParams): Input: five palette stops as normalized RGB floats (S0…S4).
+    //   The t*4 segment index picks the surrounding pair, f interpolates linearly.
+    // Returns (int): Output: packed 32-bit ARGB color (alpha always 0xFF) for one subsample;
+    //   the caller accumulates its R/G/B channels into the pixel average.
     private static int ColorFromIterations(float iterations, int maxIter, GpuPaletteParams p)
     {
         float raw = iterations / (maxIter > 0 ? maxIter : 1);
@@ -368,6 +414,21 @@ internal static class GpuMandelbrot
         return unchecked((int)(0xFF000000u | ((uint)((ar + f * (br - ar)) * 255f) << 16) | ((uint)((ag + f * (bg - ag)) * 255f) << 8) | (uint)((ab + f * (bb - ab)) * 255f)));
     }
 
+    // CUDA render kernel, single precision (float 32-bit): full on-chip SSAA color
+    // of one output pixel. The thread loops over its k×k subsamples on the global
+    // k-times grid, runs the escape iteration with smooth log/log correction, maps
+    // each subsample through the palette, and writes the RGB average. VRAM traffic
+    // stays O(W×H): the W*k×H*k grid is never materialized.
+    // Param index (Index1D): Input: linear thread index (0 … W*H-1). Decoded inside
+    //   as x = index % W (output column in this tile) and y = index / W (output row).
+    // Param pixels (ArrayView<int>): Output: device buffer of W*H packed ARGB ints. Element [index]
+    //   receives the SSAA-averaged color of this output pixel; the host copies it to RAM
+    //   and blits it into the tile bitmap.
+    // Param p (GpuViewParams): Input: view parameters. Used: W/H (tile size), Supersample k,
+    //   FullW/FullH + OffsetX/OffsetY (tile → whole-image mapping, keeps tiled output
+    //   pixel-identical), CenterX/TopY/PixelSize (grid → complex mapping in float),
+    //   MaxIter, JuliaOn/Jcx/Jcy (Julia: z(0) = pixel, c = constant; else z(0) = 0, c = pixel).
+    // Param palette (GpuPaletteParams): Input: five palette stops as normalized RGB floats.
     private static void FloatKernel(Index1D index, ArrayView<int> pixels, GpuViewParams p, GpuPaletteParams palette)
     {
         int i = index.X;
@@ -380,8 +441,8 @@ internal static class GpuMandelbrot
         {
             for (int sx = 0; sx < k; sx++)
             {
-                float px = (float)p.CenterX + (x * k + sx - p.W * k * 0.5f) * pixel;
-                float py = (float)p.TopY + (y * k + sy) * pixel;
+                float px = (float)p.CenterX + ((p.OffsetX + x) * k + sx - p.FullW * k * 0.5f) * pixel;
+                float py = (float)p.TopY + ((p.OffsetY + y) * k + sy) * pixel;
                 // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
                 float zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
                 float ccx = p.JuliaOn != 0 ? (float)p.Jcx : px;
@@ -411,6 +472,19 @@ internal static class GpuMandelbrot
         pixels[index] = unchecked((int)(0xFF000000u | ((uint)(sumR / samples) << 16) | ((uint)(sumG / samples) << 8) | (uint)(sumB / samples)));
     }
 
+    // CUDA render kernel, double precision (float 64-bit): full on-chip SSAA color
+    // of one output pixel. Same contract as FloatKernel, but the escape iteration
+    // and the grid → complex mapping run in double, so deep zoom (scale &lt; 1e-3)
+    // stays sharp where float runs out of digits. About 6x slower than float.
+    // Param index (Index1D): Input: linear thread index (0 … W*H-1). Decoded inside
+    //   as x = index % W (output column in this tile) and y = index / W (output row).
+    // Param pixels (ArrayView<int>): Output: device buffer of W*H packed ARGB ints. Element [index]
+    //   receives the SSAA-averaged color of this output pixel.
+    // Param p (GpuViewParams): Input: view parameters. Used: W/H (tile size), Supersample k,
+    //   FullW/FullH + OffsetX/OffsetY (tile → whole-image mapping), CenterX/TopY/PixelSize
+    //   (grid → complex mapping in double), MaxIter, JuliaOn/Jcx/Jcy (mode switch).
+    // Param palette (GpuPaletteParams): Input: five palette stops as normalized RGB floats (the
+    //   smoothed value is narrowed to float only for the final palette lookup).
     private static void DoubleKernel(Index1D index, ArrayView<int> pixels, GpuViewParams p, GpuPaletteParams palette)
     {
         int i = index.X;
@@ -422,8 +496,8 @@ internal static class GpuMandelbrot
         {
             for (int sx = 0; sx < k; sx++)
             {
-                double px = p.CenterX + (x * k + sx - p.W * k * 0.5) * p.PixelSize;
-                double py = p.TopY + (y * k + sy) * p.PixelSize;
+                double px = p.CenterX + ((p.OffsetX + x) * k + sx - p.FullW * k * 0.5) * p.PixelSize;
+                double py = p.TopY + ((p.OffsetY + y) * k + sy) * p.PixelSize;
                 // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
                 double zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
                 double ccx = p.JuliaOn != 0 ? p.Jcx : px;

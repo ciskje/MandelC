@@ -2,6 +2,49 @@
 
 Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 `AGENTS.md`. The version is shown in the window title.
+- **v2.18.5** — Generic Q&A moved out of `TODO.md` into new `QUESTIONS.md`
+  (GPU architecture, 5070 Ti work split, hardware comparison, ffmpeg/PATH,
+  updates audit, launch, AGENTS.md meta) so the todo stays strictly about the
+  program. No code change. Files: `QUESTIONS.md` (new), `TODO.md`,
+  `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.18.4** — Plain `//` comments instead of XML doc tags across all sources:
+  every method documents its parameters as `Param name (Type): meaning` plus
+  `Returns (Type):` where applicable; HLSL entry points keep in-shader `//`
+  input/output docs. No code change. Files: all `MandelbrotViewer/*.cs`,
+  `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.18.3** — Extensive input/output comments on the CPU compute functions
+  in `Mandelbrot.cs` (`Render`, `RenderTile`, `ColorFromEscape`,
+  `AutoIterForScale`, `BenchmarkCpu`): per-parameter roles, output bitmap
+  contract, tile→image mapping and benchmark metric. No code change. Files:
+  `Mandelbrot.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`,
+  `.csproj`.
+- **v2.18.2** — Extensive input/output comments on all kernel functions: the
+  four CUDA kernels plus the palette helper in `GpuMandelbrot.cs` (thread
+  index decoding, device output buffers, view/palette parameters) and the HLSL
+  entry points in `DxMandelbrot.cs` (`VS`, `Graded`, `PS`, `BenchPS` with
+  cbuffer fields and shader inputs/outputs). No code change. Files:
+  `GpuMandelbrot.cs`, `DxMandelbrot.cs`, `TODO.md`, `SPECS.md`,
+  `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.18.1** — On-chip SSAA without huge image (option B): the CPU tile
+  renderer computes k×k subsamples per output pixel with a local accumulator,
+  so memory stays O(W×H) and no W*k×H*k buffer is allocated (same sample
+  coordinates, pixel-identical output; CUDA/DirectX already worked this way).
+  Zoom video keeps the selected AA with no 128 MPixel auto-reduction. Busy
+  cursor recheck: only the latest render restores it (no more stuck
+  AppStarting) and the image panels go back to Crosshair. Benchmark untouched
+  (AA1x iterations-only kernels). Files: `Mandelbrot.cs`,
+  `ZoomVideoForm.cs`, `MandelbrotForm.cs`, `TODO.md`, `SPECS.md`,
+  `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+
+- **v2.18.0** — High-resolution PNG export now renders in 512×512 tiles. The
+  full-image coordinate system, sample order, supersampling and color math are
+  preserved, so tiled output is pixel-identical to a whole-frame render while
+  AA8x remains available for the Double 4K preset. CPU, CUDA and DirectX use
+  bounded tile memory and the final bitmap is assembled with exact 32-bit row
+  copies. Files: `ExportForm.cs`, `Mandelbrot.cs`, `GpuMandelbrot.cs`,
+  `DxMandelbrot.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`,
+  `.csproj`.
+
 - **v2.17.6** — Benchmark chart results are now ordered from highest to lowest
   MPixel/s, including the current measurement, so historical performance is
   easier to compare at a glance. Files: `BenchmarkForm.cs`, `TODO.md`,

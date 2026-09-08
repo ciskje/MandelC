@@ -1,15 +1,13 @@
 ﻿namespace MandelbrotViewer;
 
-/// <summary>
-/// Application version in X.Y.Z format (simplified Semantic Versioning).
-/// Bump: X = breaking change, Y = new feature, Z = fix/refactor/docs.
-/// The UI shows <see cref="Display"/>: if Z is 0 the short notation "X.Y" is used.
-/// </summary>
+// Application version in X.Y.Z format (simplified Semantic Versioning).
+// Bump: X = breaking change, Y = new feature, Z = fix/refactor/docs.
+// The UI shows Display: if Z is 0 the short notation "X.Y" is used.
 public static class AppVersion
 {
     public const int Major = 2;
-    public const int Minor = 17;
-    public const int Patch = 6;
+    public const int Minor = 18;
+    public const int Patch = 5;
 
     public static string Full => $"{Major}.{Minor}.{Patch}";
 
