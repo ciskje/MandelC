@@ -2,10 +2,10 @@ using System.Drawing.Imaging;
 
 namespace MandelbrotViewer;
 
-// Export PNG ad alta risoluzione della vista corrente: rende offscreen con il
-// motore attivo (CPU/CUDA/DirectX) alla larghezza scelta e salva il PNG.
-// Il supersampling viene calcolato a tile per mantenere limitata la memoria
-// temporanea; annullabile durante il render.
+// High-resolution PNG export of the current view: offscreen render with the
+// active engine (CPU/CUDA/DirectX) at the chosen width, saved as PNG.
+// Supersampling is computed per tile to keep temporary memory bounded;
+// cancellable during the render.
 public partial class ExportForm : Form
 {
     private const int TileSize = 512;
@@ -16,7 +16,6 @@ public partial class ExportForm : Form
     private readonly int _aa;
     private readonly bool _useCuda;
     private readonly bool _useDirectX;
-    private readonly bool _useDouble;
     private readonly bool _julia;
     private readonly double _jcx, _jcy;
     private readonly double _aspect;
@@ -30,7 +29,7 @@ public partial class ExportForm : Form
     {
         InitializeComponent();
         if (presetDefault >= 0 && presetDefault < cmbPreset.Items.Count)
-            cmbPreset.SelectedIndex = presetDefault; // screenshot: parte da Vista, tutto libero
+            cmbPreset.SelectedIndex = presetDefault; // screenshot: starts from View, all free
         Program.ApplyIcon(this);
 
         _cx = cx;
@@ -41,7 +40,9 @@ public partial class ExportForm : Form
         _aa = Math.Max(1, aa);
         _useCuda = useCuda;
         _useDirectX = engine == RenderEngine.DirectX && DxMandelbrot.IsReady;
-        _useDouble = useDouble;
+        radPrec32.Checked = !useDouble;
+        radPrec64.Checked = useDouble;
+        rowPrec.Enabled = _useCuda; // precision matters only for CUDA (CPU = double, DX = float)
         _julia = julia;
         _jcx = juliaCx;
         _jcy = juliaCy;
@@ -51,16 +52,26 @@ public partial class ExportForm : Form
         txtW.Text = _viewW0.ToString();
         txtH.Text = _viewH0.ToString();
         UpdateCustomEnabled();
-
-        string engineLabel = _useCuda ? $"CUDA {(_useDouble ? "64-bit" : "32-bit")}"
-            : _useDirectX ? "DirectX" : "CPU";
-        string modeLabel = _julia ? $"Julia c={_jcx:+0.000000;-0.000000} {_jcy:+0.000000;-0.000000}i" : "Mandelbrot";
-        lblInfo.Text = $"Motore: {engineLabel} — {modeLabel}, {_palette}, {maxIter} iterazioni. " +
-            $"Render tiled {TileSize}×{TileSize}: AA invariato anche alle alte risoluzioni.";
+        UpdateEngineLabel();
         UpdateInfo();
     }
 
-    // Risoluzione e AA richiesti: preset o caselle custom validate.
+    // CUDA precision selected in this dialog (read on the UI thread; the render
+    // worker receives a captured copy). Only enabled with the CUDA engine.
+    private bool UseDouble => radPrec64.Checked;
+
+    private void UpdateEngineLabel()
+    {
+        string engineLabel = _useCuda ? $"CUDA {(UseDouble ? "64-bit" : "32-bit")}"
+            : _useDirectX ? "DirectX" : "CPU";
+        string modeLabel = _julia ? $"Julia c={_jcx:+0.000000;-0.000000} {_jcy:+0.000000;-0.000000}i" : "Mandelbrot";
+        lblInfo.Text = $"Engine: {engineLabel} — {modeLabel}, {_palette}, {_maxIter} iterations. " +
+            $"Render tiled {TileSize}×{TileSize}: AA unchanged even at high resolutions.";
+    }
+
+    private void Prec_CheckedChanged(object? sender, EventArgs e) => UpdateEngineLabel();
+
+    // Requested resolution and AA: preset or validated custom boxes.
     private bool ResolveSettings(out int w, out int h, out int reqAa, out int effAa)
     {
         w = h = reqAa = effAa = 0;
@@ -70,14 +81,14 @@ public partial class ExportForm : Form
             case 2: w = 2560; h = 1440; break; // 2K
             case 3: w = 3840; h = 2160; break; // 4K
             case 4: w = 7680; h = 4320; break; // 8K
-            case 5: w = 7680; h = 2160; break; // doppio 4K 16:9+16:9
-            case 6: // personalizzata: validazione stretta
+            case 5: w = 7680; h = 2160; break; // double 4K 16:9+16:9
+            case 6: // custom: strict validation
                 if (!int.TryParse(txtW.Text.Trim(), out w)
                     || !int.TryParse(txtH.Text.Trim(), out h)
                     || w < 320 || w > 16384 || h < 320 || h > 16384)
                     return false;
                 break;
-            default: w = _viewW0; h = _viewH0; break; // vista corrente
+            default: w = _viewW0; h = _viewH0; break; // current view
         }
         reqAa = cmbAAExp.SelectedIndex <= 0 ? _aa : 1 << (cmbAAExp.SelectedIndex - 1);
         effAa = reqAa;
@@ -88,12 +99,12 @@ public partial class ExportForm : Form
     {
         if (!ResolveSettings(out int w, out int h, out int reqAa, out int effAa))
         {
-            lblResult.Text = "Dimensioni personalizzate: interi 320…16384 px.";
+            lblResult.Text = "Custom dimensions: integers 320…16384 px.";
             return;
         }
         double mpixel = w * (double)h / 1e6;
         lblResult.Text = $"{w}×{h} ({mpixel:0.#} MPixel), AA{effAa}x — " +
-            $"{w * (long)effAa * h * effAa / 1e6:0.#} MPixel di campioni.";
+            $"{w * (long)effAa * h * effAa / 1e6:0.#} MPixel of samples.";
     }
 
     private void CmbPreset_Changed(object? sender, EventArgs e)
@@ -116,28 +127,29 @@ public partial class ExportForm : Form
         if (_rendering) { _cts?.Cancel(); return; }
         if (!ResolveSettings(out int w, out int h, out _, out int effAa))
         {
-            lblResult.Text = "Dimensioni personalizzate: interi 320…16384 px.";
+            lblResult.Text = "Custom dimensions: integers 320…16384 px.";
             return;
         }
 
         _rendering = true;
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
-        btnStart.Text = "Annulla";
+        bool useDouble = UseDouble; // capture on the UI thread (worker must not touch controls)
+        btnStart.Text = "Cancel";
         btnClose.Enabled = false;
         progressBar.Visible = true;
-        lblResult.Text = $"Render {w}×{h} AA{effAa}x in corso…";
+        lblResult.Text = $"Rendering {w}×{h} AA{effAa}x…";
 
         try
         {
-            Bitmap? bmp = await Task.Run(() => RenderExport(w, h, effAa, token), token);
+            Bitmap? bmp = await Task.Run(() => RenderExport(w, h, effAa, useDouble, token), token);
             try
             {
                 if (IsDisposed) return;
                 token.ThrowIfCancellationRequested();
                 if (bmp == null)
                 {
-                    lblResult.Text = "Render non riuscito (DirectX non pronto?).";
+                    lblResult.Text = "Render failed (DirectX not ready?).";
                     return;
                 }
                 using var dlg = new SaveFileDialog
@@ -148,7 +160,7 @@ public partial class ExportForm : Form
                 };
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
                 bmp.Save(dlg.FileName, ImageFormat.Png);
-                lblResult.Text = $"Salvato {w}×{h} AA{effAa}x in {Path.GetFileName(dlg.FileName)}";
+                lblResult.Text = $"Saved {w}×{h} AA{effAa}x to {Path.GetFileName(dlg.FileName)}";
             }
             finally
             {
@@ -157,27 +169,27 @@ public partial class ExportForm : Form
         }
         catch (OperationCanceledException)
         {
-            lblResult.Text = "Annullato.";
+            lblResult.Text = "Cancelled.";
         }
         catch (Exception ex)
         {
-            lblResult.Text = "Errore: " + ex.Message;
+            lblResult.Text = "Error: " + ex.Message;
         }
         finally
         {
             _cts?.Dispose();
             _cts = null;
             _rendering = false;
-            btnStart.Text = "Avvia";
+            btnStart.Text = "Start";
             btnClose.Enabled = true;
             progressBar.Visible = false;
         }
     }
 
-    // Rende la vista alla risoluzione scelta col motore attivo
-    // (null se DirectX non pronto; la preview DX è sincrona e non cancellabile
-    // — la chiusura scarta il risultato).
-    private Bitmap? RenderExport(int w, int h, int aa, CancellationToken ct)
+    // Renders the view at the chosen resolution with the active engine
+    // (null when DirectX is not ready; the DX preview is synchronous and not cancellable
+    // - closing discards the result).
+    private Bitmap? RenderExport(int w, int h, int aa, bool useDouble, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var result = new Bitmap(w, h, PixelFormat.Format32bppArgb);
@@ -193,7 +205,7 @@ public partial class ExportForm : Form
                     using var tile = new Bitmap(tileW, tileH, PixelFormat.Format32bppArgb);
                     if (_useCuda)
                     {
-                        GpuMandelbrot.RenderTile(tile, _cx, _cy, _scale, _maxIter, _palette, aa, _useDouble,
+                        GpuMandelbrot.RenderTile(tile, _cx, _cy, _scale, _maxIter, _palette, aa, useDouble,
                             ct, x, y, w, h, _jcx, _jcy, _julia);
                     }
                     else if (_useDirectX)

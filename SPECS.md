@@ -1,5 +1,10 @@
 ﻿# SPECS — Mandelbrot Viewer (MandelC#)
 
+Project purpose: LLM test. This spec was written by humans as a complete,
+self-contained specification, so it can be used to recreate the application
+from scratch; the test itself is how faithfully another LLM rebuilds it.
+License: MIT (see `LICENSE`).
+
 WinForms app (.NET 8, `net8.0-windows`) that renders the Mandelbrot set
 (`z = z² + c`) with consistent smooth coloring across all engines: the tint
 depends on the escape iterations smoothed with the final module of `z`, mapped
@@ -28,6 +33,8 @@ black). Palettes: Fire, Ice, Thermal, Ocean, Purple, Desert, Forest (stops in
 - Generate menu: PNG screenshot
   (Ctrl+Shift+E: dialog from current view with View/Full HD/2K/4K/8K/
   Double 4K/Custom presets, validated dimensions 320…16384, selectable AA,
+  selectable 32-bit / 64-bit (slow) CUDA precision (own radios, enabled only
+  with CUDA; CPU is always double, DirectX always float),
   offscreen tiled render with the active engine, 512×512 working tiles and
   global coordinates/sample order preserved so the result is pixel-identical
   to a whole-frame render; AA is not reduced for large outputs), zoom video
@@ -36,7 +43,8 @@ black). Palettes: Fire, Ice, Thermal, Ocean, Purple, Desert, Forest (stops in
   proportional to the zoom so the starting point stays in frame;
   ease-out transition: fast at the start, slow at the end), 60…480 frames
   at 24/30/60 fps, selected AA (never reduced: on-chip SSAA keeps memory
-  flat, the price is render time ~k²),
+  flat, the price is render time ~k²), own 32-bit / 64-bit (slow) CUDA
+  precision radios,
   auto iterations per frame, ffmpeg H.264 (on worker, async stderr, kill on
   cancel, pad to even dimensions because the view often has odd sides) or
   PNG sequence if absent (Open button for the result)), Back to set (RealTime) (Ctrl+Shift+R: animation on the main view from the current zone to the set, 120 frames at 30 fps, Esc to stop)

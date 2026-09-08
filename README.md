@@ -78,4 +78,8 @@ dotnet publish MandelbrotViewer\MandelbrotViewer.csproj -c Release -r win-x64 --
 
 ## License
 
-Private — all rights reserved.
+MIT — see [LICENSE](LICENSE).
+
+This project is an LLM test: `SPECS.md` was written by humans as a complete,
+self-contained specification, so it can be used to recreate the application
+from scratch; the test itself is how faithfully another LLM rebuilds it.

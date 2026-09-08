@@ -2,6 +2,24 @@
 
 Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 `AGENTS.md`. The version is shown in the window title.
+- **v2.19.1** — Full English pass on the remaining Italian UI strings and
+  comments (Export/Benchmark dialogs, log window, diagnostic log, settings,
+  CLI-adjacent comments) plus English identifiers (`vista` → `viewMenu`,
+  `migliori` → `bestPerCard`/`bestPerDevice`). No behavior change. Files:
+  `ExportForm.cs`, `ExportForm.Designer.cs`, `ZoomVideoForm.Designer.cs`,
+  `BenchmarkForm.cs`, `BenchmarkForm.Designer.cs`, `BenchmarkCsv.cs`,
+  `BenchmarkProgress.cs`, `RenderEngine.cs`, `Settings.cs`, `LogForm.cs`,
+  `MandelbrotForm.cs`, `Diagnostics.cs`, `TODO.md`, `SPECS.md`,
+  `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.19.0** — Generate dialogs with own CUDA precision: Export PNG and Zoom
+  video now carry 32-bit / 64-bit (slow) radios (default from the main window,
+  enabled only with CUDA; the worker receives a captured copy, never touching
+  controls). MIT license (`LICENSE`, copyright Francesco Ferrara) with the
+  LLM-test project statement in README and SPECS (human-written spec usable to
+  recreate the app; the test is how faithfully another LLM rebuilds it).
+  Files: `ExportForm.cs`, `ExportForm.Designer.cs`, `ZoomVideoForm.cs`,
+  `ZoomVideoForm.Designer.cs`, `LICENSE` (new), `README.md`, `TODO.md`,
+  `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 - **v2.18.5** — Generic Q&A moved out of `TODO.md` into new `QUESTIONS.md`
   (GPU architecture, 5070 Ti work split, hardware comparison, ffmpeg/PATH,
   updates audit, launch, AGENTS.md meta) so the todo stays strictly about the

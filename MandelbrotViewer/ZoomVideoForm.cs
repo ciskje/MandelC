@@ -15,7 +15,6 @@ public partial class ZoomVideoForm : Form
     private readonly int _aa;
     private readonly bool _useCuda;
     private readonly bool _useDirectX;
-    private readonly bool _useDouble;
     private readonly bool _julia;
     private readonly double _jcx, _jcy;
     private readonly int _viewW, _viewH;
@@ -37,7 +36,9 @@ public partial class ZoomVideoForm : Form
         _aa = Math.Max(1, aa);
         _useCuda = useCuda;
         _useDirectX = engine == RenderEngine.DirectX && DxMandelbrot.IsReady;
-        _useDouble = useDouble;
+        radPrec32.Checked = !useDouble;
+        radPrec64.Checked = useDouble;
+        rowPrec.Enabled = _useCuda; // precision matters only for CUDA (CPU = double, DX = float)
         _julia = julia;
         _jcx = juliaCx;
         _jcy = juliaCy;
@@ -53,7 +54,7 @@ public partial class ZoomVideoForm : Form
 
     private void UpdateInfo()
     {
-        string engineLabel = _useCuda ? $"CUDA {(_useDouble ? "64-bit" : "32-bit")}"
+        string engineLabel = _useCuda ? $"CUDA {(UseDouble ? "64-bit" : "32-bit")}"
             : _useDirectX ? "DirectX" : "CPU";
         string mode = _julia ? "Julia" : "Mandelbrot";
         int effAa = EffectiveAa();
@@ -63,6 +64,12 @@ public partial class ZoomVideoForm : Form
     }
 
     private void CmbAAVid_Changed(object? sender, EventArgs e) => UpdateInfo();
+
+    // CUDA precision selected in this dialog (read on the UI thread; the render
+    // worker receives a captured copy). Only enabled with the CUDA engine.
+    private bool UseDouble => radPrec64.Checked;
+
+    private void Prec_CheckedChanged(object? sender, EventArgs e) => UpdateInfo();
 
     // Effective AA: always the selected one (no auto-reduction).
     private int EffectiveAa() => SelectedAa();
@@ -111,6 +118,7 @@ public partial class ZoomVideoForm : Form
         _rendering = true;
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
+        bool useDouble = UseDouble; // capture on the UI thread (worker must not touch controls)
         var progress = new Progress<int>(i =>
         {
             progressBar.Value = Math.Clamp((i + 1) * 100 / frames, 0, 100);
@@ -129,7 +137,7 @@ public partial class ZoomVideoForm : Form
         try
         {
             Directory.CreateDirectory(tmpDir);
-            await Task.Run(() => RenderFrames(tmpDir, frames, startCx, startCy, startScale, effAa, progress, token), token);
+            await Task.Run(() => RenderFrames(tmpDir, frames, startCx, startCy, startScale, effAa, useDouble, progress, token), token);
             token.ThrowIfCancellationRequested();
 
             string? ffmpeg = FindFfmpeg();
@@ -171,7 +179,7 @@ public partial class ZoomVideoForm : Form
     }
 
     private void RenderFrames(string tmpDir, int frames,
-        double startCx, double startCy, double startScale, int effAa,
+        double startCx, double startCy, double startScale, int effAa, bool useDouble,
         IProgress<int> progress, CancellationToken ct)
     {
         for (int i = 0; i < frames; i++)
@@ -179,7 +187,7 @@ public partial class ZoomVideoForm : Form
             ct.ThrowIfCancellationRequested();
             FrameAt(i, frames, startCx, startCy, startScale,
                 out double cx, out double cy, out double scale, out int maxIter);
-            using var bmp = RenderFrame(cx, cy, scale, maxIter, effAa, ct);
+            using var bmp = RenderFrame(cx, cy, scale, maxIter, effAa, useDouble, ct);
             if (bmp == null) throw new InvalidOperationException("Render failed (DirectX not ready?).");
             bmp.Save(Path.Combine(tmpDir, $"f{i:0000}.png"),
                 System.Drawing.Imaging.ImageFormat.Png);
@@ -203,7 +211,7 @@ public partial class ZoomVideoForm : Form
         maxIter = Mandelbrot.AutoIterForScale(scale);
     }
 
-    private Bitmap? RenderFrame(double cx, double cy, double scale, int maxIter, int effAa, CancellationToken ct)
+    private Bitmap? RenderFrame(double cx, double cy, double scale, int maxIter, int effAa, bool useDouble, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (_useCuda)
@@ -211,7 +219,7 @@ public partial class ZoomVideoForm : Form
             var bmp = new Bitmap(_viewW, _viewH, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
             try
             {
-                GpuMandelbrot.Render(bmp, cx, cy, scale, maxIter, _palette, effAa, _useDouble, ct, _jcx, _jcy, _julia);
+                GpuMandelbrot.Render(bmp, cx, cy, scale, maxIter, _palette, effAa, useDouble, ct, _jcx, _jcy, _julia);
                 return bmp;
             }
             catch

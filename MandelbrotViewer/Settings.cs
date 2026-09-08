@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace MandelbrotViewer;
 
-// Impostazioni persistite tra un lancio e l'altro
+// Settings persisted between launches
 // (%APPDATA%\MandelbrotViewer\settings.json).
 public sealed class AppSettings
 {
@@ -11,15 +11,15 @@ public sealed class AppSettings
     public int Palette { get; set; }
     public int AaIndex { get; set; }
     public string Engine { get; set; } = nameof(RenderEngine.Cuda);
-    // Scheda video scelta ("" = auto).
+    // Chosen video card ("" = auto).
     public string Gpu { get; set; } = "";
-    // Precisione CUDA: true = single 32-bit (float), false = double 64-bit (default).
+    // CUDA precision: true = single 32-bit (float), false = double 64-bit (default).
     public bool Single { get; set; }
-    // Modalità Julia attiva.
+    // Active Julia mode.
     public bool Julia { get; set; }
-    // Costante c di Julia (parte reale).
+    // Julia constant c (real part).
     public double Jcx { get; set; } = -0.7;
-    // Costante c di Julia (parte immaginaria).
+    // Julia constant c (imaginary part).
     public double Jcy { get; set; } = 0.27015;
     public int WinX { get; set; }
     public int WinY { get; set; }
@@ -42,13 +42,13 @@ public sealed class AppSettings
         }
         catch
         {
-            return new AppSettings(); // file mancante o corrotto: default
+            return new AppSettings(); // missing or corrupt file: defaults
         }
     }
 
     public void Save()
     {
-        // Validazione minima: mai persistere valori assurdi.
+        // Minimal validation: never persist absurd values.
         MaxIter = Math.Clamp(MaxIter, 50, 50000);
 
         string path = FilePath;

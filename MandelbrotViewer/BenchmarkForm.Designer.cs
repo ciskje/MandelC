@@ -46,7 +46,7 @@ partial class BenchmarkForm
         this.lblInfo.Padding = new Padding(12, 10, 12, 0);
         this.lblInfo.ForeColor = System.Drawing.Color.DimGray;
 
-        // lblResult: il numero del test, in grande
+        // lblResult: the test number, large
         this.lblResult.Dock = DockStyle.Fill;
         this.lblResult.Text = "—";
         this.lblResult.Font = new System.Drawing.Font("Segoe UI", 24f, System.Drawing.FontStyle.Bold);
@@ -60,7 +60,7 @@ partial class BenchmarkForm
         this.lblDetail.ForeColor = System.Drawing.Color.DimGray;
         this.lblDetail.Font = new System.Drawing.Font("Segoe UI", 8f);
 
-        // previewBox: primo frame della zona di benchmark (per CUDA/CPU)
+        // previewBox: first frame of the benchmark zone (for CUDA/CPU)
         this.previewBox.Dock = DockStyle.Top;
         this.previewBox.Height = 190;
         this.previewBox.BackColor = System.Drawing.Color.Black;
@@ -90,20 +90,20 @@ partial class BenchmarkForm
         // btnStart
         this.btnStart.Dock = DockStyle.Right;
         this.btnStart.Width = 90;
-        this.btnStart.Text = "Avvia";
+        this.btnStart.Text = "Start";
         this.btnStart.Click += new EventHandler(this.BtnStart_Click);
 
         // btnClose
         this.btnClose.Dock = DockStyle.Right;
         this.btnClose.Width = 90;
-        this.btnClose.Text = "Chiudi";
+        this.btnClose.Text = "Close";
         this.btnClose.DialogResult = DialogResult.Cancel;
         this.btnClose.Click += new EventHandler(this.BtnClose_Click);
 
         // btnCsv
         this.btnCsv.Dock = DockStyle.Right;
         this.btnCsv.Width = 108;
-        this.btnCsv.Text = "Esporta CSV";
+        this.btnCsv.Text = "Export CSV";
         this.btnCsv.Enabled = false;
         this.btnCsv.Click += new EventHandler(this.BtnCsv_Click);
 

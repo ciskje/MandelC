@@ -119,7 +119,7 @@ internal static class Diagnostics
             return;
         }
 
-        var migliori = new List<(string Short, double Best)>();
+        var bestPerCard = new List<(string Short, double Best)>();
         foreach (string card in cards)
         {
             string shortName = DxMandelbrot.ShortAdapterName(card);
@@ -169,7 +169,7 @@ internal static class Diagnostics
 
             if (best > 0)
             {
-                migliori.Add((shortName, best));
+                bestPerCard.Add((shortName, best));
                 Console.WriteLine($"  BEST: {best:0.#} MPixel/s");
             }
             else
@@ -180,7 +180,7 @@ internal static class Diagnostics
 
         Console.WriteLine();
         Console.WriteLine("=== Summary (best per card, MPixel/s) ===");
-        foreach (var (shortName, best) in migliori)
+        foreach (var (shortName, best) in bestPerCard)
             Console.WriteLine($"  {shortName}: {best:0.#}");
     }
 
@@ -208,7 +208,7 @@ internal static class Diagnostics
             return;
         }
 
-        var migliori = new List<(string Short, double Best32, double Best64)>();
+        var bestPerDevice = new List<(string Short, double Best32, double Best64)>();
         foreach (string device in devices)
         {
             string shortName = device.Replace("NVIDIA GeForce ", "").Trim();
@@ -248,7 +248,7 @@ internal static class Diagnostics
 
             if (best32 > 0 || best64 > 0)
             {
-                migliori.Add((shortName, best32, best64));
+                bestPerDevice.Add((shortName, best32, best64));
                 Console.WriteLine($"  BEST 32-bit: {best32:0.#} MPixel/s");
                 Console.WriteLine($"  BEST 64-bit: {best64:0.#} MPixel/s");
             }
@@ -260,7 +260,7 @@ internal static class Diagnostics
 
         Console.WriteLine();
         Console.WriteLine("=== Summary (best per device, MPixel/s) ===");
-        foreach (var (shortName, best32, best64) in migliori)
+        foreach (var (shortName, best32, best64) in bestPerDevice)
             Console.WriteLine($"  {shortName}: 32-bit {best32:0.#} | 64-bit {best64:0.#}");
     }
 

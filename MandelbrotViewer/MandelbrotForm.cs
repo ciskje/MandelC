@@ -512,7 +512,7 @@ public partial class MandelbrotForm : Form
     // the favorites list is dynamic).
     private void BuildViewMenu()
     {
-        var vista = new ToolStripMenuItem("&View");
+        var viewMenu = new ToolStripMenuItem("&View");
         _backItem = new ToolStripMenuItem("Back", null, (s, e) => GoBack())
         {
             ShortcutKeys = Keys.Alt | Keys.Left,
@@ -545,11 +545,11 @@ public partial class MandelbrotForm : Form
             ToolTipText = "Delete a favorite zone file",
         };
         _removeFavMenu.DropDownOpening += (s, e) => RebuildRemoveFavMenu();
-        vista.DropDownItems.AddRange(new ToolStripItem[] {
+        viewMenu.DropDownItems.AddRange(new ToolStripItem[] {
             _backItem, _forwardItem, new ToolStripSeparator(),
             _juliaItem, new ToolStripSeparator(),
             addFav, _favoritesMenu, _removeFavMenu });
-        menuStrip.Items.Insert(1, vista);
+        menuStrip.Items.Insert(1, viewMenu);
         UpdateHistoryMenu();
     }
 
@@ -857,8 +857,8 @@ public partial class MandelbrotForm : Form
         sb.AppendLine($"Runtime .NET: {Environment.Version}");
         sb.AppendLine();
         sb.AppendLine("=== Engine ===");
-        sb.AppendLine($"Selezionato: {RenderEngineInfo.DisplayName(_engine)}");
-        sb.AppendLine($"In uso:     {EngineDescription()}");
+        sb.AppendLine($"Selected: {RenderEngineInfo.DisplayName(_engine)}");
+        sb.AppendLine($"In use:   {EngineDescription()}");
         sb.AppendLine();
         sb.AppendLine("=== DirectX (D3D11) ===");
         sb.AppendLine($"Ready:        {(DxMandelbrot.IsReady ? "yes" : "NO")}");
@@ -967,7 +967,7 @@ public partial class MandelbrotForm : Form
                 _engine = RenderEngine.Cpu;
                 radioCpu.Checked = true;
                 ApplyEngineVisibility();
-                lblStatus.Text = $"CUDA su '{name}': {GpuMandelbrot.LastError} — passo a CPU";
+                lblStatus.Text = $"CUDA on '{name}': {GpuMandelbrot.LastError} — switching to CPU";
             }
         }
         else

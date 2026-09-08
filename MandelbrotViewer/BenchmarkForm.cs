@@ -1,15 +1,15 @@
-﻿namespace MandelbrotViewer;
+namespace MandelbrotViewer;
 
-// Benchmark standard: zona fissa ad alte iterazioni per 8 secondi, misura le
-// iterazioni al secondo del motore selezionato (con fallback CPU).
+// Standard benchmark: fixed zone at high iterations for 8 seconds, measures the
+// iterations per second of the selected engine (with CPU fallback).
 public partial class BenchmarkForm : Form
 {
-    // Parametri standard del test (condivisi, così i risultati sono confrontabili):
-    // vivono in BenchmarkStandard, condivisi anche dalla CLI --bench-dx.
+    // Standard test parameters (shared, so results are comparable):
+    // they live in BenchmarkStandard, also shared with the --bench-dx CLI.
     private const int BW = BenchmarkStandard.Width;
     private const int BH = BenchmarkStandard.Height;
     private static int BMaxIter => BenchmarkStandard.MaxIter;
-    private const int BAA = BenchmarkStandard.Aa; // il test gira in AA 1x
+    private const int BAA = BenchmarkStandard.Aa; // the test runs at AA 1x
     private const double BCx = BenchmarkStandard.CenterX;
     private const double BCy = BenchmarkStandard.CenterY;
     private const double BScale = BenchmarkStandard.Scale;
@@ -36,15 +36,15 @@ public partial class BenchmarkForm : Form
         _engine = _useDirectX ? RenderEngine.DirectX : _useCuda ? RenderEngine.Cuda : RenderEngine.Cpu;
         string note = engine switch
         {
-            RenderEngine.Cuda when !_useCuda => " (CUDA non pronta, uso CPU)",
-            RenderEngine.DirectX when !_useDirectX => " (DirectX non pronto, uso CPU)",
+            RenderEngine.Cuda when !_useCuda => " (CUDA not ready, using CPU)",
+            RenderEngine.DirectX when !_useDirectX => " (DirectX not ready, using CPU)",
             _ => "",
         };
         string precision = _useCuda ? $"CUDA {(_useDouble ? "64-bit" : "32-bit")}" : _useDirectX ? "DirectX float" : "CPU";
-        lblInfo.Text = $"Motore: {RenderEngineInfo.DisplayName(_engine)}{note}\n" +
-            $"Zona {BW}x{BH} {BAA}x AA = {BW * BAA}x{BH * BAA} campioni elementari senza media, " +
-            $"{BMaxIter} iterazioni max, scala {BScale}, precisione {precision} — " +
-            $"durata minima {Budget.TotalSeconds:F0} secondi (DirectX offscreen, senza Present).";
+        lblInfo.Text = $"Engine: {RenderEngineInfo.DisplayName(_engine)}{note}\n" +
+            $"Zone {BW}x{BH} {BAA}x AA = {BW * BAA}x{BH * BAA} elementary samples without averaging, " +
+            $"{BMaxIter} max iterations, scale {BScale}, precision {precision} — " +
+            $"minimum duration {Budget.TotalSeconds:F0} seconds (DirectX offscreen, no Present).";
         lblResult.Text = "—";
         chartPanel.Invalidate();
     }
@@ -75,16 +75,16 @@ public partial class BenchmarkForm : Form
 
         _running = true;
         _cts = new CancellationTokenSource();
-        btnStart.Text = "Annulla";
+        btnStart.Text = "Cancel";
         btnClose.Enabled = false;
         lblResult.Text = "…";
         lblDetail.Text = "";
         lblLive.Text = "0%  |  —";
         lblLive.Refresh();
 
-        // Primo frame della zona di benchmark reso visibile anche per i motori
-        // che non disegnano su una bitmap nella finestra Benchmark: DirectX rende
-        // offscreen (colored) e lo mostra in previewBox, come CUDA/CPU.
+        // First frame of the benchmark zone made visible also for engines
+        // that do not draw on a bitmap in the Benchmark window: DirectX renders
+        // offscreen (colored) and shows it in previewBox, like CUDA/CPU.
         if (_useDirectX)
         {
             try
@@ -157,12 +157,12 @@ public partial class BenchmarkForm : Form
         }
         catch (OperationCanceledException)
         {
-            lblResult.Text = "Annullato";
+            lblResult.Text = "Cancelled";
         }
         catch (Exception ex)
         {
             AppLog.Add("Benchmark " + (_useDirectX ? "DirectX" : (_useCuda ? "CUDA" : "CPU")) + ": " + ex.Message);
-            lblResult.Text = "Errore";
+            lblResult.Text = "Error";
             lblDetail.Text = ex.Message;
             lblLive.Text = "";
             chartPanel.Invalidate();
@@ -172,7 +172,7 @@ public partial class BenchmarkForm : Form
             _cts?.Dispose();
             _cts = null;
             _running = false;
-            btnStart.Text = "Avvia";
+            btnStart.Text = "Start";
             btnClose.Enabled = true;
         }
     }
@@ -258,7 +258,7 @@ public partial class BenchmarkForm : Form
 
     private void BtnClose_Click(object? sender, EventArgs e) => Close();
 
-    // Accoda il risultato misurato a un CSV (una riga per misura).
+    // Appends the measured result to a CSV (one row per measurement).
     private void BtnCsv_Click(object? sender, EventArgs e)
     {
         using var dlg = new SaveFileDialog
@@ -273,11 +273,11 @@ public partial class BenchmarkForm : Form
             var (engine, device, precision) = LastResultId();
             BenchmarkCsv.AppendRow(dlg.FileName, engine, device, precision,
                 run: 1, _lastFrames, _lastSeconds, _measuredMpixel);
-            lblLive.Text = $"CSV: riga accodata a {Path.GetFileName(dlg.FileName)}";
+            lblLive.Text = $"CSV: row appended to {Path.GetFileName(dlg.FileName)}";
         }
         catch (Exception ex)
         {
-            lblLive.Text = $"CSV fallito: {ex.Message}";
+            lblLive.Text = $"CSV failed: {ex.Message}";
         }
     }
 
@@ -290,9 +290,9 @@ public partial class BenchmarkForm : Form
         return ("CPU", Diagnostics.CpuName(), "double");
     }
 
-    // Primo frame della zona di benchmark (960x540, AA1x) reso visibile per i
-    // motori che non disegnano su una swapchain (CUDA e CPU): mostra la zona
-    // testata, come DirectX fa già con il primo frame sulla swapchain.
+    // First frame of the benchmark zone (960x540, AA1x) made visible for the
+    // engines that do not draw on a swapchain (CUDA and CPU): shows the tested
+    // zone, as DirectX already does with the first frame on the swapchain.
     private Bitmap? RenderBenchmarkPreview(CancellationToken ct)
     {
         var bmp = new Bitmap(BW, BH, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
@@ -311,12 +311,12 @@ public partial class BenchmarkForm : Form
         }
     }
 
-    // Benchmark DirectX standardizzato offscreen: rende la griglia dei campioni
-    // elementari (960x540 AA1x) con lo shader solo-iterazioni su
-    // una render target in memoria, senza media dei campioni e senza Present.
-    // Il completamento dei frame è rilevato con event query: il lavoro per frame
-    // è quindi identico a quello dei benchmark CUDA e CPU, e DWM/copia inter-GPU
-    // non falsano le schede senza monitor.
+    // Standardized offscreen DirectX benchmark: renders the elementary-samples grid
+    // (960x540 AA1x) with the iterations-only shader on
+    // an in-memory render target, with no sample averaging and no Present.
+    // Frame completion is detected with event queries: the per-frame work
+    // is therefore identical to the CUDA and CPU benchmarks, and DWM/cross-GPU copy
+    // do not skew cards without a monitor.
     private static async Task<(double Seconds, int Frames)> BenchmarkDirectX(IProgress<BenchmarkProgress> progress, CancellationToken ct)
     {
         int gridW = BW * BAA;

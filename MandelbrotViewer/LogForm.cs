@@ -1,11 +1,11 @@
 namespace MandelbrotViewer;
 
-// Dialog di sola lettura per il log/diagnostica, con pulsante per copiare negli appunti.
+// Read-only dialog for the log/diagnostics, with a copy-to-clipboard button.
 internal sealed class LogForm : Form
 {
     public LogForm(string text)
     {
-        Text = "Log / Diagnostica";
+        Text = "Log / Diagnostics";
         Program.ApplyIcon(this);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
@@ -26,12 +26,12 @@ internal sealed class LogForm : Form
             Text = text,
         };
 
-        var closeBtn = new Button { Text = "Chiudi", Dock = DockStyle.Right, Width = 90, DialogResult = DialogResult.OK };
-        var copyBtn = new Button { Text = "Copia negli appunti", Dock = DockStyle.Right, Width = 165 };
+        var closeBtn = new Button { Text = "Close", Dock = DockStyle.Right, Width = 90, DialogResult = DialogResult.OK };
+        var copyBtn = new Button { Text = "Copy to clipboard", Dock = DockStyle.Right, Width = 165 };
         copyBtn.Click += (s, e) =>
         {
             Clipboard.SetText(txt.Text);
-            copyBtn.Text = "Copiato!";
+            copyBtn.Text = "Copied!";
         };
 
         var bottom = new Panel { Dock = DockStyle.Bottom, Height = 40, Padding = new Padding(6) };
