@@ -1,5 +1,6 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] Refresh `SPECS.md` to describe only the current application — completed
 - [x] Verify AGENTS.md rules still valid (dotnet in PATH?) — completed
 - [x] Remove stale test/repo line from AGENTS.md Git section — completed
 - [x] README purpose blockquote at top (docs, no version bump) — completed
