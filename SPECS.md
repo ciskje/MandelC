@@ -164,7 +164,7 @@ frames × samples/frame / seconds.
 
 See [CHANGELOG.md](CHANGELOG.md).
 
-Release v2.17.6 is published on GitHub with the self-contained
+Release v2.18.5 is published on GitHub with the self-contained
 `MandelbrotViewer.exe` asset; the README links to the latest release download.
 
 ## Technical notes

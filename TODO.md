@@ -1,5 +1,6 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [ ] Publish v2.18.5 exe in GitHub Releases + README download check — pending
 - [x] Question: where the blocks/warps split is in the program — completed (no code change, see QUESTIONS.md)
 - [x] v2.18.5: Move generic Q&A out of TODO.md into QUESTIONS.md — completed
 - [x] Question: generic questions in .md files not about the program source — completed (no code change, see QUESTIONS.md)
