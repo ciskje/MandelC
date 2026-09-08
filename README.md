@@ -1,5 +1,9 @@
 # Mandelbrot Viewer (MandelC#)
 
+> This project is an LLM test: `SPECS.md` was written by humans as a complete,
+> self-contained specification, so it can be used to recreate the application
+> from scratch; the test itself is how faithfully another LLM rebuilds it.
+
 Interactive Mandelbrot set viewer built with C# / WinForms (.NET 8, Windows only).
 
 ![Screenshot](screen1.png)
@@ -79,7 +83,3 @@ dotnet publish MandelbrotViewer\MandelbrotViewer.csproj -c Release -r win-x64 --
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-This project is an LLM test: `SPECS.md` was written by humans as a complete,
-self-contained specification, so it can be used to recreate the application
-from scratch; the test itself is how faithfully another LLM rebuilds it.
