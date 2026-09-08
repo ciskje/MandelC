@@ -46,6 +46,9 @@ must be written in **English** from now on.
   - `Z` (patch): fixes, refactors, docs, minor changes.
   - `Y` (minor): new backward-compatible features.
   - `X` (major): breaking change / rewrites.
+- Exception: `.md`/docs-only changes (README, TODO, SPECS, CHANGELOG,
+  QUESTIONS) do NOT bump the version; they ride along with the next
+  code version.
 - On each bump: update `AppVersion.cs` + `.csproj` and add an entry in
   `CHANGELOG.md`.
 
