@@ -1,5 +1,8 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] Verify AGENTS.md rules still valid (dotnet in PATH?) — completed
+- [x] Remove stale test/repo line from AGENTS.md Git section — completed
+- [x] README purpose blockquote at top (docs, no version bump) — completed
 - [x] Publish v2.19.1 exe in GitHub Releases + README download check — completed
 - [x] v2.19.1: Translate remaining Italian UI strings/comments to English — completed
 - [x] v2.19.0: Precision radios 32-bit/64-bit (slow) in all Generate dialogs — completed

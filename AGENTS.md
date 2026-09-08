@@ -16,21 +16,20 @@ must be written in **English** from now on.
 
 ## Toolchain .NET
 
-- `dotnet` is NOT in PATH. SDK 8.0 installed user-level at `~\.dotnet\dotnet.exe`.
-- In PowerShell always use the full path:
+- `dotnet` resolves via PATH (user-level install under `~\.dotnet`, SDK 8.0).
+- If PATH ever loses it, use the full path (always quote it, the path contains `#`).
   `& "$env:USERPROFILE\.dotnet\dotnet.exe" <command>`
 - Target: `net8.0-windows` + `UseWindowsForms`. Windows only.
-- The path contains `#`: always quote paths in scripts/commands.
 
 ## Commands
 
 ```powershell
 # Build
-& "$env:USERPROFILE\.dotnet\dotnet.exe" build "MandelbrotViewer\MandelbrotViewer.csproj"
+dotnet build "MandelbrotViewer\MandelbrotViewer.csproj"
 # Debug run
-& "$env:USERPROFILE\.dotnet\dotnet.exe" run --project "MandelbrotViewer"
+dotnet run --project "MandelbrotViewer"
 # Publish self-contained (regenerates published\, ~150 MB, no installed runtime required)
-& "$env:USERPROFILE\.dotnet\dotnet.exe" publish "MandelbrotViewer\MandelbrotViewer.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "published"
+dotnet publish "MandelbrotViewer\MandelbrotViewer.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "published"
 ```
 
 - End-user launch: run the published file in `published\` if present;
@@ -61,9 +60,11 @@ must be written in **English** from now on.
 
 ## Git
 
-- The project lives in the `test/` repo (root above `MandelC#/`). No nested repo.
 - Commit scope: only files in `MandelC#/`. Never commit secrets.
 - Ignored via `MandelC#/.gitignore`: `bin/`, `obj/`, `published/` (regenerable).
 - Concise commit messages in English starting with the version number
   (e.g. `v2.0.1: DirectX realtime, benchmark, ...`).
 - Commit/push only on explicit user request.
+- On every push: publish the self-contained exe, attach it to the GitHub
+  Release of the current version, and update the README download section
+  (version, asset name, size) plus the SPECS.md release line.
