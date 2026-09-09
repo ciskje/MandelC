@@ -37,8 +37,11 @@ High-resolution PNG export uses the selected antialiasing without automatic redu
 
 ### CPU
 
-- Always available and uses double precision.
-- Uses parallel computation and locked bitmap access.
+- Always available. Precision follows the 32/64-bit setting like the CUDA
+  engine, with no fallback: 64-bit renders everything in double precision,
+  32-bit renders everything in single precision (Mandelbrot and Julia, any
+  zoom; less precise at deep zoom, by user choice). Default is 64-bit.
+- Uses parallel SIMD computation and locked bitmap access.
 - Supports Mandelbrot and Julia rendering, supersampling, cancellation, and tiled export.
 
 ### CUDA
@@ -72,9 +75,9 @@ A zone stores center, scale, iterations, Julia mode, and Julia constant.
 
 ### Generate
 
-PNG export uses the current view, Full HD, 2K, 4K, 8K, Double 4K, or Custom presets. Custom width and height must be integers from 320 through 16384. The dialog selects antialiasing and, when CUDA is active, 32-bit or 64-bit precision. CPU export always uses double precision and DirectX export always uses float precision. Rendering is cancellable and uses 512x512 working tiles.
+PNG export uses the current view, Full HD, 2K, 4K, 8K, Double 4K, or Custom presets. Custom width and height must be integers from 320 through 16384. The dialog selects antialiasing and, when CUDA or CPU is active, 32-bit or 64-bit precision. CPU and CUDA export follow the dialog precision choice; DirectX export always uses float precision. Rendering is cancellable and uses 512x512 working tiles.
 
-Zoom video export renders a transition from the current view to the full set and is unavailable when already at the full set. It keeps the starting point in frame, uses logarithmic scale interpolation with ease-out timing, and computes automatic iterations for every frame. The dialog supports 60...480 frames, 24/30/60 fps, selected antialiasing, and the CUDA precision choice. Frames are rendered at the view resolution.
+Zoom video export renders a transition from the current view to the full set and is unavailable when already at the full set. It keeps the starting point in frame, uses logarithmic scale interpolation with ease-out timing, and computes automatic iterations for every frame. The dialog supports 60...480 frames, 24/30/60 fps, selected antialiasing, and the CUDA/CPU precision choice. Frames are rendered at the view resolution.
 
 When `ffmpeg` is available on `PATH`, frames are encoded as H.264 MP4. Odd dimensions are padded to even dimensions for `yuv420p`. Without `ffmpeg`, the PNG sequence is retained and can be opened from the dialog. Encoding runs off the UI thread and is cancellable.
 
@@ -112,7 +115,7 @@ The benchmark measures the same iterations-only workload for all engines:
 
 The CPU benchmark accumulates escape iterations. CUDA uses an iterations-only kernel with reused buffers and batched synchronization. DirectX uses an offscreen iterations-only shader with event-query completion tracking. Cancellation, timeout, and device-removal failures are reported instead of being treated as successful measurements.
 
-The CPU benchmark runs in double precision by default; `--bench-cpu float` runs the float workload instead (own history, like CUDA 32-bit vs 64-bit). The benchmark window always runs the CPU double workload.
+The CPU benchmark runs in double precision by default; `--bench-cpu float` runs the float workload instead (own history, like CUDA 32-bit vs 64-bit). The benchmark window follows the precision setting for CPU and CUDA (64-bit double by default).
 
 The benchmark window renders a colored preview before measuring, reports progress approximately once per second, and displays the current result with stored history. Results are ordered by MPixel/s. CSV export writes one row per run containing timestamp, engine, device, precision, run, frame, seconds, and MPixel/s.
 
@@ -140,9 +143,10 @@ table with linear interpolation (v2.19.3; output within 1 LSB of the exact
 coloring), skips known-interior points via the main cardioid + period-2 bulb
 test (Mandelbrot mode only, also applied to the CPU benchmark), and writes the
 bitmap directly without an intermediate buffer. Since v2.19.4 the escape loop
-runs on SIMD vectors (double is bit-identical to scalar; float is used for
-Mandelbrot views at scale 1e-3 and above, with rare boundary-pixel differences
-vs double) and rows are scheduled in chunks. Since v2.20.1 the GPU render kernels
+runs on SIMD vectors and rows are scheduled in chunks. Since v2.21.0 the CPU
+precision is explicit (32/64-bit setting, no fallback): 64-bit is double
+everywhere (bit-identical to scalar), 32-bit is float everywhere including
+Julia and deep zoom. Since v2.20.1 the GPU render kernels
 sample the same cached 4096-entry palette table (CUDA device buffer, DirectX
 texture with linear filtering) and skip known-interior points via the
 cardioid/bulb test in Mandelbrot mode; GPU benchmark kernels are

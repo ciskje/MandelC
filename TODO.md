@@ -1,5 +1,11 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [ ] Push v2.21.0 with published exe in GitHub Release + README download check — pending
+- [ ] Update screen1.png with a real startup screenshot — pending
+- [x] v2.21.0 Home button with arrow + "Home" text — completed
+- [x] v2.21.0 Home button first in row (house glyph idea) — cancelled (superseded by arrow + "Home" text below)
+- [x] v2.21.0 CPU honors the 32/64-bit UI setting like other engines (no fallback) — completed
+- [x] Recheck all .md files against the current code — completed (docs only: CPU float path in SPECS/README, export precision, CLI float flag; no version bump)
 - [x] Lightweight screen2.jpg instead of 59 MB screen2.png — completed (docs only, no version bump)
 - [x] Add screen2.png to README — completed (docs only, no version bump)
 - [x] v2.20.1 WP3 GPU palette LUT (CUDA device table, DX texture LUT) — completed

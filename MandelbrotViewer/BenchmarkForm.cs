@@ -40,7 +40,7 @@ public partial class BenchmarkForm : Form
             RenderEngine.DirectX when !_useDirectX => " (DirectX not ready, using CPU)",
             _ => "",
         };
-        string precision = _useCuda ? $"CUDA {(_useDouble ? "64-bit" : "32-bit")}" : _useDirectX ? "DirectX float" : "CPU";
+        string precision = _useCuda ? $"CUDA {(_useDouble ? "64-bit" : "32-bit")}" : _useDirectX ? "DirectX float" : $"CPU {(_useDouble ? "64-bit" : "32-bit")}";
         lblInfo.Text = $"Engine: {RenderEngineInfo.DisplayName(_engine)}{note}\n" +
             $"Zone {BW}x{BH} {BAA}x AA = {BW * BAA}x{BH * BAA} elementary samples without averaging, " +
             $"{BMaxIter} max iterations, scale {BScale}, precision {precision} — " +
@@ -140,7 +140,9 @@ public partial class BenchmarkForm : Form
                 ( _, seconds, frames) = await Task.Run(() =>
                     _useCuda
                         ? GpuMandelbrot.BenchmarkGpu(BCx, BCy, BScale, BW, BH, BMaxIter, BAA, _useDouble, Budget, progress, _cts.Token)
-                        : Mandelbrot.BenchmarkCpu(BCx, BCy, BScale, BW, BH, BMaxIter, BAA, Budget, progress, _cts.Token),
+                        : _useDouble
+                            ? Mandelbrot.BenchmarkCpu(BCx, BCy, BScale, BW, BH, BMaxIter, BAA, Budget, progress, _cts.Token)
+                            : Mandelbrot.BenchmarkCpuFloat(BCx, BCy, BScale, BW, BH, BMaxIter, BAA, Budget, progress, _cts.Token),
                     _cts.Token);
             }
 

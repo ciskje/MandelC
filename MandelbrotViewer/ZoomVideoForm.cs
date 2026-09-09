@@ -15,6 +15,7 @@ public partial class ZoomVideoForm : Form
     private readonly int _aa;
     private readonly bool _useCuda;
     private readonly bool _useDirectX;
+    private readonly bool _useCpu;
     private readonly bool _julia;
     private readonly double _jcx, _jcy;
     private readonly int _viewW, _viewH;
@@ -36,9 +37,10 @@ public partial class ZoomVideoForm : Form
         _aa = Math.Max(1, aa);
         _useCuda = useCuda;
         _useDirectX = engine == RenderEngine.DirectX && DxMandelbrot.IsReady;
+        _useCpu = !_useCuda && !_useDirectX;
         radPrec32.Checked = !useDouble;
         radPrec64.Checked = useDouble;
-        rowPrec.Enabled = _useCuda; // precision matters only for CUDA (CPU = double, DX = float)
+        rowPrec.Enabled = _useCuda || _useCpu; // precision matters for CUDA and CPU (DX = float)
         _julia = julia;
         _jcx = juliaCx;
         _jcy = juliaCy;
@@ -55,7 +57,7 @@ public partial class ZoomVideoForm : Form
     private void UpdateInfo()
     {
         string engineLabel = _useCuda ? $"CUDA {(UseDouble ? "64-bit" : "32-bit")}"
-            : _useDirectX ? "DirectX" : "CPU";
+            : _useDirectX ? "DirectX" : $"CPU {(UseDouble ? "64-bit" : "32-bit")}";
         string mode = _julia ? "Julia" : "Mandelbrot";
         int effAa = EffectiveAa();
         lblInfo.Text = $"From the current view to the full set ({_viewW}×{_viewH} AA{effAa}x, {mode}, " +
@@ -65,8 +67,8 @@ public partial class ZoomVideoForm : Form
 
     private void CmbAAVid_Changed(object? sender, EventArgs e) => UpdateInfo();
 
-    // CUDA precision selected in this dialog (read on the UI thread; the render
-    // worker receives a captured copy). Only enabled with the CUDA engine.
+    // Precision selected in this dialog (read on the UI thread; the render
+    // worker receives a captured copy). Enabled with CUDA and CPU engines.
     private bool UseDouble => radPrec64.Checked;
 
     private void Prec_CheckedChanged(object? sender, EventArgs e) => UpdateInfo();
@@ -233,7 +235,7 @@ public partial class ZoomVideoForm : Form
         var cpu = new Bitmap(_viewW, _viewH, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         try
         {
-            Mandelbrot.Render(cpu, cx, cy, scale, maxIter, _palette, effAa, ct, _jcx, _jcy, _julia);
+            Mandelbrot.Render(cpu, cx, cy, scale, maxIter, _palette, effAa, ct, _jcx, _jcy, _julia, useDouble);
             return cpu;
         }
         catch

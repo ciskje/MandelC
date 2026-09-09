@@ -13,11 +13,11 @@ Interactive Mandelbrot set viewer built with C# / WinForms (.NET 8, Windows only
 ## Features
 
 - **Three rendering engines** with automatic fallback:
-  - **CPU** — always available, `Parallel.For`, double precision
+  - **CPU** — always available, parallel SIMD (double; float fast path on wide Mandelbrot views)
   - **CUDA** (NVIDIA) — float 32-bit or double 64-bit, via ILGPU
   - **DirectX 11** — realtime ~60 fps pixel shader, via Vortice
 
-- **Smooth coloring** — consistent across all engines, 7 palettes (Fire, Ice, Thermal, Ocean, Violet, Desert, Forest), gamma curve `t^0.35`
+- **Smooth coloring** — consistent across all engines, 7 palettes (Fire, Ice, Thermal, Ocean, Violet, Desert, Forest), gamma curve `t^0.35` (float fast paths may differ on rare boundary pixels)
 
 - **Zoom & pan** — mouse wheel, click-to-zoom, drag or arrow keys; half-resolution preview during interaction, full resolution on release
 
@@ -33,9 +33,9 @@ Interactive Mandelbrot set viewer built with C# / WinForms (.NET 8, Windows only
 
 - **RealTime zoom-out** — animated return to the full set (120 frames @ 30 fps, AA 1x)
 
-- **Benchmark** — standardized 960×540 AA1x test, 8 s budget, MPixel/s chart with per-card history; CLI: `--bench-cpu`, `--bench-cuda`, `--bench-dx`
+- **Benchmark** — standardized 960×540 AA1x test, 8 s budget, MPixel/s chart with per-card history; CLI: `--bench-cpu [float]`, `--bench-cuda`, `--bench-dx`
 
-- **Multi-GPU** — dropdown to select the adapter (CUDA + DirectX unified), precision selector (32/64-bit)
+- **Multi-GPU** — dropdown to select the adapter (CUDA + DirectX unified), CUDA precision selector (32/64-bit)
 
 - **Settings persistence** — iterations, palette, AA, engine, GPU, window size/position
 

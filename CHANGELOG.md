@@ -2,6 +2,18 @@
 
 Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 `AGENTS.md`. The version is shown in the window title.
+- **v2.21.0** — CPU honors the 32/64-bit setting like the other engines, with no
+  fallback: 64-bit renders everything in double, 32-bit in float (Mandelbrot and
+  Julia, any zoom; less precise at deep zoom, by user choice). Precision radios
+  enabled for CPU in the main window and both Generate dialogs; status bar shows
+  `CPU-double`/`CPU-float`; benchmark window follows the setting for CPU too.
+  Home button first in the toolbar row with a return arrow plus "Home" text.
+  Verified with `dotnet build` (0 warnings/errors) and a headless differential
+  test (double scenes bit-exact, float scenes bit-exact vs scalar float,
+  tile-identity in all combinations). Files: `Mandelbrot.cs`,
+  `MandelbrotForm.cs`, `MandelbrotForm.Designer.cs`, `ExportForm.cs`,
+  `ZoomVideoForm.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`,
+  `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 - **v2.20.1** — GPU render fast paths (WP3): palette lookup through a cached
   4096-entry table on all engines (CUDA device table with lerp, DirectX texture
   with hardware linear filtering; single palette definition, no per-pixel Pow or

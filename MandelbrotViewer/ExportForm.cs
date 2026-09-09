@@ -16,6 +16,7 @@ public partial class ExportForm : Form
     private readonly int _aa;
     private readonly bool _useCuda;
     private readonly bool _useDirectX;
+    private readonly bool _useCpu;
     private readonly bool _julia;
     private readonly double _jcx, _jcy;
     private readonly double _aspect;
@@ -40,9 +41,10 @@ public partial class ExportForm : Form
         _aa = Math.Max(1, aa);
         _useCuda = useCuda;
         _useDirectX = engine == RenderEngine.DirectX && DxMandelbrot.IsReady;
+        _useCpu = !_useCuda && !_useDirectX;
         radPrec32.Checked = !useDouble;
         radPrec64.Checked = useDouble;
-        rowPrec.Enabled = _useCuda; // precision matters only for CUDA (CPU = double, DX = float)
+        rowPrec.Enabled = _useCuda || _useCpu; // precision matters for CUDA and CPU (DX = float)
         _julia = julia;
         _jcx = juliaCx;
         _jcy = juliaCy;
@@ -56,14 +58,14 @@ public partial class ExportForm : Form
         UpdateInfo();
     }
 
-    // CUDA precision selected in this dialog (read on the UI thread; the render
-    // worker receives a captured copy). Only enabled with the CUDA engine.
+    // Precision selected in this dialog (read on the UI thread; the render
+    // worker receives a captured copy). Enabled with CUDA and CPU engines.
     private bool UseDouble => radPrec64.Checked;
 
     private void UpdateEngineLabel()
     {
         string engineLabel = _useCuda ? $"CUDA {(UseDouble ? "64-bit" : "32-bit")}"
-            : _useDirectX ? "DirectX" : "CPU";
+            : _useDirectX ? "DirectX" : $"CPU {(UseDouble ? "64-bit" : "32-bit")}";
         string modeLabel = _julia ? $"Julia c={_jcx:+0.000000;-0.000000} {_jcy:+0.000000;-0.000000}i" : "Mandelbrot";
         lblInfo.Text = $"Engine: {engineLabel} — {modeLabel}, {_palette}, {_maxIter} iterations. " +
             $"Render tiled {TileSize}×{TileSize}: AA unchanged even at high resolutions.";
@@ -219,7 +221,7 @@ public partial class ExportForm : Form
                     else
                     {
                         Mandelbrot.RenderTile(tile, _cx, _cy, _scale, _maxIter, _palette, aa, ct,
-                            x, y, w, h, _jcx, _jcy, _julia);
+                            x, y, w, h, _jcx, _jcy, _julia, useDouble);
                     }
                     CopyTile(tile, result, x, y);
                 }

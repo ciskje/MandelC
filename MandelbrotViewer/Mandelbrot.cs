@@ -10,7 +10,7 @@ namespace MandelbrotViewer;
 public static class Mandelbrot
 {
     // Renders the fractal into the given bitmap (whole-frame path).
-    // Precision follows RenderTile: SIMD double, SIMD float on wide Mandelbrot views.
+    // Precision follows RenderTile: SIMD double or float by explicit user choice.
     // Thin wrapper over RenderTile with zero offsets and full size equal
     // to the bitmap size; kept so interactive view and video frames need no tiling math.
     // Runs on a worker thread via Parallel.For with cancellation support.
@@ -35,15 +35,14 @@ public static class Mandelbrot
     // Param juliaCy (double): Input: constant c, imaginary part (Julia mode only).
     // Param julia (bool): Input: mode switch. True = Julia set (z(0) = pixel, c fixed);
     //   false = Mandelbrot (z(0) = 0, c = pixel).
-    public static void Render(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette, int supersample, CancellationToken ct, double juliaCx = 0, double juliaCy = 0, bool julia = false)
+    // Param useDouble (bool): Input: precision switch, like the other engines (no
+    //   fallback). True = double 64-bit everywhere; false = float 32-bit everywhere,
+    //   including deep zoom and Julia (less precise there, by user choice).
+    public static void Render(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette, int supersample, CancellationToken ct, double juliaCx = 0, double juliaCy = 0, bool julia = false, bool useDouble = true)
     {
         RenderTile(bmp, centerX, centerY, scale, maxIter, palette, supersample, ct,
-            0, 0, bmp.Width, bmp.Height, juliaCx, juliaCy, julia);
+            0, 0, bmp.Width, bmp.Height, juliaCx, juliaCy, julia, useDouble);
     }
-
-    // Scale at/above which the float fast path is used in Mandelbrot mode.
-    // float has enough digits there; mirrors GpuMandelbrot.WantsDouble.
-    internal const double FloatScaleThreshold = 1e-3;
 
     // Packed inputs of one tile render, so row workers take two arguments.
     private readonly struct TileArgs
@@ -88,8 +87,8 @@ public static class Mandelbrot
     // them locally, so memory stays O(W×H) and no W*k×H*k buffer is allocated.
     // Sample coordinates use the global k-times grid, so tiled output is
     // pixel-identical to a whole-frame render at the same view and AA.
-    // Precision: SIMD double path by default; float fast path in Mandelbrot mode
-    // at wide scales (>= FloatScaleThreshold); scalar fallback without SIMD hardware.
+    // Precision: SIMD double or float by explicit user choice (no fallback, like
+    // the CUDA engine); scalar fallback without SIMD hardware in both precisions.
     // Param bmp (Bitmap): Input/output: tile bitmap, overwritten in place via LockBits.
     //   Output pixels receive the SSAA-averaged ARGB colors of the tile region.
     // Param centerX (double): Input: whole-image view center, real axis (complex units).
@@ -109,9 +108,11 @@ public static class Mandelbrot
     // Param juliaCx (double): Input: constant c, real part (Julia mode only).
     // Param juliaCy (double): Input: constant c, imaginary part (Julia mode only).
     // Param julia (bool): Input: mode switch (true = Julia, false = Mandelbrot).
+    // Param useDouble (bool): Input: precision switch. True = double 64-bit;
+    //   false = float 32-bit at any scale and mode.
     public static void RenderTile(Bitmap bmp, double centerX, double centerY, double scale, int maxIter, Palette palette,
         int supersample, CancellationToken ct, int offsetX, int offsetY, int fullWidth, int fullHeight,
-        double juliaCx = 0, double juliaCy = 0, bool julia = false)
+        double juliaCx = 0, double juliaCy = 0, bool julia = false, bool useDouble = true)
     {
         int w = bmp.Width;
         int h = bmp.Height;
@@ -133,10 +134,10 @@ public static class Mandelbrot
         var args = new TileArgs(w, h, k, samples, maxIter, offsetX, offsetY,
             pixelSize, topY, originX, lut, invMaxIter, isMandelbrot, julia, juliaCx, juliaCy);
 
-        // Precision + code path: SIMD float wins on wide Mandelbrot views,
-        // SIMD double elsewhere, scalar double without SIMD hardware.
+        // Precision + code path, by explicit user choice like the CUDA engine:
+        // float when 32-bit is selected (any scale and mode), else double.
         bool useVector = Vector.IsHardwareAccelerated;
-        bool useFloat = useVector && isMandelbrot && scale >= FloatScaleThreshold;
+        bool useFloat = useVector && !useDouble;
 
         var rect = new Rectangle(0, 0, w, h);
         BitmapData data = bmp.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
@@ -153,11 +154,22 @@ public static class Mandelbrot
                 // so tiled output stays pixel-identical to a whole-frame render.
                 if (!useVector)
                 {
-                    Parallel.ForEach(partitioner, options, range =>
+                    if (useFloat)
                     {
-                        for (int y = range.Item1; y < range.Item2; y++)
-                            RenderRowScalar(in args, target, y);
-                    });
+                        Parallel.ForEach(partitioner, options, range =>
+                        {
+                            for (int y = range.Item1; y < range.Item2; y++)
+                                RenderRowScalarFloat(in args, target, y);
+                        });
+                    }
+                    else
+                    {
+                        Parallel.ForEach(partitioner, options, range =>
+                        {
+                            for (int y = range.Item1; y < range.Item2; y++)
+                                RenderRowScalar(in args, target, y);
+                        });
+                    }
                 }
                 else if (useFloat)
                 {
@@ -252,6 +264,15 @@ public static class Mandelbrot
         }
     }
 
+    // Scalar float row (fallback without SIMD hardware): one output pixel at a
+    // time through ComputePixelFloat. Matches the vector float path lane by lane.
+    private static unsafe void RenderRowScalarFloat(in TileArgs a, TileTarget t, int y)
+    {
+        int* row = t.Dst + (long)y * t.Stride;
+        for (int x = 0; x < a.W; x++)
+            row[x] = ComputePixelFloat(in a, x, y);
+    }
+
     // SIMD double row: full Vector<double>.Count blocks via the vector escape
     // core, scalar tail for the remainder. Bit-identical to RenderRowScalar.
     private static unsafe void RenderRowVectorDouble(in TileArgs a, TileTarget t, int y)
@@ -298,7 +319,7 @@ public static class Mandelbrot
             row[x] = ComputePixelDouble(in a, x, y);
     }
 
-    // SIMD float row (Mandelbrot wide views only): same structure in float.
+    // SIMD float row (explicit 32-bit setting): same structure in float.
     // Approximate vs double (like CUDA 32-bit); tiling-independent by construction.
     private static unsafe void RenderRowVectorFloat(in TileArgs a, TileTarget t, int y)
     {
@@ -444,8 +465,9 @@ public static class Mandelbrot
         }
     }
 
-    // Vector escape core, single precision (Mandelbrot wide views): same shape as
-    // the double core. Lane coordinates use the scalar float formula, so blocks
+    // Vector escape core, single precision: same shape as
+    // the double core, chosen by explicit user setting at any scale and mode.
+    // Lane coordinates use the scalar float formula, so blocks
     // and scalar tails agree exactly; values are approximate vs double.
     private static void EscapeBlockFloat(int gridBase, int gridStep, double originX, double pixelSize,
         double py, in TileArgs a, Span<int> colors)
@@ -460,7 +482,7 @@ public static class Mandelbrot
             int gb = gridBase + i * gridStep;
             float px = (float)(originX + gb * pixelSize);
             grid[i] = px;
-            if (IsInteriorBulb(originX + gb * pixelSize, py))
+            if (a.IsMandelbrot && IsInteriorBulb(originX + gb * pixelSize, py))
             {
                 seedAlive[i] = 0f;
                 seedIter[i] = a.MaxIter; // forced black, no work
@@ -478,13 +500,24 @@ public static class Mandelbrot
             return;
         }
 
-        // Mandelbrot only: z(0) = 0, c = pixel.
-        var cx = new Vector<float>(grid);
-        var cy = new Vector<float>((float)py);
-        var zx = Vector<float>.Zero;
-        var zy = Vector<float>.Zero;
-        var zx2 = Vector<float>.Zero;
-        var zy2 = Vector<float>.Zero;
+        var cpx = new Vector<float>(grid);
+        var cpy = new Vector<float>((float)py);
+        Vector<float> ccx, ccy, zx, zy;
+        if (a.Julia)
+        {
+            // Julia: z(0) = pixel point, c = constant.
+            zx = cpx; zy = cpy;
+            ccx = new Vector<float>((float)a.JuliaCx);
+            ccy = new Vector<float>((float)a.JuliaCy);
+        }
+        else
+        {
+            // Mandelbrot: z(0) = 0, c = pixel.
+            zx = Vector<float>.Zero; zy = Vector<float>.Zero;
+            ccx = cpx; ccy = cpy;
+        }
+        var zx2 = zx * zx;
+        var zy2 = zy * zy;
         var alive = new Vector<float>(seedAlive);
         var iters = new Vector<float>(seedIter);
         var vFour = new Vector<float>(4f);
@@ -496,8 +529,8 @@ public static class Mandelbrot
             alive = Vector.ConditionalSelect(escaped, Vector<float>.Zero, alive);
             if (Vector.EqualsAll(alive, Vector<float>.Zero)) break;
             iters += alive;
-            var nzy = vTwo * zx * zy + cy;
-            var nzx = zx2 - zy2 + cx;
+            var nzy = vTwo * zx * zy + ccy;
+            var nzx = zx2 - zy2 + ccx;
             var nzy2 = nzy * nzy;
             var nzx2 = nzx * nzx;
             zx = Vector.ConditionalSelect(escaped, zx, nzx);
@@ -577,8 +610,8 @@ public static class Mandelbrot
         return unchecked((int)(0xFF000000u | ((uint)(r / a.Samples) << 16) | ((uint)(g / a.Samples) << 8) | (uint)(b / a.Samples)));
     }
 
-    // Scalar tail pixel, single precision (Mandelbrot wide views): same float
-    // formula as the vector lanes, so tails and blocks agree exactly.
+    // Scalar tail pixel, single precision: full k×k average with the exact lane
+    // arithmetic, used for columns past the last full vector block.
     private static int ComputePixelFloat(in TileArgs a, int x, int y)
     {
         long r = 0, g = 0, b = 0;
@@ -592,18 +625,21 @@ public static class Mandelbrot
                 float px = (float)(a.OriginX + globalBx * a.PixelSize);
                 float fpy = (float)py;
                 int c;
-                if (IsInteriorBulb(a.OriginX + globalBx * a.PixelSize, py))
+                if (a.IsMandelbrot && IsInteriorBulb(a.OriginX + globalBx * a.PixelSize, py))
                 {
                     c = unchecked((int)0xFF000000);
                 }
                 else
                 {
-                    float zx = 0, zy = 0, zx2 = 0, zy2 = 0;
+                    // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
+                    float zx = a.Julia ? px : 0, zy = a.Julia ? fpy : 0;
+                    float ccx = a.Julia ? (float)a.JuliaCx : px, ccy = a.Julia ? (float)a.JuliaCy : fpy;
+                    float zx2 = zx * zx, zy2 = zy * zy;
                     int iter = 0;
                     while (iter < a.MaxIter && zx2 + zy2 <= 4f)
                     {
-                        zy = 2f * zx * zy + fpy;
-                        zx = zx2 - zy2 + px;
+                        zy = 2f * zx * zy + ccy;
+                        zx = zx2 - zy2 + ccx;
                         zx2 = zx * zx;
                         zy2 = zy * zy;
                         iter++;

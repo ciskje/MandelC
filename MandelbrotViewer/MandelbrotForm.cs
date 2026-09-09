@@ -158,7 +158,7 @@ public partial class MandelbrotForm : Form
             if (useCuda)
                 gpuDouble = await Task.Run(() => GpuMandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, UseDoublePrecision, token, _jcx, _jcy, _julia), token);
             else
-                await Task.Run(() => Mandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, token, _jcx, _jcy, _julia), token);
+                await Task.Run(() => Mandelbrot.Render(bmp, cx, cy, scale, maxIter, palette, aa, token, _jcx, _jcy, _julia, UseDoublePrecision), token);
 
             if (preview && (bmp.Width != fullW || bmp.Height != fullH))
                 bmp = Upscale(bmp, fullW, fullH);
@@ -170,7 +170,7 @@ public partial class MandelbrotForm : Form
             pictureBox.Image = _fractal;
             old?.Dispose();
 
-            string engineLabel = useCuda ? $"CUDA-{(gpuDouble ? "double" : "float")} {GpuMandelbrot.DeviceShortName}" : "CPU";
+            string engineLabel = useCuda ? $"CUDA-{(gpuDouble ? "double" : "float")} {GpuMandelbrot.DeviceShortName}" : $"CPU-{(UseDoublePrecision ? "double" : "float")}";
             string juliaLabel = _julia ? $" | Julia c={_jcx:+0.000000;-0.000000} {_jcy:+0.000000;-0.000000}i" : "";
             lblStatus.Text = $"Center {cx:+0.000000;-0.000000} {cy:+0.000000;-0.000000}i | width {scale:E2} | iter {maxIter}{(chkIterAuto.Checked ? " (auto)" : "")} | {ActivePalette}{(aa > 1 ? $" AA{aa}x" : "")} | engine {engineLabel}{juliaLabel}{(preview ? " (preview)" : "")}";
         }
@@ -238,7 +238,7 @@ public partial class MandelbrotForm : Form
         bool gpuEngine = _engine != RenderEngine.Cpu; // the GPU dropdown is shown only with a GPU engine
         lblGpu.Visible = gpuEngine;
         cmbGpu.Visible = gpuEngine;
-        bool prec = _engine == RenderEngine.Cuda; // the precision choice is only valid for CUDA
+        bool prec = _engine != RenderEngine.DirectX; // precision choice for CPU and CUDA (DirectX is always float)
         radPrec32.Enabled = prec;
         radPrec64.Enabled = prec;
         if (dx)
@@ -875,7 +875,7 @@ public partial class MandelbrotForm : Form
         sb.AppendLine();
         sb.AppendLine("=== GPU selection ===");
         sb.AppendLine($"Selected card: {(_gpuSelection ?? "Auto")}");
-        sb.AppendLine($"CUDA precision: {(UseDoublePrecision ? "64-bit (double)" : "32-bit (float)")}");
+        sb.AppendLine($"Precision (CPU/CUDA): {(UseDoublePrecision ? "64-bit (double)" : "32-bit (float)")}");
         sb.AppendLine();
         sb.AppendLine("=== Saved settings ===");
         sb.AppendLine($"Engine:     {_settings.Engine}");

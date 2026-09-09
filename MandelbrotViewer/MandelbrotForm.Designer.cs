@@ -138,8 +138,8 @@
         this.row0.WrapContents = false;
         this.row0.Margin = new Padding(0);
         this.row0.Padding = new Padding(0);
-        this.row0.Controls.Add(this.btnReset);
         this.row0.Controls.Add(this.btnHome);
+        this.row0.Controls.Add(this.btnReset);
         this.row0.Controls.Add(this.btnBenchmark);
         this.row0.Controls.Add(this.lblIter);
         this.row0.Controls.Add(this.numIter);
@@ -175,10 +175,11 @@
         this.btnReset.Text = "Reset";
         this.btnReset.Click += new EventHandler(this.BtnReset_Click);
 
-        // btnHome
+        // btnHome (first in the row, return arrow + text)
         this.btnHome.Anchor = AnchorStyles.Left;
-        this.btnHome.Size = new System.Drawing.Size(60, 23);
-        this.btnHome.Text = "Home";
+        this.btnHome.Size = new System.Drawing.Size(70, 23);
+        this.btnHome.Font = new System.Drawing.Font("Segoe UI Symbol", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+        this.btnHome.Text = "↩ Home";
         this.btnHome.Click += new EventHandler(this.RealTimeItem_Click);
 
         // btnBenchmark (PNG saving stays in the File menu)
@@ -263,7 +264,7 @@
         this.cmbGpu.Visible = false; // hidden with CPU engine (visible with CUDA/DirectX)
         this.cmbGpu.SelectedIndexChanged += new EventHandler(this.CmbGpu_SelectedIndexChanged);
 
-        // lblPrec + precisionPanel: CUDA precision (32 = float, 64 = double)
+        // lblPrec + precisionPanel: CPU/CUDA precision (32 = float, 64 = double)
         this.lblPrec.Anchor = AnchorStyles.Left;
         this.lblPrec.AutoSize = true;
         this.lblPrec.Text = "Precision:";
@@ -279,14 +280,14 @@
         this.radPrec32.Anchor = AnchorStyles.Left;
         this.radPrec32.AutoSize = true;
         this.radPrec32.Text = "32";
-        this.radPrec32.Enabled = false; // enabled only with CUDA engine
+        this.radPrec32.Enabled = false; // enabled with CPU/CUDA engine
         this.radPrec32.CheckedChanged += new EventHandler(this.PrecRadio_CheckedChanged);
 
         this.radPrec64.Anchor = AnchorStyles.Left;
         this.radPrec64.AutoSize = true;
         this.radPrec64.Text = "64";
         this.radPrec64.Checked = true; // 64-bit (double) default
-        this.radPrec64.Enabled = false; // enabled only with CUDA engine
+        this.radPrec64.Enabled = false; // enabled with CPU/CUDA engine
         this.radPrec64.CheckedChanged += new EventHandler(this.PrecRadio_CheckedChanged);
 
         // radioCpu
@@ -424,8 +425,8 @@
         this.toolTip.SetToolTip(this.cmbPalette, "Fractal color palette (Fire, Ice, Thermal, Ocean, Violet, Desert, Forest)");
         this.toolTip.SetToolTip(this.cmbAA, "Antialiasing: 1x disabled, 2x/4x/8x average of nearby pixels");
         this.toolTip.SetToolTip(this.cmbGpu, "Video card to use (Auto = the most powerful)");
-        this.toolTip.SetToolTip(this.radPrec32, "CUDA precision 32-bit (float): faster, less precise. Ignored with CPU/DirectX.");
-        this.toolTip.SetToolTip(this.radPrec64, "CUDA precision 64-bit (double): more precise, slower. Ignored with CPU/DirectX.");
+        this.toolTip.SetToolTip(this.radPrec32, "CPU/CUDA precision 32-bit (float): faster, less precise. Ignored with DirectX.");
+        this.toolTip.SetToolTip(this.radPrec64, "CPU/CUDA precision 64-bit (double): more precise, slower. Ignored with DirectX.");
         this.toolTip.SetToolTip(this.radioCpu, "CPU multicore engine (always available)");
         this.toolTip.SetToolTip(this.radioCuda, "CUDA engine: NVIDIA GPU via ILGPU (float/double)");
         this.toolTip.SetToolTip(this.radioDx, "DirectX engine: real-time GPU (float)");
