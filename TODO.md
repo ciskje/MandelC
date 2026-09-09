@@ -1,5 +1,10 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] v2.20.1 WP3 GPU palette LUT (CUDA device table, DX texture LUT) — completed
+- [x] v2.20.0 CPU float benchmark mode (`--bench-cpu float`, chart reference) — completed
+- [x] v2.19.4 WP2 CPU SIMD + float path (vector escape core, chunk partitioner, vector benchmark) — completed
+- [x] v2.19.3 CPU banding fix (LUT 4096 with lerp lookup) — completed
+- [x] v2.19.2 WP1 CPU P0 speedups (LUT 1024, fast smooth, cardioid/bulb render+bench, unsafe write, hoisted palette) — completed
 - [x] Refresh `SPECS.md` to describe only the current application — completed
 - [x] Verify AGENTS.md rules still valid (dotnet in PATH?) — completed
 - [x] Remove stale test/repo line from AGENTS.md Git section — completed

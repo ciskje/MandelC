@@ -213,9 +213,11 @@ public partial class BenchmarkForm : Form
 
         // Historical references, measured with the standardized test (best of 3 runs of
         // 8 s: DirectX offscreen `--bench-dx`, CUDA `--bench-cuda` float 32-bit and double
-        // 64-bit, CPU double `--bench-cpu`). Unit: MPixel/s. The DirectX and CUDA benchmark
-        // kernels use the same iteration loop (incremental squares), so the bars are a fair
-        // engine-to-engine comparison of the identical workload.
+        // 64-bit, CPU double `--bench-cpu` and CPU float `--bench-cpu float`). Unit: MPixel/s. The DirectX and CUDA benchmark
+        // kernels use the same iteration loop (incremental squares), so those bars are a fair
+        // engine-to-engine comparison of the identical workload. The CPU benchmark additionally
+        // skips known-interior points via the cardioid/bulb test and runs the escape loop
+        // through the SIMD vector core (v2.19.2/v2.19.4).
         var bars = new (string Label, double Value, Brush Brush)[]
         {
             ("Risultato", _measuredMpixel, actualBrush),
@@ -226,7 +228,8 @@ public partial class BenchmarkForm : Form
             ("DirectX 5070 Ti", 337.4, dxBrush),
             ("DirectX 4070 SUPER", 262.6, dxBrush),
             ("DirectX AMD Radeon", 5.2, dxBrush),
-            ("CPU 9900X", 4.9, cpuBrush),
+            ("CPU 9900X", 9.7, cpuBrush),
+            ("CPU 9900X float", 15.3, cpuBrush),
         }.OrderByDescending(b => b.Value).ToArray();
         double maximum = bars.Max(b => b.Value) * 1.15;
 

@@ -2,6 +2,54 @@
 
 Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 `AGENTS.md`. The version is shown in the window title.
+- **v2.20.1** — GPU render fast paths (WP3): palette lookup through a cached
+  4096-entry table on all engines (CUDA device table with lerp, DirectX texture
+  with hardware linear filtering; single palette definition, no per-pixel Pow or
+  stop search) plus the cardioid/bulb early-out in the CUDA and DirectX render
+  kernels (Mandelbrot only; benchmark kernels untouched, history unchanged).
+  Measured best-of-5 on RTX 5070 Ti, output within 1 LSB of baseline on all
+  scenes: CUDA interior-heavy 1080p view 166 → 12 ms (~14x), DirectX same view
+  5 → 2 ms (~2.5x); loop-bound deep views and overhead-floor small views
+  unchanged. Files: `GpuMandelbrot.cs`, `DxMandelbrot.cs`, `Palette.cs`,
+  `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.20.0** — CPU float benchmark mode: `--bench-cpu float` runs the
+  standardized workload through the float vector core (own history, like CUDA
+  32-bit vs 64-bit; default stays double, which is also what the benchmark window
+  runs). New `Mandelbrot.BenchmarkCpuFloat` (float vector blocks + scalar tail,
+  verified digit-exact against a scalar reference over 900 frames). History
+  measured with the new mode (best of 3, Release): CPU 9900X float 15.3 MPixel/s
+  (vs 9.7 double). Files: `Mandelbrot.cs`, `Diagnostics.cs`, `Program.cs`,
+  `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`,
+  `.csproj`.
+- **v2.19.4** — CPU SIMD + float fast path (WP2): `System.Numerics` vector escape
+  cores (double and float) with per-lane op order identical to scalar code, chunk
+  row partitioning across all CPU paths and the benchmark. SIMD double is
+  bit-identical to scalar (differential test vs reference: 0 diffs; tiled output
+  still pixel-identical to whole-frame). SIMD float applies to Mandelbrot views at
+  scale ≥ 1e-3 (same boundary as CUDA double-precision need): 0.1% boundary pixels
+  differ there, none at deeper zooms. CPU benchmark remeasured with the vector
+  core (best of 3, Release): CPU 9900X 4.8 → 9.7 MPixel/s (~2x); CUDA/DirectX
+  references unchanged. Files: `Mandelbrot.cs`, `BenchmarkForm.cs`, `TODO.md`,
+  `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.19.3** — CPU banding fix: the palette table grows to 4096 entries with
+  linear interpolation on lookup (`PaletteColors.ColorFromLut`, used by the render
+  loop), so output matches the legacy exact coloring within 1 LSB (verified with a
+  headless differential test vs `ColorFromEscape` on full, zoomed, deep-zoom and
+  Julia scenes: max channel difference 1, zero pixels above it). Files:
+  `Palette.cs`, `Mandelbrot.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`,
+  `AppVersion.cs`, `.csproj`.
+- **v2.19.2** — CPU render fast path (WP1): 1024-entry palette LUT (no per-pixel
+  `Pow`/stop search), fast smooth `log2(0.5*ln(mod2))` without `Sqrt`, main
+  cardioid + period-2 bulb early-out in render and CPU benchmark, hoisted palette
+  data, direct unsafe bitmap writes (no intermediate buffer or `Marshal.Copy`),
+  `Buffer.MemoryCopy` tile assembly, `AllowUnsafeBlocks` + `InvariantGlobalization`.
+  Slight color quantization possible (speed favored over exactness). CPU benchmark
+  history remeasured with the new workload (best of 3, Release): CPU 9900X 4.8;
+  CUDA/DirectX kernels untouched, their references unchanged. Verified with
+  `dotnet build` (0 warnings/errors), `--bench-cpu` and a headless render smoke
+  test (160x90 + tile + Julia). Files: `Mandelbrot.cs`, `Palette.cs`,
+  `ExportForm.cs`, `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`, `CHANGELOG.md`,
+  `AppVersion.cs`, `.csproj`.
 - **v2.19.1** — Full English pass on the remaining Italian UI strings and
   comments (Export/Benchmark dialogs, log window, diagnostic log, settings,
   CLI-adjacent comments) plus English identifiers (`vista` → `viewMenu`,

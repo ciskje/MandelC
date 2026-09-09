@@ -30,7 +30,9 @@ float4 VS(uint id : SV_VertexID) : SV_Position
     // complex height proportional), invW/invH (1/fullW, 1/fullH for pixel mapping),
     // maxIter (escape loop bound), aa (SSAA factor n, >=1), fullW/fullH + offsetX/offsetY
     // (tile -> whole-image mapping, keeps tiled export pixel-identical), jcx/jcy + julia
-    // (Julia mode: z(0) = pixel, c = constant; else Mandelbrot), stops[5] (palette).
+    // (Julia mode: z(0) = pixel, c = constant; else Mandelbrot).
+    // Palette: sampled from the Lut texture (same entries as the CPU table, gamma
+    // baked; hardware linear filtering interpolates between entries, no banding).
     // Output: SV_Target float4, RGB = average of the n x n subsamples, A = 1.
     private const string PsSource = @"
 cbuffer Params : register(b0)
@@ -39,20 +41,30 @@ cbuffer Params : register(b0)
     float invW; float invH; int maxIter; int aa;
     int fullW; int fullH; int offsetX; int offsetY;
     float jcx; float jcy; int julia; int jpad;
-    float3 stops[5];
 };
 
-// Graded: palette interpolation, aligned with PaletteColors.ColorFor (CPU) and
-// GpuMandelbrot.ColorFromIterations (CUDA).
-// Input t (float: normalized position 0..1 along the gradient, saturated inside).
-// Output float3: lerped RGB between stops[i] and stops[i+1] (5 stops -> 4 segments).
-float3 Graded(float t)
+Texture1D<float4> Lut : register(t0);
+SamplerState LutSampler : register(s0);
+
+// Graded: palette lookup through the Lut texture, aligned with the CPU table
+// (PaletteColors.GetLut) and GpuMandelbrot.LutColor (CUDA).
+// Input raw (float: smoothed iterations / maxIter, 0..1, gamma baked in the table).
+// Output float3: hardware-lerped RGB between adjacent entries.
+float3 Graded(float raw)
 {
-    t = saturate(t);
-    float seg = t * 4.0;
-    int i = (int)min(seg, 3.0);
-    float f = seg - (float)i;
-    return lerp(stops[i], stops[i + 1], f);
+    return Lut.SampleLevel(LutSampler, saturate(raw), 0).rgb;
+}
+
+// InteriorBulb: main cardioid + period-2 bulb test, mirrors the CPU early-out.
+// Input c (float2: pixel complex coordinates, i.e. the Mandelbrot constant).
+// Output bool: true when the point is known interior (renders black, loop skipped).
+bool InteriorBulb(float2 c)
+{
+    float2 q = c - float2(0.25, 0.0);
+    float q2 = dot(q, q);
+    if (q2 * (q2 + q.x) <= 0.25 * c.y * c.y) return true;
+    float2 d = c + float2(1.0, 0.0);
+    return dot(d, d) <= 0.0625;
 }
 
 // PS: full on-chip SSAA color of one output pixel.
@@ -60,9 +72,9 @@ float3 Graded(float t)
 // target, i.e. the tile when exporting). Centered sub-pixel offsets
 // ((jx,jy)+0.5)/n-0.5 distribute the n x n samples around the pixel center.
 // Output SV_Target float4: acc/(n*n) averaged RGB (interior = black), A = 1.
-// Per subsample: pixel -> complex (px), escape loop with smooth log/log correction,
-// gamma mapping pow(nu/maxIter, 0.35), palette via Graded. No W*n x H*n target:
-// VRAM stays O(W x H).
+// Per subsample: pixel -> complex (px), cardioid/bulb early-out (Mandelbrot only),
+// escape loop with smooth log/log correction, LUT palette lookup. No W*n x H*n
+// target: VRAM stays O(W x H).
 float4 PS(float4 pos : SV_Position) : SV_Target
 {
     int n = max(aa, 1);
@@ -75,23 +87,32 @@ float4 PS(float4 pos : SV_Position) : SV_Target
             float2 p = float2((float)offsetX, (float)offsetY) + pos.xy + sub;
             float2 px = float2(cx + (p.x * invW - 0.5) * scale,
                                cy + (p.y * invH - 0.5) * scale * aspect);
-            // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
-            float2 z = julia != 0 ? px : 0.0;
-            float2 cc = julia != 0 ? float2(jcx, jcy) : px;
-            int iter = 0;
-            while (iter < maxIter && dot(z, z) <= 4.0)
-            {
-                z = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + cc;
-                iter++;
-            }
             float3 col = 0.0;
-            if (iter < maxIter)
+            // Cardioid + period-2 bulb early-out (Mandelbrot only, mirrors the CPU):
+            // interior points skip the escape loop entirely.
+            if (julia == 0 && InteriorBulb(px))
             {
-                float mod2 = max(dot(z, z), 4.0);
-                float smoothIterations = (float)iter + 1.0 - log(log(sqrt(mod2))) / log(2.0);
-                // Mapping aligned with PaletteColors (CPU) and GpuMandelbrot.ColorFromIterations (CUDA).
-                float t = pow(saturate(smoothIterations / (float)maxIter), 0.35);
-                col = Graded(t);
+                // col stays black, no work.
+            }
+            else
+            {
+                // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
+                float2 z = julia != 0 ? px : 0.0;
+                float2 cc = julia != 0 ? float2(jcx, jcy) : px;
+                int iter = 0;
+                while (iter < maxIter && dot(z, z) <= 4.0)
+                {
+                    z = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + cc;
+                    iter++;
+                }
+                if (iter < maxIter)
+                {
+                    float mod2 = max(dot(z, z), 4.0);
+                    float smoothIterations = (float)iter + 1.0 - log(log(sqrt(mod2))) / log(2.0);
+                    // Raw position into the Lut texture (gamma baked in the table,
+                    // aligned with the CPU table and GpuMandelbrot.LutColor).
+                    col = Graded(saturate(smoothIterations / (float)maxIter));
+                }
             }
             acc += col;
         }
@@ -141,12 +162,6 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
 ";
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct DxStop
-    {
-        public float R, G, B, Pad;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
     private struct DxParams
     {
         public float Cx, Cy, Scale, Aspect;
@@ -155,7 +170,6 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         public int FullW, FullH, OffsetX, OffsetY;
         public float JuliaCx, JuliaCy;
         public int JuliaOn, JuliaPad;
-        public DxStop S0, S1, S2, S3, S4;
     }
 
     private static ID3D11Device? _device;
@@ -177,6 +191,15 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     private static ID3D11RenderTargetView? _benchRtv;
     private static ID3D11Query?[] _benchQueries = Array.Empty<ID3D11Query?>();
     private static int _benchGridW, _benchGridH;
+
+    // Palette table for the colored shader: 1D RGBA texture with the CPU table
+    // entries (gamma baked), hardware linear filtering interpolates between
+    // entries. Refilled when palette or iteration budget changes.
+    private static ID3D11Texture1D? _lutTex;
+    private static ID3D11ShaderResourceView? _lutSrv;
+    private static ID3D11SamplerState? _lutSampler;
+    private static Palette _lutPalette = (Palette)(-1);
+    private static int _lutMaxIter = -1;
 
     public static bool IsReady => _device != null;
     public static string LastError { get; private set; } = "";
@@ -382,6 +405,15 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
                 ResourceUsage.Dynamic,
                 CpuAccessFlags.Write);
 
+            step = "CreateSamplerState (palette table sampler)";
+            _lutSampler = _device.CreateSamplerState(new SamplerDescription
+            {
+                Filter = Filter.MinMagMipLinear,
+                AddressU = TextureAddressMode.Clamp,
+                AddressV = TextureAddressMode.Clamp,
+                AddressW = TextureAddressMode.Clamp,
+            });
+
             return true;
         }
         catch (Exception ex)
@@ -390,6 +422,58 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             Dispose();
             return false;
         }
+    }
+
+    // Refills the palette texture when palette or iteration budget changed.
+    // Same entries as PaletteColors.GetLut (packed ARGB); the shader samples them
+    // with linear filtering, so adjacent entries interpolate like the CPU table.
+    // Param palette (Palette): Input: palette baked into the texture.
+    // Param maxIter (int): Input: iteration budget baked into the normalization.
+    private static void EnsureLut(Palette palette, int maxIter)
+    {
+        if (_device == null || _context == null)
+            throw new InvalidOperationException("DirectX not initialized.");
+        if (_lutTex != null && _lutSrv != null && _lutPalette == palette && _lutMaxIter == maxIter)
+            return;
+        int[] table = PaletteColors.GetLut(palette, maxIter);
+        _lutSrv?.Dispose(); _lutSrv = null;
+        _lutTex?.Dispose();
+        var desc = new Texture1DDescription
+        {
+            Width = (uint)table.Length,
+            MipLevels = 1,
+            ArraySize = 1,
+            Format = DxgiFormat.R8G8B8A8_UNorm,
+            Usage = ResourceUsage.Dynamic,
+            BindFlags = BindFlags.ShaderResource,
+            CPUAccessFlags = CpuAccessFlags.Write,
+            MiscFlags = ResourceOptionFlags.None,
+        };
+        _lutTex = _device.CreateTexture1D(desc);
+        _lutSrv = _device.CreateShaderResourceView(_lutTex);
+        // Packed ARGB int -> R,G,B,A bytes (R8G8B8A8 expects R first in memory).
+        MappedSubresource mapped = _context.Map(_lutTex, 0, MapMode.WriteDiscard);
+        try
+        {
+            unsafe
+            {
+                byte* dst = (byte*)mapped.DataPointer;
+                for (int i = 0; i < table.Length; i++)
+                {
+                    int c = table[i];
+                    dst[i * 4 + 0] = (byte)((c >> 16) & 0xFF);
+                    dst[i * 4 + 1] = (byte)((c >> 8) & 0xFF);
+                    dst[i * 4 + 2] = (byte)(c & 0xFF);
+                    dst[i * 4 + 3] = 0xFF;
+                }
+            }
+        }
+        finally
+        {
+            _context.Unmap(_lutTex, 0);
+        }
+        _lutPalette = palette;
+        _lutMaxIter = maxIter;
     }
 
     private static void CreateViews(int width, int height)
@@ -414,14 +498,13 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         CreateViews(width, height);
     }
 
-    // Builds the parameters of a colored frame (with the palette stops).
-    private static DxParams BuildParams(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette,
+    // Builds the parameters of a colored frame (palette comes from the Lut texture).
+    private static DxParams BuildParams(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa,
         int fullWidth = 0, int fullHeight = 0, int offsetX = 0, int offsetY = 0,
         double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         fullWidth = fullWidth > 0 ? fullWidth : width;
         fullHeight = fullHeight > 0 ? fullHeight : height;
-        var stops = PaletteColors.GetStops(palette);
         return new DxParams
         {
             Cx = (float)centerX,
@@ -439,16 +522,13 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             JuliaCx = (float)juliaCx,
             JuliaCy = (float)juliaCy,
             JuliaOn = julia ? 1 : 0,
-            S0 = ToStop(stops[0]),
-            S1 = ToStop(stops[1]),
-            S2 = ToStop(stops[2]),
-            S3 = ToStop(stops[3]),
-            S4 = ToStop(stops[4]),
         };
     }
 
     // Pipeline common to all frames (Render, offscreen benchmark, RenderPreviewToBitmap):
-    // constants, shaders, render target, viewport and draw of the fullscreen triangle.
+    // constants, shaders, palette table binding, render target, viewport and draw
+    // of the fullscreen triangle. The Lut binding is skipped while the table is
+    // missing (benchmark-only sessions); the benchmark shader samples nothing.
     private static void DrawFrame(DxParams pars, ID3D11RenderTargetView rtv, ID3D11PixelShader ps, int width, int height)
     {
         MappedSubresource mapped = _context!.Map(_cbuffer!, 0, MapMode.WriteDiscard);
@@ -459,6 +539,11 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
         _context.VSSetShader(_vs);
         _context.PSSetShader(ps);
         _context.PSSetConstantBuffer(0, _cbuffer!);
+        if (_lutSrv != null && _lutSampler != null)
+        {
+            _context.PSSetShaderResource(0, _lutSrv);
+            _context.PSSetSampler(0, _lutSampler);
+        }
         _context.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
         _context.RSSetViewport(new Viewport(width, height));
         _context.Draw(3, 0);
@@ -467,7 +552,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     public static void Render(double centerX, double centerY, double scale, int width, int height, int maxIter, int aa, Palette palette, double juliaCx = 0, double juliaCy = 0, bool julia = false)
     {
         if (!IsReady) return;
-        DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette,
+        EnsureLut(palette, maxIter);
+        DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa,
             juliaCx: juliaCx, juliaCy: juliaCy, julia: julia), _rtv!, _ps!, width, height);
         _swapChain!.Present(0, PresentFlags.None);
     }
@@ -715,9 +801,6 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     public static string ShortAdapterName(string fullName) =>
         fullName.Replace("NVIDIA GeForce ", "").Replace("(TM)", "").Trim();
 
-    private static DxStop ToStop((double T, byte R, byte G, byte B) s) =>
-        new() { R = s.R / 255f, G = s.G / 255f, B = s.B / 255f };
-
     // Captures the backbuffer in a Bitmap (for Save PNG).
     public static Bitmap Capture()
     {
@@ -759,7 +842,8 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
             using ID3D11Texture2D target = _device!.CreateTexture2D(desc);
             using ID3D11RenderTargetView rtv = _device.CreateRenderTargetView(target);
 
-            DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa, palette,
+            EnsureLut(palette, maxIter);
+            DrawFrame(BuildParams(centerX, centerY, scale, width, height, maxIter, aa,
                 fullWidth, fullHeight, offsetX, offsetY, juliaCx, juliaCy, julia), rtv, _ps!, width, height);
 
             var bmp = ReadTextureToBitmap(target, width, height);
@@ -824,6 +908,11 @@ float4 BenchPS(float4 pos : SV_Position) : SV_Target
     public static void Dispose()
     {
         EndBenchmarkOffscreen();
+        _lutSrv?.Dispose(); _lutSrv = null;
+        _lutTex?.Dispose(); _lutTex = null;
+        _lutSampler?.Dispose(); _lutSampler = null;
+        _lutPalette = (Palette)(-1);
+        _lutMaxIter = -1;
         _cbuffer?.Dispose(); _cbuffer = null;
         _benchPs?.Dispose(); _benchPs = null;
         _ps?.Dispose(); _ps = null;

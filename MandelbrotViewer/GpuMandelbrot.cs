@@ -45,28 +45,15 @@ public readonly struct GpuViewParams
     }
 }
 
-public readonly struct GpuPaletteParams
-{
-    public readonly float S0R, S0G, S0B, S1R, S1G, S1B, S2R, S2G, S2B, S3R, S3G, S3B, S4R, S4G, S4B;
-
-    public GpuPaletteParams((double T, byte R, byte G, byte B)[] stops)
-    {
-        S0R = stops[0].R / 255f; S0G = stops[0].G / 255f; S0B = stops[0].B / 255f;
-        S1R = stops[1].R / 255f; S1G = stops[1].G / 255f; S1B = stops[1].B / 255f;
-        S2R = stops[2].R / 255f; S2G = stops[2].G / 255f; S2B = stops[2].B / 255f;
-        S3R = stops[3].R / 255f; S3G = stops[3].G / 255f; S3B = stops[3].B / 255f;
-        S4R = stops[4].R / 255f; S4G = stops[4].G / 255f; S4B = stops[4].B / 255f;
-    }
-}
-
 // CUDA backend via ILGPU: one thread per pixel computes the escape, the smooth
-// coloring and the AA downsampling directly on the GPU.
+// coloring (through a cached device palette table shared with the CPU path)
+// and the AA downsampling directly on the GPU.
 internal static class GpuMandelbrot
 {
     private static Context? _context;
     private static Accelerator? _accelerator;
-    private static Action<Index1D, ArrayView<int>, GpuViewParams, GpuPaletteParams>? _floatKernel;
-    private static Action<Index1D, ArrayView<int>, GpuViewParams, GpuPaletteParams>? _doubleKernel;
+    private static Action<Index1D, ArrayView<int>, GpuViewParams, ArrayView<int>>? _floatKernel;
+    private static Action<Index1D, ArrayView<int>, GpuViewParams, ArrayView<int>>? _doubleKernel;
     // Benchmark kernel: only the iteration count, no |z|² buffer (a third of the traffic).
     private static Action<Index1D, ArrayView<int>, GpuViewParams>? _floatBenchKernel;
     private static Action<Index1D, ArrayView<int>, GpuViewParams>? _doubleBenchKernel;
@@ -74,6 +61,11 @@ internal static class GpuMandelbrot
     private static MemoryBuffer1D<int, Stride1D.Dense>? _renderPixelsBuffer;
     private static int[]? _renderPixels;
     private static int _renderCount;
+    // Device palette table (packed ARGB, same entries as PaletteColors.GetLut),
+    // uploaded once per palette/iteration combination and reused across frames.
+    private static MemoryBuffer1D<int, Stride1D.Dense>? _lutBuffer;
+    private static Palette _lutPalette = (Palette)(-1);
+    private static int _lutMaxIter = -1;
 
     public static bool IsReady => _accelerator != null;
     public static string DeviceName { get; private set; } = "";
@@ -138,8 +130,8 @@ internal static class GpuMandelbrot
                 {
                     _accelerator = device.CreateAccelerator(_context);
                     DeviceName = device.Name;
-                    _floatKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams, GpuPaletteParams>(FloatKernel);
-                    _doubleKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams, GpuPaletteParams>(DoubleKernel);
+                    _floatKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams, ArrayView<int>>(FloatKernel);
+                    _doubleKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams, ArrayView<int>>(DoubleKernel);
                     _floatBenchKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams>(FloatBenchKernel);
                     _doubleBenchKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams>(DoubleBenchKernel);
                     return true;
@@ -177,9 +169,30 @@ internal static class GpuMandelbrot
         _renderPixelsBuffer = null;
         _renderPixels = null;
         _renderCount = 0;
+        _lutBuffer?.Dispose();
+        _lutBuffer = null;
+        _lutPalette = (Palette)(-1);
+        _lutMaxIter = -1;
         _accelerator?.Dispose();
         _accelerator = null;
         DeviceName = "";
+    }
+
+    // Ensures the device palette table matches the requested palette/iterations.
+    // Uploads once per combination; frames reuse it. Must run under RenderGate.
+    // Param accelerator (Accelerator): Input: active CUDA accelerator owning the buffer.
+    // Param palette (Palette): Input: palette baked into the table.
+    // Param maxIter (int): Input: iteration budget baked into the table normalization.
+    private static void EnsureLut(Accelerator accelerator, Palette palette, int maxIter)
+    {
+        if (_lutBuffer != null && _lutPalette == palette && _lutMaxIter == maxIter)
+            return;
+        int[] host = PaletteColors.GetLut(palette, maxIter);
+        _lutBuffer?.Dispose();
+        _lutBuffer = accelerator.Allocate1D<int>(host.Length);
+        _lutBuffer.CopyFromCPU(host);
+        _lutPalette = palette;
+        _lutMaxIter = maxIter;
     }
 
     // Computes the frame on the GPU (kernel launch + copy back to RAM).
@@ -209,7 +222,7 @@ internal static class GpuMandelbrot
             double topY = centerY - (bigH * 0.5) * pixelSize;
             var view = new GpuViewParams(centerX, centerY, pixelSize, topY, bmp.Width, bmp.Height, maxIter, k,
                 julia ? 1 : 0, juliaCx, juliaCy, fullWidth, fullHeight, offsetX, offsetY);
-            var paletteParams = new GpuPaletteParams(PaletteColors.GetStops(palette));
+            EnsureLut(accelerator, palette, maxIter);
             int count = bmp.Width * bmp.Height;
             if (_renderCount != count)
             {
@@ -222,7 +235,7 @@ internal static class GpuMandelbrot
             var kernel = useDouble ? _doubleKernel! : _floatKernel!;
             var pixelsBuffer = _renderPixelsBuffer!;
             var pixels = _renderPixels!;
-            kernel(count, pixelsBuffer.View, view, paletteParams);
+            kernel(count, pixelsBuffer.View, view, _lutBuffer!.View);
             accelerator.Synchronize();
             ct.ThrowIfCancellationRequested();
             pixelsBuffer.CopyToCPU(pixels);
@@ -384,40 +397,52 @@ internal static class GpuMandelbrot
         iters[index] = iter;
     }
 
-    // Palette interpolation in the CUDA kernel: it must stay aligned with
-    // PaletteColors.ColorFor (CPU) and with the Graded function of the HLSL shader
-    // (DxMandelbrot.cs): same 5 stops and same mapping t = (nu/maxIter)^0.35.
+    // Main cardioid + period-2 bulb test, device version of Mandelbrot.IsInteriorBulb.
+    // Conservative in exact math (only true interior); the float kernel classifies
+    // the float coordinates in double, like the CPU float render path.
+    // Param px (double): Input: point real coordinate. Param py (double): Input: imaginary.
+    // Returns (bool): Output: true when the point is known interior (renders black).
+    private static bool IsInteriorBulbD(double px, double py)
+    {
+        double q = (px - 0.25) * (px - 0.25) + py * py;
+        if (q * (q + (px - 0.25)) <= 0.25 * py * py) return true;
+        double dx = px + 1.0;
+        return dx * dx + py * py <= 0.0625;
+    }
+
+    // Palette lookup in the CUDA kernel through the cached device table (same
+    // entries as PaletteColors.GetLut on the CPU): no Pow and no stop search per
+    // subsample, linear interpolation between entries (no banding).
     // Device-only helper, called once per subsample by FloatKernel/DoubleKernel.
-    // Param iterations (float): Input: smoothed escape value nu (float). Interior
-    //   points pass MaxIter and are clamped to the last stop; exterior points carry
-    //   the fractional log/log correction.
+    // Param lut (ArrayView<int>): Input: device table of PaletteColors.LutSize packed
+    //   ARGB colors (gamma baked). Read-only in the kernel.
+    // Param smooth (float): Input: smoothed escape value nu. Interior points pass
+    //   MaxIter and clamp to the last entry; exterior points carry the fractional
+    //   log/log correction.
     // Param maxIter (int): Input: reference iteration budget of the view. Normalizes
-    //   nu to raw = nu/maxIter before the gamma curve; values outside [0,1] are clamped.
-    // Param p (GpuPaletteParams): Input: five palette stops as normalized RGB floats (S0…S4).
-    //   The t*4 segment index picks the surrounding pair, f interpolates linearly.
+    //   nu to raw = nu/maxIter; values outside [0,1] are clamped.
     // Returns (int): Output: packed 32-bit ARGB color (alpha always 0xFF) for one subsample;
     //   the caller accumulates its R/G/B channels into the pixel average.
-    private static int ColorFromIterations(float iterations, int maxIter, GpuPaletteParams p)
+    private static int LutColor(ArrayView<int> lut, float smooth, int maxIter)
     {
-        float raw = iterations / (maxIter > 0 ? maxIter : 1);
-        raw = raw < 0f ? 0f : raw > 1f ? 1f : raw;
-        float t = MathF.Pow(raw, 0.35f);
-        float segment = t * 4f;
-        int i = (int)(segment < 3f ? segment : 3f);
-        float f = segment - i;
-        float ar = i == 0 ? p.S0R : i == 1 ? p.S1R : i == 2 ? p.S2R : p.S3R;
-        float ag = i == 0 ? p.S0G : i == 1 ? p.S1G : i == 2 ? p.S2G : p.S3G;
-        float ab = i == 0 ? p.S0B : i == 1 ? p.S1B : i == 2 ? p.S2B : p.S3B;
-        float br = i == 0 ? p.S1R : i == 1 ? p.S2R : i == 2 ? p.S3R : p.S4R;
-        float bg = i == 0 ? p.S1G : i == 1 ? p.S2G : i == 2 ? p.S3G : p.S4G;
-        float bb = i == 0 ? p.S1B : i == 1 ? p.S2B : i == 2 ? p.S3B : p.S4B;
-        return unchecked((int)(0xFF000000u | ((uint)((ar + f * (br - ar)) * 255f) << 16) | ((uint)((ag + f * (bg - ag)) * 255f) << 8) | (uint)((ab + f * (bb - ab)) * 255f)));
+        int len = PaletteColors.LutSize;
+        float pos = smooth / (maxIter > 0 ? maxIter : 1) * len - 0.5f;
+        if (pos <= 0f) return lut[0];
+        if (pos >= len - 1) return lut[len - 1];
+        int i0 = (int)pos;
+        float f = pos - i0;
+        int c0 = lut[i0], c1 = lut[i0 + 1];
+        float r = ((c0 >> 16) & 255) + f * ((((c1 >> 16) & 255) - ((c0 >> 16) & 255)));
+        float g = ((c0 >> 8) & 255) + f * ((((c1 >> 8) & 255) - ((c0 >> 8) & 255)));
+        float b = (c0 & 255) + f * (((c1 & 255) - (c0 & 255)));
+        return unchecked((int)(0xFF000000u | ((uint)r << 16) | ((uint)g << 8) | (uint)b));
     }
 
     // CUDA render kernel, single precision (float 32-bit): full on-chip SSAA color
     // of one output pixel. The thread loops over its k×k subsamples on the global
-    // k-times grid, runs the escape iteration with smooth log/log correction, maps
-    // each subsample through the palette, and writes the RGB average. VRAM traffic
+    // k-times grid, skips known-interior points via the cardioid/bulb test
+    // (Mandelbrot only), runs the escape iteration with smooth log/log correction, maps
+    // each subsample through the palette table, and writes the RGB average. VRAM traffic
     // stays O(W×H): the W*k×H*k grid is never materialized.
     // Param index (Index1D): Input: linear thread index (0 … W*H-1). Decoded inside
     //   as x = index % W (output column in this tile) and y = index / W (output row).
@@ -428,8 +453,8 @@ internal static class GpuMandelbrot
     //   FullW/FullH + OffsetX/OffsetY (tile → whole-image mapping, keeps tiled output
     //   pixel-identical), CenterX/TopY/PixelSize (grid → complex mapping in float),
     //   MaxIter, JuliaOn/Jcx/Jcy (Julia: z(0) = pixel, c = constant; else z(0) = 0, c = pixel).
-    // Param palette (GpuPaletteParams): Input: five palette stops as normalized RGB floats.
-    private static void FloatKernel(Index1D index, ArrayView<int> pixels, GpuViewParams p, GpuPaletteParams palette)
+    // Param lut (ArrayView<int>): Input: cached device palette table (packed ARGB).
+    private static void FloatKernel(Index1D index, ArrayView<int> pixels, GpuViewParams p, ArrayView<int> lut)
     {
         int i = index.X;
         int x = i % p.W;
@@ -443,26 +468,36 @@ internal static class GpuMandelbrot
             {
                 float px = (float)p.CenterX + ((p.OffsetX + x) * k + sx - p.FullW * k * 0.5f) * pixel;
                 float py = (float)p.TopY + ((p.OffsetY + y) * k + sy) * pixel;
-                // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
-                float zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
-                float ccx = p.JuliaOn != 0 ? (float)p.Jcx : px;
-                float ccy = p.JuliaOn != 0 ? (float)p.Jcy : py;
-                float zx2 = zx * zx, zy2 = zy * zy;
-                int iter = 0;
-                while (iter < p.MaxIter && zx2 + zy2 <= 4f)
+                int color;
+                // Cardioid + period-2 bulb early-out (Mandelbrot only, mirrors the CPU):
+                // interior points skip the escape loop entirely.
+                if (p.JuliaOn == 0 && IsInteriorBulbD(px, py))
                 {
-                    zy = 2 * zx * zy + ccy;
-                    zx = zx2 - zy2 + ccx;
-                    zx2 = zx * zx;
-                    zy2 = zy * zy;
-                    ++iter;
+                    color = unchecked((int)0xFF000000);
                 }
-                float smoothIterations = iter >= p.MaxIter
-                    ? p.MaxIter
-                    : iter + 1f - XMath.Log2(0.5f * XMath.Log2(MathF.Max(zx2 + zy2, 4f)));
-                int color = iter >= p.MaxIter
-                    ? unchecked((int)0xFF000000)
-                    : ColorFromIterations(smoothIterations, p.MaxIter, palette);
+                else
+                {
+                    // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
+                    float zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
+                    float ccx = p.JuliaOn != 0 ? (float)p.Jcx : px;
+                    float ccy = p.JuliaOn != 0 ? (float)p.Jcy : py;
+                    float zx2 = zx * zx, zy2 = zy * zy;
+                    int iter = 0;
+                    while (iter < p.MaxIter && zx2 + zy2 <= 4f)
+                    {
+                        zy = 2 * zx * zy + ccy;
+                        zx = zx2 - zy2 + ccx;
+                        zx2 = zx * zx;
+                        zy2 = zy * zy;
+                        ++iter;
+                    }
+                    float smoothIterations = iter >= p.MaxIter
+                        ? p.MaxIter
+                        : iter + 1f - XMath.Log2(0.5f * XMath.Log2(MathF.Max(zx2 + zy2, 4f)));
+                    color = iter >= p.MaxIter
+                        ? unchecked((int)0xFF000000)
+                        : LutColor(lut, smoothIterations, p.MaxIter);
+                }
                 sumR += (color >> 16) & 255;
                 sumG += (color >> 8) & 255;
                 sumB += color & 255;
@@ -473,7 +508,8 @@ internal static class GpuMandelbrot
     }
 
     // CUDA render kernel, double precision (float 64-bit): full on-chip SSAA color
-    // of one output pixel. Same contract as FloatKernel, but the escape iteration
+    // of one output pixel. Same contract as FloatKernel (including the
+    // cardioid/bulb early-out), but the escape iteration
     // and the grid → complex mapping run in double, so deep zoom (scale &lt; 1e-3)
     // stays sharp where float runs out of digits. About 6x slower than float.
     // Param index (Index1D): Input: linear thread index (0 … W*H-1). Decoded inside
@@ -483,9 +519,9 @@ internal static class GpuMandelbrot
     // Param p (GpuViewParams): Input: view parameters. Used: W/H (tile size), Supersample k,
     //   FullW/FullH + OffsetX/OffsetY (tile → whole-image mapping), CenterX/TopY/PixelSize
     //   (grid → complex mapping in double), MaxIter, JuliaOn/Jcx/Jcy (mode switch).
-    // Param palette (GpuPaletteParams): Input: five palette stops as normalized RGB floats (the
-    //   smoothed value is narrowed to float only for the final palette lookup).
-    private static void DoubleKernel(Index1D index, ArrayView<int> pixels, GpuViewParams p, GpuPaletteParams palette)
+    // Param lut (ArrayView<int>): Input: cached device palette table (packed ARGB;
+    //   the smoothed value is narrowed to float only for the table lookup).
+    private static void DoubleKernel(Index1D index, ArrayView<int> pixels, GpuViewParams p, ArrayView<int> lut)
     {
         int i = index.X;
         int x = i % p.W;
@@ -498,26 +534,36 @@ internal static class GpuMandelbrot
             {
                 double px = p.CenterX + ((p.OffsetX + x) * k + sx - p.FullW * k * 0.5) * p.PixelSize;
                 double py = p.TopY + ((p.OffsetY + y) * k + sy) * p.PixelSize;
-                // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
-                double zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
-                double ccx = p.JuliaOn != 0 ? p.Jcx : px;
-                double ccy = p.JuliaOn != 0 ? p.Jcy : py;
-                double zx2 = zx * zx, zy2 = zy * zy;
-                int iter = 0;
-                while (iter < p.MaxIter && zx2 + zy2 <= 4.0)
+                int color;
+                // Cardioid + period-2 bulb early-out (Mandelbrot only, mirrors the CPU):
+                // interior points skip the escape loop entirely.
+                if (p.JuliaOn == 0 && IsInteriorBulbD(px, py))
                 {
-                    zy = 2 * zx * zy + ccy;
-                    zx = zx2 - zy2 + ccx;
-                    zx2 = zx * zx;
-                    zy2 = zy * zy;
-                    ++iter;
+                    color = unchecked((int)0xFF000000);
                 }
-                double smoothIterations = iter >= p.MaxIter
-                    ? p.MaxIter
-                    : iter + 1.0 - XMath.Log2(0.5 * XMath.Log2(Math.Max(zx2 + zy2, 4.0)));
-                int color = iter >= p.MaxIter
-                    ? unchecked((int)0xFF000000)
-                    : ColorFromIterations((float)smoothIterations, p.MaxIter, palette);
+                else
+                {
+                    // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
+                    double zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
+                    double ccx = p.JuliaOn != 0 ? p.Jcx : px;
+                    double ccy = p.JuliaOn != 0 ? p.Jcy : py;
+                    double zx2 = zx * zx, zy2 = zy * zy;
+                    int iter = 0;
+                    while (iter < p.MaxIter && zx2 + zy2 <= 4.0)
+                    {
+                        zy = 2 * zx * zy + ccy;
+                        zx = zx2 - zy2 + ccx;
+                        zx2 = zx * zx;
+                        zy2 = zy * zy;
+                        ++iter;
+                    }
+                    double smoothIterations = iter >= p.MaxIter
+                        ? p.MaxIter
+                        : iter + 1.0 - XMath.Log2(0.5 * XMath.Log2(Math.Max(zx2 + zy2, 4.0)));
+                    color = iter >= p.MaxIter
+                        ? unchecked((int)0xFF000000)
+                        : LutColor(lut, (float)smoothIterations, p.MaxIter);
+                }
                 sumR += (color >> 16) & 255;
                 sumG += (color >> 8) & 255;
                 sumB += color & 255;

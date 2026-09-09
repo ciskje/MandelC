@@ -242,12 +242,12 @@ public partial class ExportForm : Form
         try
         {
             int rowBytes = source.Width * 4;
-            var row = new byte[rowBytes];
-            for (int y = 0; y < source.Height; y++)
+            unsafe
             {
-                System.Runtime.InteropServices.Marshal.Copy(sourceData.Scan0 + y * sourceData.Stride, row, 0, rowBytes);
-                System.Runtime.InteropServices.Marshal.Copy(row, 0,
-                    destinationData.Scan0 + y * destinationData.Stride, rowBytes);
+                byte* src = (byte*)sourceData.Scan0;
+                byte* dst = (byte*)destinationData.Scan0;
+                for (int y = 0; y < source.Height; y++)
+                    Buffer.MemoryCopy(src + (long)y * sourceData.Stride, dst + (long)y * destinationData.Stride, rowBytes, rowBytes);
             }
         }
         finally

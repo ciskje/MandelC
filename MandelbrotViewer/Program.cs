@@ -7,7 +7,7 @@ static class Program
     static void Main(string[] args)
     {
         // Diagnostics and benchmarks without UI: --diag-dx [card] | --diag-gpu |
-        // --bench-dx [card] | --bench-cuda [device] | --bench-cpu [--csv file]
+        // --bench-dx [card] | --bench-cuda [device] | --bench-cpu [float] [--csv file]
         // (see Diagnostics.cs). `--csv file` appends one row per run to the CSV.
         if (args.Length > 0 && args[0] == "--diag-dx")
         {
@@ -28,8 +28,9 @@ static class Program
         }
         if (args.Length > 0 && args[0] == "--bench-cpu")
         {
-            var (_, csv) = ParseBenchArgs(args);
-            Diagnostics.BenchCpu(runs: 3, budget: BenchmarkStandard.Budget, csvPath: csv);
+            var (mode, csv) = ParseBenchArgs(args);
+            bool useFloat = string.Equals(mode, "float", StringComparison.OrdinalIgnoreCase);
+            Diagnostics.BenchCpu(runs: 3, budget: BenchmarkStandard.Budget, csvPath: csv, useFloat: useFloat);
             return;
         }
         if (args.Length > 0 && args[0] == "--diag-gpu")
@@ -59,8 +60,9 @@ static class Program
         }
     }
 
-    // Arguments of the --bench-* commands: first positional = card/device,
-    // `--csv file` anywhere after the flag. Returns (device, csvPath).
+    // Arguments of the --bench-* commands: first positional = card/device
+    // (--bench-cpu: precision mode "float", default double), `--csv file`
+    // anywhere after the flag. Returns (device, csvPath).
     private static (string? Device, string? Csv) ParseBenchArgs(string[] args)
     {
         string? device = null, csv = null;

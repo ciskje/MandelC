@@ -112,6 +112,8 @@ The benchmark measures the same iterations-only workload for all engines:
 
 The CPU benchmark accumulates escape iterations. CUDA uses an iterations-only kernel with reused buffers and batched synchronization. DirectX uses an offscreen iterations-only shader with event-query completion tracking. Cancellation, timeout, and device-removal failures are reported instead of being treated as successful measurements.
 
+The CPU benchmark runs in double precision by default; `--bench-cpu float` runs the float workload instead (own history, like CUDA 32-bit vs 64-bit). The benchmark window always runs the CPU double workload.
+
 The benchmark window renders a colored preview before measuring, reports progress approximately once per second, and displays the current result with stored history. Results are ordered by MPixel/s. CSV export writes one row per run containing timestamp, engine, device, precision, run, frame, seconds, and MPixel/s.
 
 ## Command-Line Diagnostics
@@ -120,7 +122,7 @@ The executable supports these non-UI commands:
 
 - `--bench-dx [card] [--csv file]`
 - `--bench-cuda [device] [--csv file]`
-- `--bench-cpu [--csv file]`
+- `--bench-cpu [float] [--csv file]`
 - `--diag-dx [card]`
 - `--diag-gpu`
 
@@ -129,3 +131,16 @@ The optional card or device argument selects one target; without it, available t
 ## Application Status
 
 The current application version is defined by `AppVersion` and the project file. Documentation is kept separate from release history, development tasks, generic questions, and repository workflow instructions.
+
+v2.19.2 render notes: the CPU path colors through a cached 4096-entry palette
+table with linear interpolation (v2.19.3; output within 1 LSB of the exact
+coloring), skips known-interior points via the main cardioid + period-2 bulb
+test (Mandelbrot mode only, also applied to the CPU benchmark), and writes the
+bitmap directly without an intermediate buffer. Since v2.19.4 the escape loop
+runs on SIMD vectors (double is bit-identical to scalar; float is used for
+Mandelbrot views at scale 1e-3 and above, with rare boundary-pixel differences
+vs double) and rows are scheduled in chunks. Since v2.20.1 the GPU render kernels
+sample the same cached 4096-entry palette table (CUDA device buffer, DirectX
+texture with linear filtering) and skip known-interior points via the
+cardioid/bulb test in Mandelbrot mode; GPU benchmark kernels are
+iterations-only and unchanged.

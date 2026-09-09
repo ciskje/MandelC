@@ -288,32 +288,40 @@ internal static class Diagnostics
     }
 
     // Standard triple test on the CPU: runs the standardized benchmark
-    // (Mandelbrot.BenchmarkCpu, double) and prints the values in MPixel/s with
-    // the best one — the measure used for the CPU history of the benchmark graph
-    // (with model name).
+    // (Mandelbrot.BenchmarkCpu double or BenchmarkCpuFloat) and prints the values
+    // in MPixel/s with the best one — the measure used for the CPU history of the
+    // benchmark graph (with model name).
     // Param runs (int): Input, repetitions.
     // Param budget (TimeSpan): Input, time budget of each single run.
     // Param csvPath (string?): Input, CSV file for one row per run; null = no CSV output.
-    public static void BenchCpu(int runs, TimeSpan budget, string? csvPath = null)
+    // Param useFloat (bool): Input, true for the float workload (own history, like
+    //   CUDA 32-bit), false for double (default, the GUI benchmark workload).
+    public static void BenchCpu(int runs, TimeSpan budget, string? csvPath = null, bool useFloat = false)
     {
+        string precision = useFloat ? "float" : "double";
         Console.WriteLine($"Standardized CPU benchmark ({CpuName()}): {runs} runs of {budget.TotalSeconds:0} s, " +
             $"area {BenchmarkStandard.Width}x{BenchmarkStandard.Height} AA{BenchmarkStandard.Aa} " +
             $"({BenchmarkStandard.PixelsPerFrame / 1e6:0.##} MPixel/frame), " +
-            $"{BenchmarkStandard.MaxIter} iter, double, iterations only.");
+            $"{BenchmarkStandard.MaxIter} iter, {precision}, iterations only.");
 
         double best = 0;
         for (int r = 1; r <= runs; r++)
         {
             try
             {
-                var (_, seconds, frames) = Mandelbrot.BenchmarkCpu(
-                    BenchmarkStandard.CenterX, BenchmarkStandard.CenterY, BenchmarkStandard.Scale,
-                    BenchmarkStandard.Width, BenchmarkStandard.Height, BenchmarkStandard.MaxIter,
-                    BenchmarkStandard.Aa, budget, null, CancellationToken.None);
+                var (_, seconds, frames) = useFloat
+                    ? Mandelbrot.BenchmarkCpuFloat(
+                        BenchmarkStandard.CenterX, BenchmarkStandard.CenterY, BenchmarkStandard.Scale,
+                        BenchmarkStandard.Width, BenchmarkStandard.Height, BenchmarkStandard.MaxIter,
+                        BenchmarkStandard.Aa, budget, null, CancellationToken.None)
+                    : Mandelbrot.BenchmarkCpu(
+                        BenchmarkStandard.CenterX, BenchmarkStandard.CenterY, BenchmarkStandard.Scale,
+                        BenchmarkStandard.Width, BenchmarkStandard.Height, BenchmarkStandard.MaxIter,
+                        BenchmarkStandard.Aa, budget, null, CancellationToken.None);
                 double mps = BenchmarkStandard.PixelsPerSecond(frames, seconds) / 1e6;
                 best = Math.Max(best, mps);
                 Console.WriteLine($"  run {r}: {frames} frames in {seconds:0.00} s  →  {mps:0.#} MPixel/s");
-                WriteCsvRow(csvPath, "CPU", CpuName(), "double", r, frames, seconds, mps);
+                WriteCsvRow(csvPath, "CPU", CpuName(), precision, r, frames, seconds, mps);
             }
             catch (Exception ex)
             {
