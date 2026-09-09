@@ -1,7 +1,6 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
-- [x] Push v2.21.0 with published exe in GitHub Release + README download check — completed
-- [x] Update screen1.png with a real startup screenshot — completed (captured live v2.21 window, 1044x834)
+- [x] Update screen1.png with cropped version — completed (docs only, no version bump)
 - [x] v2.21.0 Home button with arrow + "Home" text — completed
 - [x] v2.21.0 Home button first in row (house glyph idea) — cancelled (superseded by arrow + "Home" text below)
 - [x] v2.21.0 CPU honors the 32/64-bit UI setting like other engines (no fallback) — completed
