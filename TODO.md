@@ -1,5 +1,6 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] Bust GitHub Camo cache on screen1.png with ?raw=true — completed (docs only, no version bump)
 - [x] Update screen1.png with cropped version — completed (docs only, no version bump)
 - [x] v2.21.0 Home button with arrow + "Home" text — completed
 - [x] v2.21.0 Home button first in row (house glyph idea) — cancelled (superseded by arrow + "Home" text below)
