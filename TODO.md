@@ -1,5 +1,6 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] Add screen2.png to README — completed (docs only, no version bump)
 - [x] v2.20.1 WP3 GPU palette LUT (CUDA device table, DX texture LUT) — completed
 - [x] Question: should the benchmark run at 4K? (analysis: no — 960x540 deep zone is already compute-dominated at 80ms/frame; 4K would destroy history incl. unremeasurable bars, TDR weak GPUs, and not change engine ranking) — completed (no code change)
 - [x] v2.20.1: Commit and push with published exe in GitHub Release + README download check — completed

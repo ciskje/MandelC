@@ -8,6 +8,8 @@ Interactive Mandelbrot set viewer built with C# / WinForms (.NET 8, Windows only
 
 ![Screenshot](screen1.png)
 
+![Screenshot](screen2.png)
+
 ## Features
 
 - **Three rendering engines** with automatic fallback:
