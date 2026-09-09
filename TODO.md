@@ -1,6 +1,8 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
 - [x] v2.20.1 WP3 GPU palette LUT (CUDA device table, DX texture LUT) — completed
+- [x] Question: should the benchmark run at 4K? (analysis: no — 960x540 deep zone is already compute-dominated at 80ms/frame; 4K would destroy history incl. unremeasurable bars, TDR weak GPUs, and not change engine ranking) — completed (no code change)
+- [x] v2.20.1: Commit and push with published exe in GitHub Release + README download check — completed
 - [x] v2.20.0 CPU float benchmark mode (`--bench-cpu float`, chart reference) — completed
 - [x] v2.19.4 WP2 CPU SIMD + float path (vector escape core, chunk partitioner, vector benchmark) — completed
 - [x] v2.19.3 CPU banding fix (LUT 4096 with lerp lookup) — completed
