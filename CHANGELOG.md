@@ -2,6 +2,26 @@
 
 Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 `AGENTS.md`. The version is shown in the window title.
+- **v2.22.0** — Native CUDA backend replacing ILGPU: the four kernels live
+  in `Cuda/mandelbrot.cu`, compile to PTX at build time (`nvcc`, embedded
+  resource, regenerable; checked-in PTX keeps toolkit-less builds working),
+  and run through a minimal `nvcuda.dll` driver-API binding (`CudaNative.cs`,
+  no NuGet wrapper). Explicit wave allocation: `grid = ceil(N/block)` with a
+  per-precision init probe over 128/256/512/1024 threads per block
+  (measured on RTX 5070 Ti: 512 float / 128 double; both saturate the SMs).
+  PTX uses `--fmad=false` so rational arithmetic matches the CPU bit for
+  bit. Bonus fix found by the new pixel-diff harness: the old backend
+  smoothed with `log2(0.5*log2(|z|²))` instead of the correct
+  `log2(0.5*ln(|z|²))`, shifting every exterior color; native output is now
+  pixel-identical to the CPU in float/double, Mandelbrot/Julia, AA1x/AA2x
+  and tiled offsets (0 diffs on all scenes). Benchmark history remeasured
+  (best of 3, Release): CUDA 5070 Ti 289.8/5.8 and 4070 SUPER 230.2/4.6
+  (32/64-bit; float slightly above the ILGPU values, double lower due to no
+  FMA). Files: `Cuda/mandelbrot.cu` + `mandelbrot.ptx` (new),
+  `CudaNative.cs` (new), `GpuMandelbrot.cs`, `MandelbrotViewer.csproj`,
+  `BenchmarkForm.cs`, `Palette.cs`, `Mandelbrot.cs`, `MandelbrotForm.cs`,
+  `MandelbrotForm.Designer.cs`, `RenderEngine.cs`, `TODO.md`, `SPECS.md`,
+  `README.md`, `CHANGELOG.md`, `AppVersion.cs`.
 - **v2.21.0** — CPU honors the 32/64-bit setting like the other engines, with no
   fallback: 64-bit renders everything in double, 32-bit in float (Mandelbrot and
   Julia, any zoom; less precise at deep zoom, by user choice). Precision radios

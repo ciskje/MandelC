@@ -6,21 +6,34 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>2.21.0</Version>
-    <AssemblyVersion>2.21.0.0</AssemblyVersion>
-    <FileVersion>2.21.0.0</FileVersion>
+    <Version>2.22.0</Version>
+    <AssemblyVersion>2.22.0.0</AssemblyVersion>
+    <FileVersion>2.22.0.0</FileVersion>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ILGPU" Version="1.5.3" />
-    <PackageReference Include="ILGPU.Algorithms" Version="1.5.3" />
     <EmbeddedResource Include="app.ico" />
+    <EmbeddedResource Include="Cuda\mandelbrot.ptx">
+      <LogicalName>MandelbrotViewer.Cuda.mandelbrot.ptx</LogicalName>
+    </EmbeddedResource>
+    <None Include="Cuda\mandelbrot.cu" />
     <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
     <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
   </ItemGroup>
+
+  <!-- Regenerates the embedded PTX from the .cu source when nvcc is available.
+       Without nvcc (or without its MSVC host compiler) the build keeps the
+       checked-in PTX with a warning; end-user machines never need the toolkit. -->
+  <Target Name="CompileCudaPtx" BeforeTargets="BeforeBuild"
+          Inputs="Cuda\mandelbrot.cu" Outputs="Cuda\mandelbrot.ptx"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command='nvcc --ptx "$(MSBuildProjectDirectory)\Cuda\mandelbrot.cu" -o "$(MSBuildProjectDirectory)\Cuda\mandelbrot.ptx" -arch=compute_75'
+          ContinueOnError="WarnAndContinue"
+          StandardOutputImportance="low" />
+  </Target>
 
 </Project>

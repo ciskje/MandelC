@@ -1,12 +1,10 @@
 using System.Drawing.Imaging;
-using ILGPU;
-using ILGPU.Algorithms;
-using ILGPU.Runtime;
-using ILGPU.Runtime.Cuda;
+using System.Runtime.InteropServices;
 
 namespace MandelbrotViewer;
 
-// View parameters passed to the kernels (blittable struct, must be public for ILGPU).
+// View parameters passed to the kernels (blittable struct shared with
+// Cuda/mandelbrot.cu: same field order, same 8-byte packing, 88 bytes total).
 public readonly struct GpuViewParams
 {
     public readonly double CenterX;
@@ -45,49 +43,72 @@ public readonly struct GpuViewParams
     }
 }
 
-// CUDA backend via ILGPU: one thread per pixel computes the escape, the smooth
-// coloring (through a cached device palette table shared with the CPU path)
-// and the AA downsampling directly on the GPU.
+// CUDA backend over the driver API (nvcuda.dll): kernels are compiled from
+// Cuda/mandelbrot.cu to PTX at build time and launched with an explicit
+// grid/block layout chosen here (no runtime compiler, no JIT framework).
+// One thread per pixel computes the escape, the smooth coloring (through a
+// cached device palette table shared with the CPU path) and the AA
+// downsampling directly on the GPU.
 internal static class GpuMandelbrot
 {
-    private static Context? _context;
-    private static Accelerator? _accelerator;
-    private static Action<Index1D, ArrayView<int>, GpuViewParams, ArrayView<int>>? _floatKernel;
-    private static Action<Index1D, ArrayView<int>, GpuViewParams, ArrayView<int>>? _doubleKernel;
-    // Benchmark kernel: only the iteration count, no |z|² buffer (a third of the traffic).
-    private static Action<Index1D, ArrayView<int>, GpuViewParams>? _floatBenchKernel;
-    private static Action<Index1D, ArrayView<int>, GpuViewParams>? _doubleBenchKernel;
+    // Embedded PTX resource built from Cuda/mandelbrot.cu (see csproj target).
+    private const string PtxResourceName = "MandelbrotViewer.Cuda.mandelbrot.ptx";
+    // Expected native size of GpuViewParams (must match the C struct).
+    private const int ViewParamsSize = 88;
+    // Block-size candidates swept by the init probe (threads per block).
+    private static readonly int[] TuneCandidates = [128, 256, 512, 1024];
+
     private static readonly object RenderGate = new();
-    private static MemoryBuffer1D<int, Stride1D.Dense>? _renderPixelsBuffer;
+    private static IntPtr _ctx = IntPtr.Zero;
+    private static IntPtr _module = IntPtr.Zero;
+    private static IntPtr _floatFunc = IntPtr.Zero;
+    private static IntPtr _doubleFunc = IntPtr.Zero;
+    private static IntPtr _floatBenchFunc = IntPtr.Zero;
+    private static IntPtr _doubleBenchFunc = IntPtr.Zero;
+    private static ulong _dPixels;
     private static int[]? _renderPixels;
     private static int _renderCount;
     // Device palette table (packed ARGB, same entries as PaletteColors.GetLut),
     // uploaded once per palette/iteration combination and reused across frames.
-    private static MemoryBuffer1D<int, Stride1D.Dense>? _lutBuffer;
+    private static ulong _dLut;
     private static Palette _lutPalette = (Palette)(-1);
     private static int _lutMaxIter = -1;
+    // Explicit wave allocation: tuned threads-per-block per precision
+    // (default 256 = 8 warps; refined by the init probe, see TuneBlocks).
+    private static int _blockFloat = 256;
+    private static int _blockDouble = 256;
 
-    public static bool IsReady => _accelerator != null;
+    public static bool IsReady => _ctx != IntPtr.Zero;
     public static string DeviceName { get; private set; } = "";
     public static string DeviceShortName => DeviceName.Replace("NVIDIA GeForce ", "");
     // Reason of the last failed initialization (diagnostic).
     public static string LastError { get; private set; } = "";
+    // Device summary with the chosen launch layout (diagnostic).
+    public static string DeviceDetails { get; private set; } = "";
 
     // True if the scale requires double (float does not have enough digits).
     public static bool WantsDouble(double scale) => scale < 1e-3;
 
-    // CUDA devices available (ILGPU names); empty if no CUDA.
+    // CUDA devices available (driver names); empty if no CUDA.
     public static IReadOnlyList<string> DeviceNames()
     {
         try
         {
-            _context ??= Context.Create(builder => builder.Default().EnableAlgorithms());
-            return _context.Devices
-                .Where(d => d.AcceleratorType == AcceleratorType.Cuda)
-                .Select(d => d.Name)
-                .Distinct()
-                .OrderBy(n => n)
-                .ToList();
+            CudaNative.Init();
+            int n = CudaNative.DeviceCount();
+            var names = new List<string>(n);
+            for (int o = 0; o < n; o++)
+            {
+                try
+                {
+                    names.Add(CudaNative.GetDeviceName(CudaNative.GetDevice(o)));
+                }
+                catch
+                {
+                    // Skip unreadable devices, like the old enumeration did.
+                }
+            }
+            return names.Distinct().OrderBy(x => x).ToList();
         }
         catch
         {
@@ -95,102 +116,313 @@ internal static class GpuMandelbrot
         }
     }
 
-    // Initializes the context, the CUDA device and the kernels. With deviceName
+    // Initializes the driver, the CUDA context and the kernels. With deviceName
     // it uses that card; without it, it tries the CUDA devices from the largest.
     // Returns false if none works (the CPU is used).
     public static bool TryInitialize(string? deviceName = null)
     {
         if (IsReady && (deviceName == null || DeviceName == deviceName)) return true;
         LastError = "";
-        ResetAccelerator();
+        ResetCore();
         try
         {
-            _context ??= Context.Create(builder => builder.Default().EnableAlgorithms());
-            var cudaDevices = _context.Devices
-                .Where(d => d.AcceleratorType == AcceleratorType.Cuda)
-                .ToList();
-            if (cudaDevices.Count == 0)
+            if (Marshal.SizeOf<GpuViewParams>() != ViewParamsSize)
+                throw new InvalidOperationException(
+                    $"GpuViewParams is {Marshal.SizeOf<GpuViewParams>()} bytes, native side expects {ViewParamsSize}.");
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.GetType().Name + ": " + ex.Message;
+            return false;
+        }
+        byte[] ptx;
+        try
+        {
+            ptx = LoadPtxImage();
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.GetType().Name + ": " + ex.Message;
+            return false;
+        }
+        List<(int Dev, string Name, ulong Mem)> devices;
+        try
+        {
+            CudaNative.Init();
+            int n = CudaNative.DeviceCount();
+            devices = new List<(int, string, ulong)>(n);
+            for (int o = 0; o < n; o++)
             {
-                LastError = "No CUDA device enumerated.";
-                return false;
-            }
-
-            var candidates = deviceName == null
-                ? cudaDevices.OrderByDescending(d => d.MemorySize).ToList()
-                : cudaDevices.Where(d => d.Name == deviceName).ToList();
-            if (candidates.Count == 0)
-            {
-                LastError = $"CUDA device not found: {deviceName}";
-                return false;
-            }
-
-            foreach (var device in candidates)
-            {
+                int dev;
                 try
                 {
-                    _accelerator = device.CreateAccelerator(_context);
-                    DeviceName = device.Name;
-                    _floatKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams, ArrayView<int>>(FloatKernel);
-                    _doubleKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams, ArrayView<int>>(DoubleKernel);
-                    _floatBenchKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams>(FloatBenchKernel);
-                    _doubleBenchKernel = _accelerator.LoadAutoGroupedStreamKernel<Index1D, ArrayView<int>, GpuViewParams>(DoubleBenchKernel);
-                    return true;
+                    dev = CudaNative.GetDevice(o);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    LastError = $"{device.Name}: {ex.GetType().Name}: {ex.Message}";
-                    ResetAccelerator();
+                    continue;
                 }
+                string name;
+                try
+                {
+                    name = CudaNative.GetDeviceName(dev);
+                }
+                catch
+                {
+                    name = $"CUDA device {o}";
+                }
+                ulong mem;
+                try
+                {
+                    mem = CudaNative.GetTotalMem(dev);
+                }
+                catch
+                {
+                    mem = 0;
+                }
+                devices.Add((dev, name, mem));
             }
+        }
+        catch (DllNotFoundException ex)
+        {
+            LastError = "NVIDIA driver (nvcuda.dll) not available: " + ex.Message;
             return false;
         }
         catch (Exception ex)
         {
             LastError = ex.GetType().Name + ": " + ex.Message;
-            ResetAccelerator();
             return false;
+        }
+        if (devices.Count == 0)
+        {
+            LastError = "No CUDA device enumerated.";
+            return false;
+        }
+
+        var candidates = deviceName == null
+            ? devices.OrderByDescending(d => d.Mem).ToList()
+            : devices.Where(d => d.Name == deviceName).ToList();
+        if (candidates.Count == 0)
+        {
+            LastError = $"CUDA device not found: {deviceName}";
+            return false;
+        }
+
+        foreach (var c in candidates)
+        {
+            try
+            {
+                SetupDevice(c.Dev, c.Name, c.Mem, ptx);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LastError = $"{c.Name}: {ex.GetType().Name}: {ex.Message}";
+                ResetCore();
+            }
+        }
+        return false;
+    }
+
+    // Reads the embedded PTX image with a trailing zero byte for cuModuleLoadDataEx.
+    // Returns (byte[]): Output: PTX bytes plus one zero terminator.
+    private static byte[] LoadPtxImage()
+    {
+        using var s = typeof(GpuMandelbrot).Assembly.GetManifestResourceStream(PtxResourceName)
+            ?? throw new InvalidOperationException(
+                $"Embedded CUDA PTX '{PtxResourceName}' not found (rebuild with the PTX resource).");
+        if (s.Length is <= 0 or > 10_000_000)
+            throw new InvalidOperationException($"Embedded CUDA PTX has an unexpected size ({s.Length} bytes).");
+        var ptx = new byte[s.Length + 1];
+        int read = s.Read(ptx, 0, (int)s.Length);
+        if (read != (int)s.Length)
+            throw new InvalidOperationException("Embedded CUDA PTX could not be fully read.");
+        ptx[^1] = 0;
+        return ptx;
+    }
+
+    // Creates the context on one device, loads the module and tunes the launch
+    // layout. Must run outside RenderGate (caller holds no lock yet).
+    // Param dev (int): Input: driver device handle. Param name (string): Input: device display name.
+    // Param mem (ulong): Input: total device memory in bytes. Param ptx (byte[]): Input: PTX image.
+    private static void SetupDevice(int dev, string name, ulong mem, byte[] ptx)
+    {
+        _ctx = CudaNative.CreateContext(dev);
+        try
+        {
+            _module = CudaNative.LoadModule(ptx);
+            _floatFunc = CudaNative.GetFunction(_module, "FloatKernel");
+            _doubleFunc = CudaNative.GetFunction(_module, "DoubleKernel");
+            _floatBenchFunc = CudaNative.GetFunction(_module, "FloatBenchKernel");
+            _doubleBenchFunc = CudaNative.GetFunction(_module, "DoubleBenchKernel");
+            DeviceName = name;
+            int sm = CudaNative.GetAttribute(dev, CudaNative.AttrMultiprocessorCount);
+            int major = CudaNative.GetAttribute(dev, CudaNative.AttrComputeCapabilityMajor);
+            int minor = CudaNative.GetAttribute(dev, CudaNative.AttrComputeCapabilityMinor);
+            TuneBlocks();
+            int occF = CudaNative.ActiveBlocksPerSm(_floatBenchFunc, _blockFloat);
+            int occD = CudaNative.ActiveBlocksPerSm(_doubleBenchFunc, _blockDouble);
+            DeviceDetails = $"SM x{sm}, CC {major}.{minor}, {mem / (1024 * 1024)} MB, " +
+                $"block {_blockFloat}/{_blockDouble} (32/64-bit), occ {occF}/{occD} blocks/SM";
+        }
+        catch
+        {
+            ResetCore();
+            throw;
         }
     }
 
-    // Unloads accelerator+kernels (the CUDA context stays reusable).
-    private static void ResetAccelerator()
+    // Picks the fastest threads-per-block per precision with a small occupancy
+    // probe (480x270 grid, 500 iterations): for this register-light escape loop
+    // the ranking is occupancy-driven, so it holds for full-size frames while
+    // the probe costs a fraction of a second even in double precision.
+    // Wave math for a frame of N threads on S SMs with B threads/block and
+    // R resident blocks/SM: blocks = ceil(N/B), waves = blocks/(S*R).
+    // Must run with the context current on this thread.
+    private static void TuneBlocks()
     {
-        lock (RenderGate)
-            ResetAcceleratorCore();
+        const int pw = 480;
+        const int ph = 270;
+        const int pIter = 500;
+        double pixel = 0.01 / pw;
+        var probe = new GpuViewParams(-0.75, 0.0, pixel, 0.0 - (ph * 0.5) * pixel, pw, ph, pIter);
+        int count = pw * ph;
+        ulong dProbe = CudaNative.Alloc((ulong)count * 4);
+        try
+        {
+            _blockFloat = TuneOne(_floatBenchFunc, dProbe, probe, count);
+            _blockDouble = TuneOne(_doubleBenchFunc, dProbe, probe, count);
+        }
+        finally
+        {
+            CudaNative.Free(dProbe);
+        }
     }
 
-    private static void ResetAcceleratorCore()
+    // Times one kernel over the candidate block sizes, returns the fastest.
+    // Param func (IntPtr): Input: bench kernel handle. Param dBuf (ulong): Input: probe device buffer.
+    // Param view (GpuViewParams): Input: probe view. Param count (int): Input: probe thread count.
+    // Returns (int): Output: winning threads-per-block (256 on any failure).
+    private static int TuneOne(IntPtr func, ulong dBuf, in GpuViewParams view, int count)
     {
-        _floatKernel = null;
-        _doubleKernel = null;
-        _floatBenchKernel = null;
-        _doubleBenchKernel = null;
-        _renderPixelsBuffer?.Dispose();
-        _renderPixelsBuffer = null;
-        _renderPixels = null;
-        _renderCount = 0;
-        _lutBuffer?.Dispose();
-        _lutBuffer = null;
-        _lutPalette = (Palette)(-1);
-        _lutMaxIter = -1;
-        _accelerator?.Dispose();
-        _accelerator = null;
-        DeviceName = "";
+        int best = 256;
+        double bestSeconds = double.PositiveInfinity;
+        foreach (int b in TuneCandidates)
+        {
+            try
+            {
+                uint grid = GridFor(count, b);
+                CudaNative.LaunchBench(func, grid, (uint)b, dBuf, view);
+                CudaNative.Synchronize();
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                for (int i = 0; i < 3; i++)
+                    CudaNative.LaunchBench(func, grid, (uint)b, dBuf, view);
+                CudaNative.Synchronize();
+                sw.Stop();
+                double avg = sw.Elapsed.TotalSeconds / 3;
+                if (avg < bestSeconds)
+                {
+                    bestSeconds = avg;
+                    best = b;
+                }
+            }
+            catch
+            {
+                // A failing candidate is skipped; the default survives.
+            }
+        }
+        return best;
+    }
+
+    // Block count covering count threads. Param count (int): Input: thread count.
+    // Param block (int): Input: threads per block. Returns (uint): Output: grid size.
+    private static uint GridFor(int count, int block) => (uint)((count + block - 1) / block);
+
+    // Unloads context+kernels and frees device buffers (the driver stays initialized).
+    private static void ResetCore()
+    {
+        lock (RenderGate)
+        {
+            _floatFunc = IntPtr.Zero;
+            _doubleFunc = IntPtr.Zero;
+            _floatBenchFunc = IntPtr.Zero;
+            _doubleBenchFunc = IntPtr.Zero;
+            if (_dPixels != 0)
+            {
+                try
+                {
+                    CudaNative.Free(_dPixels);
+                }
+                catch
+                {
+                    // Best effort during teardown.
+                }
+                _dPixels = 0;
+            }
+            if (_dLut != 0)
+            {
+                try
+                {
+                    CudaNative.Free(_dLut);
+                }
+                catch
+                {
+                    // Best effort during teardown.
+                }
+                _dLut = 0;
+            }
+            _renderPixels = null;
+            _renderCount = 0;
+            _lutPalette = (Palette)(-1);
+            _lutMaxIter = -1;
+            if (_module != IntPtr.Zero)
+            {
+                try
+                {
+                    CudaNative.UnloadModule(_module);
+                }
+                catch
+                {
+                    // Best effort during teardown.
+                }
+                _module = IntPtr.Zero;
+            }
+            if (_ctx != IntPtr.Zero)
+            {
+                try
+                {
+                    CudaNative.DestroyContext(_ctx);
+                }
+                catch
+                {
+                    // Best effort during teardown.
+                }
+                _ctx = IntPtr.Zero;
+            }
+            DeviceName = "";
+            DeviceDetails = "";
+            _blockFloat = 256;
+            _blockDouble = 256;
+        }
     }
 
     // Ensures the device palette table matches the requested palette/iterations.
-    // Uploads once per combination; frames reuse it. Must run under RenderGate.
-    // Param accelerator (Accelerator): Input: active CUDA accelerator owning the buffer.
+    // Uploads once per combination; frames reuse it. Must run under RenderGate
+    // with the context current.
     // Param palette (Palette): Input: palette baked into the table.
     // Param maxIter (int): Input: iteration budget baked into the table normalization.
-    private static void EnsureLut(Accelerator accelerator, Palette palette, int maxIter)
+    private static void EnsureLut(Palette palette, int maxIter)
     {
-        if (_lutBuffer != null && _lutPalette == palette && _lutMaxIter == maxIter)
+        if (_dLut != 0 && _lutPalette == palette && _lutMaxIter == maxIter)
             return;
         int[] host = PaletteColors.GetLut(palette, maxIter);
-        _lutBuffer?.Dispose();
-        _lutBuffer = accelerator.Allocate1D<int>(host.Length);
-        _lutBuffer.CopyFromCPU(host);
+        if (_dLut != 0)
+        {
+            CudaNative.Free(_dLut);
+            _dLut = 0;
+        }
+        _dLut = CudaNative.Alloc((ulong)host.Length * 4);
+        CudaNative.CopyHtoD(_dLut, host);
         _lutPalette = palette;
         _lutMaxIter = maxIter;
     }
@@ -214,7 +446,8 @@ internal static class GpuMandelbrot
     {
         lock (RenderGate)
         {
-            var accelerator = _accelerator ?? throw new InvalidOperationException("GPU not initialized.");
+            if (_ctx == IntPtr.Zero) throw new InvalidOperationException("GPU not initialized.");
+            CudaNative.SetCurrent(_ctx);
             int k = Math.Max(1, supersample);
             int bigW = fullWidth * k;
             int bigH = fullHeight * k;
@@ -222,29 +455,33 @@ internal static class GpuMandelbrot
             double topY = centerY - (bigH * 0.5) * pixelSize;
             var view = new GpuViewParams(centerX, centerY, pixelSize, topY, bmp.Width, bmp.Height, maxIter, k,
                 julia ? 1 : 0, juliaCx, juliaCy, fullWidth, fullHeight, offsetX, offsetY);
-            EnsureLut(accelerator, palette, maxIter);
+            EnsureLut(palette, maxIter);
             int count = bmp.Width * bmp.Height;
             if (_renderCount != count)
             {
-                _renderPixelsBuffer?.Dispose();
-                _renderPixelsBuffer = accelerator.Allocate1D<int>(count);
+                if (_dPixels != 0)
+                {
+                    CudaNative.Free(_dPixels);
+                    _dPixels = 0;
+                }
+                _dPixels = CudaNative.Alloc((ulong)count * 4);
                 _renderPixels = new int[count];
                 _renderCount = count;
             }
 
-            var kernel = useDouble ? _doubleKernel! : _floatKernel!;
-            var pixelsBuffer = _renderPixelsBuffer!;
-            var pixels = _renderPixels!;
-            kernel(count, pixelsBuffer.View, view, _lutBuffer!.View);
-            accelerator.Synchronize();
+            int block = useDouble ? _blockDouble : _blockFloat;
+            IntPtr func = useDouble ? _doubleFunc : _floatFunc;
+            CudaNative.LaunchRender(func, GridFor(count, block), (uint)block, _dPixels, view, _dLut);
+            CudaNative.Synchronize();
             ct.ThrowIfCancellationRequested();
-            pixelsBuffer.CopyToCPU(pixels);
+            var pixels = _renderPixels!;
+            CudaNative.CopyDtoH(pixels, _dPixels);
 
             var rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
             BitmapData data = bmp.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
             try
             {
-                System.Runtime.InteropServices.Marshal.Copy(pixels, 0, data.Scan0, pixels.Length);
+                Marshal.Copy(pixels, 0, data.Scan0, pixels.Length);
             }
             finally
             {
@@ -263,7 +500,8 @@ internal static class GpuMandelbrot
 
     private static (long TotalIters, double Seconds, int Frames) BenchmarkGpuCore(double centerX, double centerY, double scale, int w, int h, int maxIter, int supersample, bool useDouble, TimeSpan budget, IProgress<BenchmarkProgress>? progress, CancellationToken ct)
     {
-        var accelerator = _accelerator ?? throw new InvalidOperationException("GPU not initialized.");
+        if (_ctx == IntPtr.Zero) throw new InvalidOperationException("GPU not initialized.");
+        CudaNative.SetCurrent(_ctx);
 
         // Buffers allocated once and reused for all the frames (no extra alloc/copy).
         int k = Math.Max(1, supersample);
@@ -273,303 +511,62 @@ internal static class GpuMandelbrot
         double topY = centerY - (bigH * 0.5) * pixelSize;
         var pars = new GpuViewParams(centerX, centerY, pixelSize, topY, bigW, bigH, maxIter);
         int count = bigW * bigH;
-        var kernel = useDouble ? _doubleBenchKernel! : _floatBenchKernel!;
-        using var itersBuffer = accelerator.Allocate1D<int>(count);
-
-        // Keep several kernels in flight, like the DirectX benchmark. A
-        // synchronize after every launch measures submit latency and starves
-        // fast GPUs instead of measuring their compute throughput.
-        const int batchMin = 4;
-        const int batchMax = 256;
-        const double safeQueuedSeconds = 0.8;
-        int estimateFrames = batchMin;
-        var estimateWatch = System.Diagnostics.Stopwatch.StartNew();
-        for (int i = 0; i < estimateFrames; i++)
-            kernel(count, itersBuffer.View, pars);
-        accelerator.Synchronize();
-        double frameSeconds = Math.Max(1e-6, estimateWatch.Elapsed.TotalSeconds / estimateFrames);
-        int batchSize = Math.Clamp((int)Math.Round(safeQueuedSeconds / frameSeconds), batchMin, batchMax);
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        int frames = 0;
-        bool first = true;
-        TimeSpan lastReport = TimeSpan.Zero;
-
-        while (sw.Elapsed < budget)
+        int block = useDouble ? _blockDouble : _blockFloat;
+        IntPtr func = useDouble ? _doubleBenchFunc : _floatBenchFunc;
+        uint grid = GridFor(count, block);
+        ulong dIters = CudaNative.Alloc((ulong)count * 4);
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            int submitted = 0;
-            while (submitted < batchSize && sw.Elapsed < budget)
-            {
-                kernel(count, itersBuffer.View, pars);
-                submitted++;
-            }
-            accelerator.Synchronize();
-            ct.ThrowIfCancellationRequested();
-            frames += submitted;
-            if (first || sw.Elapsed - lastReport >= BenchmarkProgress.ReportInterval)
-            {
-                progress?.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));
-                lastReport = sw.Elapsed;
-                first = false;
-            }
-        }
+            // Keep several kernels in flight, like the DirectX benchmark. A
+            // synchronize after every launch measures submit latency and starves
+            // fast GPUs instead of measuring their compute throughput.
+            const int batchMin = 4;
+            const int batchMax = 256;
+            const double safeQueuedSeconds = 0.8;
+            int estimateFrames = batchMin;
+            var estimateWatch = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < estimateFrames; i++)
+                CudaNative.LaunchBench(func, grid, (uint)block, dIters, pars);
+            CudaNative.Synchronize();
+            double frameSeconds = Math.Max(1e-6, estimateWatch.Elapsed.TotalSeconds / estimateFrames);
+            int batchSize = Math.Clamp((int)Math.Round(safeQueuedSeconds / frameSeconds), batchMin, batchMax);
 
-        progress?.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));
-        return (0, sw.Elapsed.TotalSeconds, frames);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            int frames = 0;
+            bool first = true;
+            TimeSpan lastReport = TimeSpan.Zero;
+
+            while (sw.Elapsed < budget)
+            {
+                ct.ThrowIfCancellationRequested();
+                int submitted = 0;
+                while (submitted < batchSize && sw.Elapsed < budget)
+                {
+                    CudaNative.LaunchBench(func, grid, (uint)block, dIters, pars);
+                    submitted++;
+                }
+                CudaNative.Synchronize();
+                ct.ThrowIfCancellationRequested();
+                frames += submitted;
+                if (first || sw.Elapsed - lastReport >= BenchmarkProgress.ReportInterval)
+                {
+                    progress?.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));
+                    lastReport = sw.Elapsed;
+                    first = false;
+                }
+            }
+
+            progress?.Report(new BenchmarkProgress(sw.Elapsed.TotalSeconds, 0, frames));
+            return (0, sw.Elapsed.TotalSeconds, frames);
+        }
+        finally
+        {
+            CudaNative.Free(dIters);
+        }
     }
 
     public static void Dispose()
     {
-        ResetAccelerator();
-        _context?.Dispose();
-        _context = null;
-    }
-
-    // ---------- Benchmark kernel: only iterations (no |z|², a third of the traffic) ----------
-
-    // CUDA benchmark kernel, single precision (float 32-bit): escape-iteration
-    // count of one elementary sample, no coloring, no smoothing, no SSAA averaging.
-    // One GPU thread handles exactly one grid cell; the measured throughput is
-    // pure Mandelbrot iteration compute.
-    // Param index (Index1D): Input: linear thread index (0 … W*H-1). Decoded inside
-    //   as x = index % W (column on the samples grid) and y = index / W (row).
-    // Param iters (ArrayView<int>): Output: device buffer of W*H ints. Element [index] receives
-    //   the escape-iteration count of this sample (0 … MaxIter). Read back by the host
-    //   only for validation; the benchmark counts frames, not values.
-    // Param p (GpuViewParams): Input: view parameters. Used here: W/H (grid size), CenterX,
-    //   PixelSize, TopY (sample → complex mapping), MaxIter (loop bound). Ignored here:
-    //   Supersample, palette, Julia fields, tile offsets (the benchmark grid is whole-frame).
-    // Note: Coordinate mapping and incremental-squares loop are identical to the
-    // DirectX benchmark shader, so the two engines measure the same workload.
-    private static void FloatBenchKernel(Index1D index, ArrayView<int> iters, GpuViewParams p)
-    {
-        int i = index.X;
-        int x = i % p.W;
-        int y = i / p.W;
-        float pixel = (float)p.PixelSize;
-        float cx = (float)p.CenterX + (x - p.W * 0.5f) * pixel;
-        float cy = (float)p.TopY + y * pixel;
-
-        float zx = 0, zy = 0, zx2 = 0, zy2 = 0;
-        int iter = 0;
-        while (iter < p.MaxIter && zx2 + zy2 <= 4f)
-        {
-            zy = 2 * zx * zy + cy;
-            zx = zx2 - zy2 + cx;
-            zx2 = zx * zx;
-            zy2 = zy * zy;
-            ++iter;
-        }
-        iters[index] = iter;
-    }
-
-    // CUDA benchmark kernel, double precision (float 64-bit): escape-iteration
-    // count of one elementary sample, no coloring, no smoothing, no SSAA averaging.
-    // One GPU thread handles exactly one grid cell; used when deep zoom needs more
-    // digits than float provides (about 6x slower than the float kernel).
-    // Param index (Index1D): Input: linear thread index (0 … W*H-1). Decoded inside
-    //   as x = index % W (column on the samples grid) and y = index / W (row).
-    // Param iters (ArrayView<int>): Output: device buffer of W*H ints. Element [index] receives
-    //   the escape-iteration count of this sample (0 … MaxIter).
-    // Param p (GpuViewParams): Input: view parameters. Used here: W/H (grid size), CenterX,
-    //   CenterY-independent TopY, PixelSize (sample → complex mapping in double),
-    //   MaxIter (loop bound). Ignored here: Supersample, palette, Julia fields,
-    //   tile offsets.
-    private static void DoubleBenchKernel(Index1D index, ArrayView<int> iters, GpuViewParams p)
-    {
-        int i = index.X;
-        int x = i % p.W;
-        int y = i / p.W;
-        double cx = p.CenterX + (x - p.W * 0.5) * p.PixelSize;
-        double cy = p.TopY + y * p.PixelSize;
-
-        double zx = 0, zy = 0, zx2 = 0, zy2 = 0;
-        int iter = 0;
-        while (iter < p.MaxIter && zx2 + zy2 <= 4.0)
-        {
-            zy = 2 * zx * zy + cy;
-            zx = zx2 - zy2 + cx;
-            zx2 = zx * zx;
-            zy2 = zy * zy;
-            ++iter;
-        }
-        iters[index] = iter;
-    }
-
-    // Main cardioid + period-2 bulb test, device version of Mandelbrot.IsInteriorBulb.
-    // Conservative in exact math (only true interior); the float kernel classifies
-    // the float coordinates in double, like the CPU float render path.
-    // Param px (double): Input: point real coordinate. Param py (double): Input: imaginary.
-    // Returns (bool): Output: true when the point is known interior (renders black).
-    private static bool IsInteriorBulbD(double px, double py)
-    {
-        double q = (px - 0.25) * (px - 0.25) + py * py;
-        if (q * (q + (px - 0.25)) <= 0.25 * py * py) return true;
-        double dx = px + 1.0;
-        return dx * dx + py * py <= 0.0625;
-    }
-
-    // Palette lookup in the CUDA kernel through the cached device table (same
-    // entries as PaletteColors.GetLut on the CPU): no Pow and no stop search per
-    // subsample, linear interpolation between entries (no banding).
-    // Device-only helper, called once per subsample by FloatKernel/DoubleKernel.
-    // Param lut (ArrayView<int>): Input: device table of PaletteColors.LutSize packed
-    //   ARGB colors (gamma baked). Read-only in the kernel.
-    // Param smooth (float): Input: smoothed escape value nu. Interior points pass
-    //   MaxIter and clamp to the last entry; exterior points carry the fractional
-    //   log/log correction.
-    // Param maxIter (int): Input: reference iteration budget of the view. Normalizes
-    //   nu to raw = nu/maxIter; values outside [0,1] are clamped.
-    // Returns (int): Output: packed 32-bit ARGB color (alpha always 0xFF) for one subsample;
-    //   the caller accumulates its R/G/B channels into the pixel average.
-    private static int LutColor(ArrayView<int> lut, float smooth, int maxIter)
-    {
-        int len = PaletteColors.LutSize;
-        float pos = smooth / (maxIter > 0 ? maxIter : 1) * len - 0.5f;
-        if (pos <= 0f) return lut[0];
-        if (pos >= len - 1) return lut[len - 1];
-        int i0 = (int)pos;
-        float f = pos - i0;
-        int c0 = lut[i0], c1 = lut[i0 + 1];
-        float r = ((c0 >> 16) & 255) + f * ((((c1 >> 16) & 255) - ((c0 >> 16) & 255)));
-        float g = ((c0 >> 8) & 255) + f * ((((c1 >> 8) & 255) - ((c0 >> 8) & 255)));
-        float b = (c0 & 255) + f * (((c1 & 255) - (c0 & 255)));
-        return unchecked((int)(0xFF000000u | ((uint)r << 16) | ((uint)g << 8) | (uint)b));
-    }
-
-    // CUDA render kernel, single precision (float 32-bit): full on-chip SSAA color
-    // of one output pixel. The thread loops over its k×k subsamples on the global
-    // k-times grid, skips known-interior points via the cardioid/bulb test
-    // (Mandelbrot only), runs the escape iteration with smooth log/log correction, maps
-    // each subsample through the palette table, and writes the RGB average. VRAM traffic
-    // stays O(W×H): the W*k×H*k grid is never materialized.
-    // Param index (Index1D): Input: linear thread index (0 … W*H-1). Decoded inside
-    //   as x = index % W (output column in this tile) and y = index / W (output row).
-    // Param pixels (ArrayView<int>): Output: device buffer of W*H packed ARGB ints. Element [index]
-    //   receives the SSAA-averaged color of this output pixel; the host copies it to RAM
-    //   and blits it into the tile bitmap.
-    // Param p (GpuViewParams): Input: view parameters. Used: W/H (tile size), Supersample k,
-    //   FullW/FullH + OffsetX/OffsetY (tile → whole-image mapping, keeps tiled output
-    //   pixel-identical), CenterX/TopY/PixelSize (grid → complex mapping in float),
-    //   MaxIter, JuliaOn/Jcx/Jcy (Julia: z(0) = pixel, c = constant; else z(0) = 0, c = pixel).
-    // Param lut (ArrayView<int>): Input: cached device palette table (packed ARGB).
-    private static void FloatKernel(Index1D index, ArrayView<int> pixels, GpuViewParams p, ArrayView<int> lut)
-    {
-        int i = index.X;
-        int x = i % p.W;
-        int y = i / p.W;
-        int k = p.Supersample;
-        float pixel = (float)p.PixelSize;
-        float sumR = 0, sumG = 0, sumB = 0;
-        for (int sy = 0; sy < k; sy++)
-        {
-            for (int sx = 0; sx < k; sx++)
-            {
-                float px = (float)p.CenterX + ((p.OffsetX + x) * k + sx - p.FullW * k * 0.5f) * pixel;
-                float py = (float)p.TopY + ((p.OffsetY + y) * k + sy) * pixel;
-                int color;
-                // Cardioid + period-2 bulb early-out (Mandelbrot only, mirrors the CPU):
-                // interior points skip the escape loop entirely.
-                if (p.JuliaOn == 0 && IsInteriorBulbD(px, py))
-                {
-                    color = unchecked((int)0xFF000000);
-                }
-                else
-                {
-                    // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
-                    float zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
-                    float ccx = p.JuliaOn != 0 ? (float)p.Jcx : px;
-                    float ccy = p.JuliaOn != 0 ? (float)p.Jcy : py;
-                    float zx2 = zx * zx, zy2 = zy * zy;
-                    int iter = 0;
-                    while (iter < p.MaxIter && zx2 + zy2 <= 4f)
-                    {
-                        zy = 2 * zx * zy + ccy;
-                        zx = zx2 - zy2 + ccx;
-                        zx2 = zx * zx;
-                        zy2 = zy * zy;
-                        ++iter;
-                    }
-                    float smoothIterations = iter >= p.MaxIter
-                        ? p.MaxIter
-                        : iter + 1f - XMath.Log2(0.5f * XMath.Log2(MathF.Max(zx2 + zy2, 4f)));
-                    color = iter >= p.MaxIter
-                        ? unchecked((int)0xFF000000)
-                        : LutColor(lut, smoothIterations, p.MaxIter);
-                }
-                sumR += (color >> 16) & 255;
-                sumG += (color >> 8) & 255;
-                sumB += color & 255;
-            }
-        }
-        float samples = k * k;
-        pixels[index] = unchecked((int)(0xFF000000u | ((uint)(sumR / samples) << 16) | ((uint)(sumG / samples) << 8) | (uint)(sumB / samples)));
-    }
-
-    // CUDA render kernel, double precision (float 64-bit): full on-chip SSAA color
-    // of one output pixel. Same contract as FloatKernel (including the
-    // cardioid/bulb early-out), but the escape iteration
-    // and the grid → complex mapping run in double, so deep zoom (scale &lt; 1e-3)
-    // stays sharp where float runs out of digits. About 6x slower than float.
-    // Param index (Index1D): Input: linear thread index (0 … W*H-1). Decoded inside
-    //   as x = index % W (output column in this tile) and y = index / W (output row).
-    // Param pixels (ArrayView<int>): Output: device buffer of W*H packed ARGB ints. Element [index]
-    //   receives the SSAA-averaged color of this output pixel.
-    // Param p (GpuViewParams): Input: view parameters. Used: W/H (tile size), Supersample k,
-    //   FullW/FullH + OffsetX/OffsetY (tile → whole-image mapping), CenterX/TopY/PixelSize
-    //   (grid → complex mapping in double), MaxIter, JuliaOn/Jcx/Jcy (mode switch).
-    // Param lut (ArrayView<int>): Input: cached device palette table (packed ARGB;
-    //   the smoothed value is narrowed to float only for the table lookup).
-    private static void DoubleKernel(Index1D index, ArrayView<int> pixels, GpuViewParams p, ArrayView<int> lut)
-    {
-        int i = index.X;
-        int x = i % p.W;
-        int y = i / p.W;
-        int k = p.Supersample;
-        double sumR = 0, sumG = 0, sumB = 0;
-        for (int sy = 0; sy < k; sy++)
-        {
-            for (int sx = 0; sx < k; sx++)
-            {
-                double px = p.CenterX + ((p.OffsetX + x) * k + sx - p.FullW * k * 0.5) * p.PixelSize;
-                double py = p.TopY + ((p.OffsetY + y) * k + sy) * p.PixelSize;
-                int color;
-                // Cardioid + period-2 bulb early-out (Mandelbrot only, mirrors the CPU):
-                // interior points skip the escape loop entirely.
-                if (p.JuliaOn == 0 && IsInteriorBulbD(px, py))
-                {
-                    color = unchecked((int)0xFF000000);
-                }
-                else
-                {
-                    // Julia: z(0) = pixel point, c = constant; Mandelbrot: z(0) = 0, c = pixel.
-                    double zx = p.JuliaOn != 0 ? px : 0, zy = p.JuliaOn != 0 ? py : 0;
-                    double ccx = p.JuliaOn != 0 ? p.Jcx : px;
-                    double ccy = p.JuliaOn != 0 ? p.Jcy : py;
-                    double zx2 = zx * zx, zy2 = zy * zy;
-                    int iter = 0;
-                    while (iter < p.MaxIter && zx2 + zy2 <= 4.0)
-                    {
-                        zy = 2 * zx * zy + ccy;
-                        zx = zx2 - zy2 + ccx;
-                        zx2 = zx * zx;
-                        zy2 = zy * zy;
-                        ++iter;
-                    }
-                    double smoothIterations = iter >= p.MaxIter
-                        ? p.MaxIter
-                        : iter + 1.0 - XMath.Log2(0.5 * XMath.Log2(Math.Max(zx2 + zy2, 4.0)));
-                    color = iter >= p.MaxIter
-                        ? unchecked((int)0xFF000000)
-                        : LutColor(lut, (float)smoothIterations, p.MaxIter);
-                }
-                sumR += (color >> 16) & 255;
-                sumG += (color >> 8) & 255;
-                sumB += color & 255;
-            }
-        }
-        double samples = k * k;
-        pixels[index] = unchecked((int)(0xFF000000u | ((uint)(sumR / samples) << 16) | ((uint)(sumG / samples) << 8) | (uint)(sumB / samples)));
+        ResetCore();
     }
 }

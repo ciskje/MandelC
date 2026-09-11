@@ -47,6 +47,20 @@ High-resolution PNG export uses the selected antialiasing without automatic redu
 ### CUDA
 
 - Available on NVIDIA hardware; the application falls back to CPU rendering when CUDA is unavailable.
+- Native backend (no runtime compiler framework): the four kernels in
+  `Cuda/mandelbrot.cu` (float/double render + float/double iterations-only
+  benchmark, with the cardioid/bulb test, smooth log/log coloring through
+  the cached palette table, and on-chip SSAA) are compiled to PTX at build
+  time and embedded in the executable; the C# side drives them through a
+  minimal `nvcuda.dll` driver-API binding (`CudaNative.cs`). End-user
+  machines need only the NVIDIA driver, never the CUDA toolkit.
+- Explicit wave allocation: launches use `grid = ceil(N/block)` with a
+  tuned threads-per-block per precision (default 256 = 8 warps). At
+  initialization a small occupancy probe times 128/256/512/1024 on each
+  kernel and keeps the fastest; the log window reports SM count, compute
+  capability, chosen blocks, and resident blocks/SM. PTX is built with FMA
+  contraction disabled so the rational arithmetic matches the CPU bit for
+  bit; render output is pixel-identical to the CPU engine in all modes.
 - Supports 32-bit float and 64-bit double precision, with 64-bit as the default.
 - Performs fractal computation, coloring, and antialiasing on the GPU, then transfers the final bitmap to the host.
 - Reuses device and host buffers between frames where possible.
@@ -135,7 +149,7 @@ The optional card or device argument selects one target; without it, available t
 
 The current application version is defined by `AppVersion` and the project file. Documentation is kept separate from release history, development tasks, generic questions, and repository workflow instructions.
 
-Release v2.21.0 is published on GitHub with the self-contained
+Release v2.22.0 is published on GitHub with the self-contained
 `MandelbrotViewer.exe` asset; the README links to the latest release download.
 
 v2.19.2 render notes: the CPU path colors through a cached 4096-entry palette

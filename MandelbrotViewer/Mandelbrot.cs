@@ -682,7 +682,7 @@ public static class Mandelbrot
     // Kept for reference and compatibility; the render hot loop now uses the
     // fast PaletteColors LUT. The smooth
     // (log/log) formula and the palette mapping must stay aligned with
-    // the CUDA kernel (GpuMandelbrot.cs) and the HLSL shader (DxMandelbrot.cs).
+    // the CUDA kernels (Cuda/mandelbrot.cu) and the HLSL shader (DxMandelbrot.cs).
     // Called once per subsample; the caller averages the channels.
     // Param iter (int): Input: raw escape-iteration count of the subsample
     //   (0 … maxIter). Values ≥ maxIter mean interior.

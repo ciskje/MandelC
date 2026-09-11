@@ -113,7 +113,7 @@ internal static class PaletteColors
     };
 
     // Color interpolation for the CPU path (aligned with
-    // the device table sampled by GpuMandelbrot.LutColor and with Graded in the HLSL shader).
+    // the device table sampled by LutColor in Cuda/mandelbrot.cu and with Graded in the HLSL shader).
     // Mapping: t = (nu/maxIter)^0.35 (gamma, smooth iteration already applied
     // by the caller).
     internal static int ColorFor(double iterations, int maxIter, Palette palette)

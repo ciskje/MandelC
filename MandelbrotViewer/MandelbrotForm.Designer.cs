@@ -428,7 +428,7 @@
         this.toolTip.SetToolTip(this.radPrec32, "CPU/CUDA precision 32-bit (float): faster, less precise. Ignored with DirectX.");
         this.toolTip.SetToolTip(this.radPrec64, "CPU/CUDA precision 64-bit (double): more precise, slower. Ignored with DirectX.");
         this.toolTip.SetToolTip(this.radioCpu, "CPU multicore engine (always available)");
-        this.toolTip.SetToolTip(this.radioCuda, "CUDA engine: NVIDIA GPU via ILGPU (float/double)");
+        this.toolTip.SetToolTip(this.radioCuda, "CUDA engine: NVIDIA GPU via native kernels (float/double)");
         this.toolTip.SetToolTip(this.radioDx, "DirectX engine: real-time GPU (float)");
         // menu items are ToolStripItem: use the ToolTipText property
         this.loadZoneItem.ToolTipText = "Reload the view saved in a JSON file (Ctrl+O)";

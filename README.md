@@ -14,7 +14,7 @@ Interactive Mandelbrot set viewer built with C# / WinForms (.NET 8, Windows only
 
 - **Three rendering engines** with automatic fallback:
   - **CPU** — always available, parallel SIMD (double; float fast path on wide Mandelbrot views)
-  - **CUDA** (NVIDIA) — float 32-bit or double 64-bit, via ILGPU
+  - **CUDA** (NVIDIA) — float 32-bit or double 64-bit, via native PTX kernels
   - **DirectX 11** — realtime ~60 fps pixel shader, via Vortice
 
 - **Smooth coloring** — consistent across all engines, 7 palettes (Fire, Ice, Thermal, Ocean, Violet, Desert, Forest), gamma curve `t^0.35` (float fast paths may differ on rare boundary pixels)
@@ -47,8 +47,8 @@ Interactive Mandelbrot set viewer built with C# / WinForms (.NET 8, Windows only
 
 ## Download
 
-Download the latest self-contained Windows executable (v2.21.0:
-`MandelbrotViewer.exe`, ~159 MB, no .NET installation required) from the
+Download the latest self-contained Windows executable (v2.22.0:
+`MandelbrotViewer.exe`, ~155 MB, no .NET installation required) from the
 [GitHub Releases page](https://github.com/ciskje/MandelC/releases/latest).
 Extract and run it.
 

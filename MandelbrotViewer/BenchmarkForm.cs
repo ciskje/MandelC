@@ -223,10 +223,10 @@ public partial class BenchmarkForm : Form
         var bars = new (string Label, double Value, Brush Brush)[]
         {
             ("Risultato", _measuredMpixel, actualBrush),
-            ("CUDA 5070 Ti 32-bit", 278.2, cudaBrush),
-            ("CUDA 4070 SUPER 32-bit", 222.1, cudaBrush),
-            ("CUDA 5070 Ti 64-bit", 6.7, cudaBrush),
-            ("CUDA 4070 S. 64-bit", 5.3, cudaBrush),
+            ("CUDA 5070 Ti 32-bit", 289.8, cudaBrush),
+            ("CUDA 4070 SUPER 32-bit", 230.2, cudaBrush),
+            ("CUDA 5070 Ti 64-bit", 5.8, cudaBrush),
+            ("CUDA 4070 S. 64-bit", 4.6, cudaBrush),
             ("DirectX 5070 Ti", 337.4, dxBrush),
             ("DirectX 4070 SUPER", 262.6, dxBrush),
             ("DirectX AMD Radeon", 5.2, dxBrush),

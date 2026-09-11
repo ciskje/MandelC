@@ -1,6 +1,6 @@
 namespace MandelbrotViewer;
 
-// Fractal rendering engine: `Cpu` (multicore), `Cuda` (v1.4, ILGPU)
+// Fractal rendering engine: `Cpu` (multicore), `Cuda` (v1.4 ILGPU, v2.22 native nvcc)
 // and `DirectX` (v2.0, realtime shader).
 public enum RenderEngine
 {

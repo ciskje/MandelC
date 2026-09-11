@@ -1,5 +1,6 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] v2.22.0 Native CUDA via nvcc (external compiler, explicit wave allocation, ILGPU removed) — completed
 - [x] Bust GitHub Camo cache on screen1.png with ?raw=true — completed (docs only, no version bump)
 - [x] Update screen1.png with cropped version — completed (docs only, no version bump)
 - [x] v2.21.0 Home button with arrow + "Home" text — completed
