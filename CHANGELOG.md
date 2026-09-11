@@ -4,6 +4,10 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 `AGENTS.md`. The version is shown in the window title. Entries are grouped
 by minor series below, newest first.
 ## v2.22.x — Native CUDA backend
+- **v2.22.7** — DirectX 5070 Ti history bar 322.4 → 338 (remeasured best of
+  3, Release: 338.5; 4070 SUPER bar kept at 262.4, remeasured 262.2).
+  Files: `BenchmarkForm.cs`, `TODO.md`, `CHANGELOG.md`, `AppVersion.cs`,
+  `.csproj`.
 - **v2.22.6** — Render kernels on the 2D grid too (same thread-to-pixel
   mapping as the benchmark kernels; no index division anywhere; the render
   path shares the tuned 32x8/32x4 layout, dead 1D `GridFor` removed).

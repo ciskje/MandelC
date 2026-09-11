@@ -233,7 +233,7 @@ public partial class BenchmarkForm : Form
             ("CUDA 4070 SUPER 32-bit", 250.1, cudaBrush),
             ("CUDA 5070 Ti 64-bit", 6.7, cudaBrush),
             ("CUDA 4070 S. 64-bit", 5.3, cudaBrush),
-            ("DirectX 5070 Ti", 322.4, dxBrush),
+            ("DirectX 5070 Ti", 338, dxBrush),
             ("DirectX 4070 SUPER", 262.4, dxBrush),
             ("DirectX AMD Radeon", 5.2, dxBrush),
             ("CPU 9900X", 9.7, cpuBrush),
