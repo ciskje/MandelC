@@ -156,7 +156,7 @@ The optional card or device argument selects one target; without it, available t
 
 The current application version is defined by `AppVersion` and the project file. Documentation is kept separate from release history, development tasks, generic questions, and repository workflow instructions.
 
-Release v2.22.4 is published on GitHub with the self-contained
+Release v2.22.7 is published on GitHub with the self-contained
 `MandelbrotViewer.exe` asset; the README links to the latest release download.
 
 v2.19.2 render notes: the CPU path colors through a cached 4096-entry palette
