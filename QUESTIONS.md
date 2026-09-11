@@ -38,6 +38,41 @@ zone constants) stays in `TODO.md` with its verdicts in `SPECS.md`.
 - **Generic questions in .md files not about the program source** — answered;
   this move itself (generic entries collected here).
 
+- **What PTX is** — answered. PTX (Parallel Thread Execution) is NVIDIA's
+  virtual GPU assembly: an intermediate, forward-compatible instruction set
+  between CUDA C++ (`.cu`) and the real per-architecture machine code (SASS).
+  The chain is `.cu` → PTX (via `nvcc` or NVRTC, sharing the same backend)
+  → SASS (via the driver's JIT compiler at module load, cached on disk).
+  One PTX file runs on every GPU because the driver translates it for the
+  actual chip (sm_89, sm_120, ...); SASS would need one binary per chip.
+  Think of it as the GPU equivalent of .NET IL or Java bytecode. This app
+  embeds one `compute_75` PTX (`Cuda/mandelbrot.ptx`, built from
+  `Cuda/mandelbrot.cu`) and loads it with `cuModuleLoadDataEx`; it is
+  compiled with `--fmad=false` so the rational arithmetic matches the CPU
+  bit for bit.
+
+- **What --fmad=false means** — answered. FMA (fused multiply-add) is one
+  GPU instruction computing `a*b+c` with a single rounding instead of two
+  (round after mul, round after add). With fusion on (`nvcc` default, and our
+  first PTX), the compiler silently merges separate `*` and `+` operations
+  of the escape loop (e.g. `2*zx*zy+ccy`) into FMAs: faster (one instruction
+  instead of two) and in isolation more accurate, but bit-different from the
+  CPU, where the .NET JIT evaluates mul and add separately. `--fmad=false`
+  forbids that contraction, so every GPU operation rounds exactly like its
+  CPU counterpart and the render comes out pixel-identical (verified: 0 diffs
+  on all scenes). Measured cost on the double-precision kernel: ~13%
+  throughput (6.7 → 5.8 MPixel/s on the 5070 Ti); the float kernel still
+  gained from the explicit block tuning.   Deliberate trade: identity with the
+  CPU over raw speed, same guarantee as the CPU SIMD path (v2.19.4).
+  Measured per-precision cost on the 5070 Ti (same PTX, flag on/off):
+  32-bit 295 → 291.3 MPixel/s (−1.3%), 64-bit 6.7 → 5.8 (−13%).
+  So the flag does affect 32-bit, but barely; the double loop pays most.
+  Decision v2.22.2: FMA enabled on both precisions (user choice, speed over
+  bit-identity). Measured vs-CPU pixel difference with FMA on: ≤0.7% of
+  pixels on all scenes except 32-bit deep zoom, where chaos amplification
+  reaches ~12% sparse flips; official history bars remeasured accordingly
+  (5070 Ti 293.7/6.7, 4070 SUPER 246.2/5.3).
+
 - **Where the blocks/warps split is in the program** — answered: nowhere, it
   is implicit. Our code only decides the thread count (one per sample); the
   blocks/warps slicing is done by the ILGPU runtime (CUDA) and by the

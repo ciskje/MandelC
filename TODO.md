@@ -1,5 +1,12 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] v2.22.3 Benchmark uses wrong GPU by default (first run scores like the 4070 until reselected) — completed (root cause: flaky autotune, not selection; probe fixed + device shown in results)
+- [x] v2.22.2 Enable FMA contraction in the CUDA PTX (speed over CPU bit-identity) — completed
+- [x] Question: does --fmad=false also affect CUDA 32-bit (measure FMA-on PTX vs FMA-off) — completed (yes, but only −1.3% float vs −13% double; shipped PTX verified restored via hash + full diff harness, no code change)
+- [x] Question: explain --fmad=false — completed (no code change, see QUESTIONS.md)
+- [x] Question: what is PTX? — completed (no code change, see QUESTIONS.md)
+- [x] v2.22.1 Refresh all benchmark history bars (CUDA + DirectX + CPU remeasured via CLI) — completed
+- [x] Question: how much was gained vs ILGPU, was it worth it (A/B measurements) — completed (verdict: throughput wash +4%/-13%, real wins are the smooth-color fix with CPU bit-identity, -225 ms startup, -3.4 MB exe, no ILGPU dependency; details in chat, no code change)
 - [x] v2.22.0 Native CUDA via nvcc (external compiler, explicit wave allocation, ILGPU removed) — completed
 - [x] Bust GitHub Camo cache on screen1.png with ?raw=true — completed (docs only, no version bump)
 - [x] Update screen1.png with cropped version — completed (docs only, no version bump)

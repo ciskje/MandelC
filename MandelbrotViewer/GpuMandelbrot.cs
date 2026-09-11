@@ -272,24 +272,33 @@ internal static class GpuMandelbrot
         }
     }
 
-    // Picks the fastest threads-per-block per precision with a small occupancy
-    // probe (480x270 grid, 500 iterations): for this register-light escape loop
-    // the ranking is occupancy-driven, so it holds for full-size frames while
-    // the probe costs a fraction of a second even in double precision.
+    // Picks the fastest threads-per-block per precision with an occupancy
+    // probe: for this register-light escape loop the ranking is
+    // occupancy-driven, so it holds for full-size frames while the probe
+    // costs about half a second even in double precision.
     // Wave math for a frame of N threads on S SMs with B threads/block and
     // R resident blocks/SM: blocks = ceil(N/B), waves = blocks/(S*R).
-    // Must run with the context current on this thread.
+    // The probe uses the real benchmark grid (960x540) at reduced iterations:
+    // same occupancy regime as the measured workload, so the ranking transfers
+    // (a small grid starves the SMs and ranks differently). Candidates run
+    // interleaved after a warmup, so clock ramp and JIT cannot bias the later
+    // ones; the median of 5 rounds wins. Must run with the context current.
     private static void TuneBlocks()
     {
-        const int pw = 480;
-        const int ph = 270;
-        const int pIter = 500;
+        const int pw = 960;
+        const int ph = 540;
+        const int pIter = 2000;
         double pixel = 0.01 / pw;
         var probe = new GpuViewParams(-0.75, 0.0, pixel, 0.0 - (ph * 0.5) * pixel, pw, ph, pIter);
         int count = pw * ph;
         ulong dProbe = CudaNative.Alloc((ulong)count * 4);
         try
         {
+            // Warmup: steady clocks and compiled kernels before timing anyone.
+            uint warmGrid = GridFor(count, 256);
+            for (int i = 0; i < 8; i++)
+                CudaNative.LaunchBench(_floatBenchFunc, warmGrid, 256, dProbe, probe);
+            CudaNative.Synchronize();
             _blockFloat = TuneOne(_floatBenchFunc, dProbe, probe, count);
             _blockDouble = TuneOne(_doubleBenchFunc, dProbe, probe, count);
         }
@@ -299,38 +308,58 @@ internal static class GpuMandelbrot
         }
     }
 
-    // Times one kernel over the candidate block sizes, returns the fastest.
+    // Times one kernel over the candidate block sizes, returns the fastest
+    // median. Rounds interleave the candidates to cancel clock drift.
     // Param func (IntPtr): Input: bench kernel handle. Param dBuf (ulong): Input: probe device buffer.
     // Param view (GpuViewParams): Input: probe view. Param count (int): Input: probe thread count.
     // Returns (int): Output: winning threads-per-block (256 on any failure).
     private static int TuneOne(IntPtr func, ulong dBuf, in GpuViewParams view, int count)
     {
-        int best = 256;
-        double bestSeconds = double.PositiveInfinity;
-        foreach (int b in TuneCandidates)
+        const int rounds = 5;
+        var grids = new uint[TuneCandidates.Length];
+        for (int c = 0; c < TuneCandidates.Length; c++)
+            grids[c] = GridFor(count, TuneCandidates[c]);
+        var times = new double[TuneCandidates.Length, rounds];
+        for (int r = 0; r < rounds; r++)
         {
-            try
+            for (int c = 0; c < TuneCandidates.Length; c++)
             {
-                uint grid = GridFor(count, b);
-                CudaNative.LaunchBench(func, grid, (uint)b, dBuf, view);
-                CudaNative.Synchronize();
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                for (int i = 0; i < 3; i++)
-                    CudaNative.LaunchBench(func, grid, (uint)b, dBuf, view);
-                CudaNative.Synchronize();
-                sw.Stop();
-                double avg = sw.Elapsed.TotalSeconds / 3;
-                if (avg < bestSeconds)
+                try
                 {
-                    bestSeconds = avg;
-                    best = b;
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    CudaNative.LaunchBench(func, grids[c], (uint)TuneCandidates[c], dBuf, view);
+                    CudaNative.Synchronize();
+                    sw.Stop();
+                    times[c, r] = sw.Elapsed.TotalSeconds;
+                }
+                catch
+                {
+                    times[c, r] = double.PositiveInfinity;
                 }
             }
-            catch
+        }
+        int best = 256;
+        double bestMedian = double.PositiveInfinity;
+        double median256 = double.PositiveInfinity;
+        for (int c = 0; c < TuneCandidates.Length; c++)
+        {
+            var sorted = new double[rounds];
+            for (int r = 0; r < rounds; r++)
+                sorted[r] = times[c, r];
+            Array.Sort(sorted);
+            if (TuneCandidates[c] == 256)
+                median256 = sorted[rounds / 2];
+            if (sorted[rounds / 2] < bestMedian)
             {
-                // A failing candidate is skipped; the default survives.
+                bestMedian = sorted[rounds / 2];
+                best = TuneCandidates[c];
             }
         }
+        // Keep the sane default unless the winner is clearly faster: medians
+        // within noise of each other must not flip the layout between runs.
+        const double minGain = 0.015;
+        if (best != 256 && (median256 - bestMedian) / median256 < minGain)
+            best = 256;
         return best;
     }
 

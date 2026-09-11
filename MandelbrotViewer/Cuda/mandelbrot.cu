@@ -1,8 +1,11 @@
 // Mandelbrot CUDA kernels, compiled with nvcc to PTX at build time.
 // One thread per output pixel (render) or per sample (benchmark).
-// Mirrors GpuMandelbrot.cs kernel math exactly: incremental squares loop,
+// Same math as the CPU path (Mandelbrot.cs): incremental squares loop,
 // cardioid/bulb early-out in double, 4096-entry palette LUT with lerp,
-// smooth log2 correction, Julia branch, tiled global coordinates.
+// smooth log/log correction, Julia branch, tiled global coordinates.
+// Compiled with FMA contraction enabled (nvcc/NVRTC default) for speed:
+// fused multiply-adds may round boundary pixels differently than the CPU
+// (rare single-pixel flips, amplified only in 32-bit deep zoom).
 
 typedef struct
 {
@@ -41,8 +44,9 @@ __device__ inline bool IsInteriorBulbD(double px, double py)
 
 // Palette lookup through the cached device table (same entries as
 // PaletteColors.GetLut on the CPU): linear interpolation, no banding.
-// Bit-mirrors PaletteColors.ColorFromLut: position and channel lerp run in
-// double from a precomputed 1/maxIter, then truncate.
+// Bit-mirrors PaletteColors.ColorFromLut (position and channel lerp run in
+// double from a precomputed 1/maxIter, then truncate; FMA may fuse the
+// final adds, unlike the CPU).
 // Param lut: device table of LUT_SIZE packed ARGB colors (gamma baked).
 // Param smooth: smoothed escape value nu. Param maxIter: view budget.
 // Returns packed 32-bit ARGB color (alpha always 0xFF).
@@ -110,8 +114,9 @@ extern "C" __global__ void DoubleBenchKernel(int* __restrict__ iters, GpuViewPar
 }
 
 // Render kernel, single precision: full on-chip SSAA color of one output
-// pixel. Bit-mirrors ComputePixelFloat: cardioid test in double on the
-// host-order coordinates, escape and smooth in float, integer accumulation.
+// pixel. Same math as ComputePixelFloat: cardioid test in double on the
+// host-order coordinates, escape and smooth in float, integer accumulation
+// (FMA contraction may flip rare boundary pixels vs the CPU).
 // Param idx contract, tile mapping and LUT averaging as in DoubleKernel below.
 extern "C" __global__ void FloatKernel(int* __restrict__ pixels, GpuViewParams p, const int* __restrict__ lut)
 {
@@ -171,8 +176,9 @@ extern "C" __global__ void FloatKernel(int* __restrict__ pixels, GpuViewParams p
 }
 
 // Render kernel, double precision: full on-chip SSAA color of one output
-// pixel. Bit-mirrors ComputePixelDouble: host-order originX coordinates,
-// integer channel accumulation with truncating average.
+// pixel. Same math as ComputePixelDouble: host-order originX coordinates,
+// integer channel accumulation with truncating average (FMA contraction may
+// flip rare boundary pixels vs the CPU).
 // The thread loops over its k x k subsamples on the global k-times grid;
 // VRAM traffic stays O(W x H), the W*k x H*k grid is never materialized.
 extern "C" __global__ void DoubleKernel(int* __restrict__ pixels, GpuViewParams p, const int* __restrict__ lut)

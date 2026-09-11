@@ -19,6 +19,7 @@ public partial class BenchmarkForm : Form
     private readonly bool _useCuda;
     private readonly bool _useDirectX;
     private readonly bool _useDouble;
+    private readonly string _deviceLabel;
     private CancellationTokenSource? _cts;
     private bool _running;
     private double _measuredMpixel;
@@ -34,6 +35,11 @@ public partial class BenchmarkForm : Form
         _useDirectX = engine == RenderEngine.DirectX && DxMandelbrot.IsReady;
         _useDouble = useDouble;
         _engine = _useDirectX ? RenderEngine.DirectX : _useCuda ? RenderEngine.Cuda : RenderEngine.Cpu;
+        // Device that actually runs the test (the benchmark uses the current
+        // engine initialization, so show it next to the result).
+        _deviceLabel = _useCuda ? GpuMandelbrot.DeviceShortName
+            : _useDirectX ? DxMandelbrot.ShortAdapterName(DxMandelbrot.AdapterName)
+            : Diagnostics.CpuName();
         string note = engine switch
         {
             RenderEngine.Cuda when !_useCuda => " (CUDA not ready, using CPU)",
@@ -152,8 +158,8 @@ public partial class BenchmarkForm : Form
             btnCsv.Enabled = true;
             lblResult.Text = FormatPixels(_measuredMpixel * 1e6);
             lblDetail.Text = _useDirectX
-                ? $"{frames} frame ({frames / seconds:F1} frame/s) {BW}x{BH} AA{BAA}x in {seconds:F1} s"
-                : $"{frames} frame {BW}x{BH} AA{BAA}x in {seconds:F1} s";
+                ? $"{frames} frame ({frames / seconds:F1} frame/s) {BW}x{BH} AA{BAA}x in {seconds:F1} s on {_deviceLabel}"
+                : $"{frames} frame {BW}x{BH} AA{BAA}x in {seconds:F1} s on {_deviceLabel}";
             lblLive.Text = "";
             chartPanel.Invalidate();
         }
@@ -223,12 +229,12 @@ public partial class BenchmarkForm : Form
         var bars = new (string Label, double Value, Brush Brush)[]
         {
             ("Risultato", _measuredMpixel, actualBrush),
-            ("CUDA 5070 Ti 32-bit", 289.8, cudaBrush),
-            ("CUDA 4070 SUPER 32-bit", 230.2, cudaBrush),
-            ("CUDA 5070 Ti 64-bit", 5.8, cudaBrush),
-            ("CUDA 4070 S. 64-bit", 4.6, cudaBrush),
-            ("DirectX 5070 Ti", 337.4, dxBrush),
-            ("DirectX 4070 SUPER", 262.6, dxBrush),
+            ("CUDA 5070 Ti 32-bit", 301.7, cudaBrush),
+            ("CUDA 4070 SUPER 32-bit", 247.1, cudaBrush),
+            ("CUDA 5070 Ti 64-bit", 6.7, cudaBrush),
+            ("CUDA 4070 S. 64-bit", 5.3, cudaBrush),
+            ("DirectX 5070 Ti", 322.4, dxBrush),
+            ("DirectX 4070 SUPER", 262.4, dxBrush),
             ("DirectX AMD Radeon", 5.2, dxBrush),
             ("CPU 9900X", 9.7, cpuBrush),
             ("CPU 9900X float", 15.3, cpuBrush),

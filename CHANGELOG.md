@@ -2,6 +2,31 @@
 
 Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 `AGENTS.md`. The version is shown in the window title.
+- **v2.22.3** — Fixed flaky autotune picking a slow block size on the first
+  run (the small cold-clock probe ranked a starved grid and chose 1024,
+  scoring 246 instead of ~300 on the 5070 Ti until the GPU was reselected).
+  The probe now warms up, runs on the real benchmark grid at reduced
+  iterations, interleaves candidates (median of 5), and keeps 256 without a
+  clear margin; fresh processes converge on 256/256 and ~300 MPixel/s.
+  Bonus: the benchmark result line now names the device that actually ran
+  (CUDA/DirectX/CPU). History bars remeasured: CUDA 5070 Ti 301.7/6.7 and
+  4070 SUPER 247.1/5.3. Files: `GpuMandelbrot.cs`, `BenchmarkForm.cs`,
+  `TODO.md`, `SPECS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.22.2** — FMA contraction enabled in the CUDA PTX (both precisions,
+  plain operators everywhere): 32-bit gains little (−1.3% measured cost of
+  disabling it), 64-bit gains ~15% (5070 Ti 5.8 → 6.7). Trade-off vs CPU
+  bit-identity accepted by design: ≤0.7% boundary pixels differ on all
+  scenes except 32-bit deep zoom (~12% sparse flips from chaos
+  amplification, inside that path's documented imprecision). History bars
+  remeasured (best of 3, Release): CUDA 5070 Ti 293.7/6.7 and 4070 SUPER
+  246.2/5.3. Files: `Cuda/mandelbrot.cu`, `Cuda/mandelbrot.ptx`,
+  `BenchmarkForm.cs`, `TODO.md`, `SPECS.md`, `QUESTIONS.md`,
+  `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.22.1** — Benchmark history refresh (best of 3, Release, same session):
+  CUDA 5070 Ti 291.3/5.8 and 4070 SUPER 230.1/4.6 (32/64-bit), DirectX 5070 Ti
+  322.4, 4070 SUPER 262.4 and Radeon 5.2, CPU 9900X 9.7 double / 15.3 float
+  (unchanged). No code change besides the reference table. Files:
+  `BenchmarkForm.cs`, `TODO.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 - **v2.22.0** — Native CUDA backend replacing ILGPU: the four kernels live
   in `Cuda/mandelbrot.cu`, compile to PTX at build time (`nvcc`, embedded
   resource, regenerable; checked-in PTX keeps toolkit-less builds working),
