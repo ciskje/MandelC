@@ -1,5 +1,6 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] Restructure CHANGELOG.md by minor series + AGENTS.md rule: questions go to QUESTIONS.md, never TODO.md — completed (docs only, no version bump)
 - [x] v2.22.3 Benchmark uses wrong GPU by default (first run scores like the 4070 until reselected) — completed (root cause: flaky autotune, not selection; probe fixed + device shown in results)
 - [x] v2.22.2 Enable FMA contraction in the CUDA PTX (speed over CPU bit-identity) — completed
 - [x] Question: does --fmad=false also affect CUDA 32-bit (measure FMA-on PTX vs FMA-off) — completed (yes, but only −1.3% float vs −13% double; shipped PTX verified restored via hash + full diff harness, no code change)

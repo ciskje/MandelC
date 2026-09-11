@@ -53,10 +53,14 @@ dotnet publish "MandelbrotViewer\MandelbrotViewer.csproj" -c Release -r win-x64 
 
 ## Workflow for each user request (mandatory)
 
-1. Add the request at the top as a `pending` entry in `TODO.md`.
+1. Add the request at the top as a `pending` entry in `TODO.md`
+   (tasks and bug reports only — never questions, see 5).
 2. Execute it; mark `completed` (or `cancelled`) as soon as done, no batching.
 3. Add a note in `SPECS.md` (what was done, files touched, version if bumped).
 4. Verify with build (`dotnet build`) when C# code is touched.
+5. Questions (anything the user asks to know, not to do) never go to
+   `TODO.md`; they go directly to `QUESTIONS.md` with their answer, and the
+   `TODO.md` history is left untouched.
 
 ## Git
 
