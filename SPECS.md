@@ -83,6 +83,72 @@ High-resolution PNG export uses the selected antialiasing without automatic redu
 
 The GPU selector lists available CUDA devices and DirectX adapters. `Auto` selects the most capable CUDA device or the default DirectX adapter. A chosen device is persisted and applied when the engine changes. If an engine is unavailable, the reason is shown in the status bar.
 
+## Optimizations
+
+Each item is tagged with its scope: benchmark only, interactive and export
+rendering, or both. The benchmark kernels of both engines run the identical
+incremental-squares escape loop, so the benchmark compares engine overhead,
+not different math.
+
+### CUDA
+
+- Iterations-only benchmark kernels (no coloring, smoothing, or sample
+  averaging) with reused device buffers [benchmark].
+- 2D launch grid for every kernel: thread (x, y) maps directly to its
+  sample, with no index division; 32-wide blocks keep warps on single rows
+  so writes stay coalesced [both].
+- Autotuned block layout: at initialization a probe on the real benchmark
+  grid times 32x4/32x8/32x16/32x32 interleaved (median of 5 rounds after
+  warmup) and keeps 32x8 without a clear winner [both, tuned on the
+  benchmark workload].
+- Adaptive launch batching: several kernels are queued per synchronization
+  (4 to 256, capped at ~0.8 s of queued work against TDR), so fast GPUs are
+  measured on compute throughput, not submit latency [benchmark].
+- Full render on the GPU (escape, smooth coloring, palette lookup, and
+  antialiasing downsampling per thread) with only the final bitmap
+  transferred to the host; device and host buffers are reused between frames
+  [interactive and export].
+- On-chip supersampling: threads loop over their `k x k` subsamples, so VRAM
+  stays O(W x H) and the `W*k x H*k` grid is never materialized
+  [interactive and export].
+- Main cardioid + period-2 bulb early-out in the render kernels (Mandelbrot
+  mode only); the benchmark kernels skip it to keep the measured workload
+  identical across engines [interactive and export].
+- Cached 4096-entry device palette table with linear interpolation, uploaded
+  once per palette/iteration combination and shared by all frames
+  [interactive and export].
+- PTX built with FMA contraction enabled (speed over CPU bit-identity;
+  rare single-pixel flips on chaotic boundaries) [both].
+- Rendering and benchmark operations serialized through one gate [both].
+
+### DirectX 11
+
+- Fullscreen triangle with one float pixel-shader invocation per pixel; the
+  engine is float-only, so deep zoom needs CUDA or CPU double precision
+  [both].
+- On-chip supersampling in the shader, same O(W x H) memory behavior as
+  CUDA [interactive and export].
+- Palette through a 1D texture holding the same 4096 entries as the CPU
+  table, with hardware linear filtering between entries [interactive and
+  export].
+- Main cardioid + period-2 bulb early-out in the render shader (Mandelbrot
+  mode only); the benchmark shader omits it like its CUDA counterpart
+  [interactive and export].
+- Realtime main view on a 16 ms timer with immediate pan/zoom updates;
+  resize stretches the swapchain image during the drag and renders full
+  quality on release [interactive].
+- Benchmark on an offscreen target in the tested GPU's memory with no
+  `Present`, so DWM composition and cross-GPU copies are excluded
+  [benchmark].
+- Benchmark pipeline state (constants, shaders, render target) set once;
+  per frame only `Draw` plus an event-query marker, with a deep in-flight
+  ring (4 to 256, capped at ~0.8 s of queued work) and completion counted
+  through the queries [benchmark].
+- Iterations-only benchmark shader with no coloring, smoothing, or
+  averaging [benchmark].
+- PNG capture and previews via a staging-texture copy of the render target
+  [interactive and export].
+
 ## Menus and Export
 
 ### File

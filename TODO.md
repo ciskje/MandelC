@@ -1,5 +1,6 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] Add Optimizations section to SPECS.md, split by DirectX/CUDA with benchmark-vs-interactive scope — completed (docs only, no version bump)
 - [x] v2.22.7 Update DirectX 5070 Ti history bar to 338 — completed
 - [x] v2.22.6 CUDA speed plan phase 3: render-kernel optimization — completed (render kernels on 2D grid, bit-identical; end-to-end CUDA f32 >= DX on all scenes incl. 1080p AA4; double render FP64-bound, CPU wins on GeForce, untouched; temp timing/diff harness removed after use)
 - [x] v2.22.5 CUDA speed plan phase 0+1: baseline profile, 2D-grid bench kernels (no div/mod), multi-frame per launch, launch_bounds, fast-math bench — completed (kept: 2D grid +1.5-3% float, 310.7/250.1; rejected by A/B: unroll4, half-px sampling, float2 loop form, fast-math; submit/graphs skipped on Nsight evidence of full saturation; double unchanged)
