@@ -1,5 +1,6 @@
 ﻿# TODO — MandelC#
 Every user request becomes an entry here. Status: `pending` → `completed`/`cancelled`.
+- [x] v2.22.4 Use icon4.png as the program icon — completed
 - [x] Restructure CHANGELOG.md by minor series + AGENTS.md rule: questions go to QUESTIONS.md, never TODO.md — completed (docs only, no version bump)
 - [x] v2.22.3 Benchmark uses wrong GPU by default (first run scores like the 4070 until reselected) — completed (root cause: flaky autotune, not selection; probe fixed + device shown in results)
 - [x] v2.22.2 Enable FMA contraction in the CUDA PTX (speed over CPU bit-identity) — completed

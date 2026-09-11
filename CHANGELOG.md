@@ -4,6 +4,9 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 `AGENTS.md`. The version is shown in the window title. Entries are grouped
 by minor series below, newest first.
 ## v2.22.x — Native CUDA backend
+- **v2.22.4** — Program icon replaced with `icon4.png`, converted to a
+  multiresolution `.ico` 16/32/48/256. Files: `app.ico`, `AppVersion.cs`,
+  `.csproj`.
 - **v2.22.3** — Fixed flaky autotune picking a slow block size on the first
   run (the small cold-clock probe ranked a starved grid and chose 1024,
   scoring 246 instead of ~300 on the 5070 Ti until the GPU was reselected).
