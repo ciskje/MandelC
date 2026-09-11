@@ -55,8 +55,11 @@ internal static class GpuMandelbrot
     private const string PtxResourceName = "MandelbrotViewer.Cuda.mandelbrot.ptx";
     // Expected native size of GpuViewParams (must match the C struct).
     private const int ViewParamsSize = 88;
-    // Block-size candidates swept by the init probe (threads per block).
-    private static readonly int[] TuneCandidates = [128, 256, 512, 1024];
+    // Block-size candidates swept by the init probe (threads per block, x by y).
+    // Width 32 keeps every warp on a single sample row (writes stay coalesced,
+    // no divergence from the x/y mapping); heights sweep the same thread
+    // counts as the old 1D probe (128/256/512/1024).
+    private static readonly (int X, int Y)[] TuneCandidates = [(32, 4), (32, 8), (32, 16), (32, 32)];
 
     private static readonly object RenderGate = new();
     private static IntPtr _ctx = IntPtr.Zero;
@@ -73,10 +76,12 @@ internal static class GpuMandelbrot
     private static ulong _dLut;
     private static Palette _lutPalette = (Palette)(-1);
     private static int _lutMaxIter = -1;
-    // Explicit wave allocation: tuned threads-per-block per precision
-    // (default 256 = 8 warps; refined by the init probe, see TuneBlocks).
-    private static int _blockFloat = 256;
-    private static int _blockDouble = 256;
+    // Explicit wave allocation: tuned 2D threads-per-block per precision
+    // (default 32x8 = 256 threads = 8 warps; refined by the init probe, see TuneBlocks).
+    private static int _blockFloatX = 32;
+    private static int _blockFloatY = 8;
+    private static int _blockDoubleX = 32;
+    private static int _blockDoubleY = 8;
 
     public static bool IsReady => _ctx != IntPtr.Zero;
     public static string DeviceName { get; private set; } = "";
@@ -260,10 +265,10 @@ internal static class GpuMandelbrot
             int major = CudaNative.GetAttribute(dev, CudaNative.AttrComputeCapabilityMajor);
             int minor = CudaNative.GetAttribute(dev, CudaNative.AttrComputeCapabilityMinor);
             TuneBlocks();
-            int occF = CudaNative.ActiveBlocksPerSm(_floatBenchFunc, _blockFloat);
-            int occD = CudaNative.ActiveBlocksPerSm(_doubleBenchFunc, _blockDouble);
+            int occF = CudaNative.ActiveBlocksPerSm(_floatBenchFunc, _blockFloatX * _blockFloatY);
+            int occD = CudaNative.ActiveBlocksPerSm(_doubleBenchFunc, _blockDoubleX * _blockDoubleY);
             DeviceDetails = $"SM x{sm}, CC {major}.{minor}, {mem / (1024 * 1024)} MB, " +
-                $"block {_blockFloat}/{_blockDouble} (32/64-bit), occ {occF}/{occD} blocks/SM";
+                $"block {_blockFloatX}x{_blockFloatY}/{_blockDoubleX}x{_blockDoubleY} (32/64-bit), occ {occF}/{occD} blocks/SM";
         }
         catch
         {
@@ -272,7 +277,7 @@ internal static class GpuMandelbrot
         }
     }
 
-    // Picks the fastest threads-per-block per precision with an occupancy
+    // Picks the fastest 2D threads-per-block per precision with an occupancy
     // probe: for this register-light escape loop the ranking is
     // occupancy-driven, so it holds for full-size frames while the probe
     // costs about half a second even in double precision.
@@ -295,12 +300,12 @@ internal static class GpuMandelbrot
         try
         {
             // Warmup: steady clocks and compiled kernels before timing anyone.
-            uint warmGrid = GridFor(count, 256);
+            var (warmGX, warmGY) = GridFor2D(pw, ph, 32, 8);
             for (int i = 0; i < 8; i++)
-                CudaNative.LaunchBench(_floatBenchFunc, warmGrid, 256, dProbe, probe);
+                CudaNative.LaunchBench(_floatBenchFunc, warmGX, warmGY, 32, 8, dProbe, probe);
             CudaNative.Synchronize();
-            _blockFloat = TuneOne(_floatBenchFunc, dProbe, probe, count);
-            _blockDouble = TuneOne(_doubleBenchFunc, dProbe, probe, count);
+            (_blockFloatX, _blockFloatY) = TuneOne(_floatBenchFunc, dProbe, probe, pw, ph);
+            (_blockDoubleX, _blockDoubleY) = TuneOne(_doubleBenchFunc, dProbe, probe, pw, ph);
         }
         finally
         {
@@ -311,14 +316,14 @@ internal static class GpuMandelbrot
     // Times one kernel over the candidate block sizes, returns the fastest
     // median. Rounds interleave the candidates to cancel clock drift.
     // Param func (IntPtr): Input: bench kernel handle. Param dBuf (ulong): Input: probe device buffer.
-    // Param view (GpuViewParams): Input: probe view. Param count (int): Input: probe thread count.
-    // Returns (int): Output: winning threads-per-block (256 on any failure).
-    private static int TuneOne(IntPtr func, ulong dBuf, in GpuViewParams view, int count)
+    // Param view (GpuViewParams): Input: probe view. Param w/h (int): Input: probe grid dimensions.
+    // Returns ((int, int)): Output: winning (x, y) threads-per-block (32x8 on any failure).
+    private static (int X, int Y) TuneOne(IntPtr func, ulong dBuf, in GpuViewParams view, int w, int h)
     {
         const int rounds = 5;
-        var grids = new uint[TuneCandidates.Length];
+        var grids = new (uint GX, uint GY)[TuneCandidates.Length];
         for (int c = 0; c < TuneCandidates.Length; c++)
-            grids[c] = GridFor(count, TuneCandidates[c]);
+            grids[c] = GridFor2D(w, h, TuneCandidates[c].X, TuneCandidates[c].Y);
         var times = new double[TuneCandidates.Length, rounds];
         for (int r = 0; r < rounds; r++)
         {
@@ -327,7 +332,8 @@ internal static class GpuMandelbrot
                 try
                 {
                     var sw = System.Diagnostics.Stopwatch.StartNew();
-                    CudaNative.LaunchBench(func, grids[c], (uint)TuneCandidates[c], dBuf, view);
+                    CudaNative.LaunchBench(func, grids[c].GX, grids[c].GY,
+                        (uint)TuneCandidates[c].X, (uint)TuneCandidates[c].Y, dBuf, view);
                     CudaNative.Synchronize();
                     sw.Stop();
                     times[c, r] = sw.Elapsed.TotalSeconds;
@@ -338,17 +344,17 @@ internal static class GpuMandelbrot
                 }
             }
         }
-        int best = 256;
+        (int X, int Y) best = (32, 8);
         double bestMedian = double.PositiveInfinity;
-        double median256 = double.PositiveInfinity;
+        double medianDefault = double.PositiveInfinity;
         for (int c = 0; c < TuneCandidates.Length; c++)
         {
             var sorted = new double[rounds];
             for (int r = 0; r < rounds; r++)
                 sorted[r] = times[c, r];
             Array.Sort(sorted);
-            if (TuneCandidates[c] == 256)
-                median256 = sorted[rounds / 2];
+            if (TuneCandidates[c] == (32, 8))
+                medianDefault = sorted[rounds / 2];
             if (sorted[rounds / 2] < bestMedian)
             {
                 bestMedian = sorted[rounds / 2];
@@ -358,14 +364,16 @@ internal static class GpuMandelbrot
         // Keep the sane default unless the winner is clearly faster: medians
         // within noise of each other must not flip the layout between runs.
         const double minGain = 0.015;
-        if (best != 256 && (median256 - bestMedian) / median256 < minGain)
-            best = 256;
+        if (best != (32, 8) && (medianDefault - bestMedian) / medianDefault < minGain)
+            best = (32, 8);
         return best;
     }
 
-    // Block count covering count threads. Param count (int): Input: thread count.
-    // Param block (int): Input: threads per block. Returns (uint): Output: grid size.
-    private static uint GridFor(int count, int block) => (uint)((count + block - 1) / block);
+    // 2D block counts covering a w*h sample area with bx*by-thread blocks.
+    // Param w/h (int): Input: sample counts. Param bx/by (int): Input: threads per block per axis.
+    // Returns ((uint, uint)): Output: (gridX, gridY) block counts.
+    private static (uint GX, uint GY) GridFor2D(int w, int h, int bx, int by) =>
+        ((uint)((w + bx - 1) / bx), (uint)((h + by - 1) / by));
 
     // Unloads context+kernels and frees device buffers (the driver stays initialized).
     private static void ResetCore()
@@ -430,8 +438,10 @@ internal static class GpuMandelbrot
             }
             DeviceName = "";
             DeviceDetails = "";
-            _blockFloat = 256;
-            _blockDouble = 256;
+            _blockFloatX = 32;
+            _blockFloatY = 8;
+            _blockDoubleX = 32;
+            _blockDoubleY = 8;
         }
     }
 
@@ -498,9 +508,11 @@ internal static class GpuMandelbrot
                 _renderCount = count;
             }
 
-            int block = useDouble ? _blockDouble : _blockFloat;
+            int bx = useDouble ? _blockDoubleX : _blockFloatX;
+            int by = useDouble ? _blockDoubleY : _blockFloatY;
             IntPtr func = useDouble ? _doubleFunc : _floatFunc;
-            CudaNative.LaunchRender(func, GridFor(count, block), (uint)block, _dPixels, view, _dLut);
+            var (gridX, gridY) = GridFor2D(bmp.Width, bmp.Height, bx, by);
+            CudaNative.LaunchRender(func, gridX, gridY, (uint)bx, (uint)by, _dPixels, view, _dLut);
             CudaNative.Synchronize();
             ct.ThrowIfCancellationRequested();
             var pixels = _renderPixels!;
@@ -539,11 +551,11 @@ internal static class GpuMandelbrot
         double pixelSize = scale / bigW;
         double topY = centerY - (bigH * 0.5) * pixelSize;
         var pars = new GpuViewParams(centerX, centerY, pixelSize, topY, bigW, bigH, maxIter);
-        int count = bigW * bigH;
-        int block = useDouble ? _blockDouble : _blockFloat;
+        int bx = useDouble ? _blockDoubleX : _blockFloatX;
+        int by = useDouble ? _blockDoubleY : _blockFloatY;
         IntPtr func = useDouble ? _doubleBenchFunc : _floatBenchFunc;
-        uint grid = GridFor(count, block);
-        ulong dIters = CudaNative.Alloc((ulong)count * 4);
+        var (gridX, gridY) = GridFor2D(bigW, bigH, bx, by);
+        ulong dIters = CudaNative.Alloc((ulong)bigW * (ulong)bigH * 4);
         try
         {
             // Keep several kernels in flight, like the DirectX benchmark. A
@@ -555,7 +567,7 @@ internal static class GpuMandelbrot
             int estimateFrames = batchMin;
             var estimateWatch = System.Diagnostics.Stopwatch.StartNew();
             for (int i = 0; i < estimateFrames; i++)
-                CudaNative.LaunchBench(func, grid, (uint)block, dIters, pars);
+                CudaNative.LaunchBench(func, gridX, gridY, (uint)bx, (uint)by, dIters, pars);
             CudaNative.Synchronize();
             double frameSeconds = Math.Max(1e-6, estimateWatch.Elapsed.TotalSeconds / estimateFrames);
             int batchSize = Math.Clamp((int)Math.Round(safeQueuedSeconds / frameSeconds), batchMin, batchMax);
@@ -571,7 +583,7 @@ internal static class GpuMandelbrot
                 int submitted = 0;
                 while (submitted < batchSize && sw.Elapsed < budget)
                 {
-                    CudaNative.LaunchBench(func, grid, (uint)block, dIters, pars);
+                    CudaNative.LaunchBench(func, gridX, gridY, (uint)bx, (uint)by, dIters, pars);
                     submitted++;
                 }
                 CudaNative.Synchronize();

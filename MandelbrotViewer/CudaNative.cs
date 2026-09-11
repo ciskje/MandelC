@@ -250,12 +250,13 @@ internal static class CudaNative
             Check(cuMemcpyDtoH_v2((IntPtr)p, src, (UIntPtr)(dst.Length * 4L)), "cuMemcpyDtoH");
     }
 
-    // Launches a render kernel: (pixels, view, lut).
-    // Param func (IntPtr): Input: kernel handle. Param grid (uint): Input: block count.
-    // Param block (uint): Input: threads per block. Param dPixels (ulong): Input: device output buffer.
+    // Launches a render kernel on a 2D grid: (pixels, view, lut). Thread (x, y)
+    // maps directly to output pixel (x, y), so the device needs no index division.
+    // Param func (IntPtr): Input: kernel handle. Param gridX/gridY (uint): Input: block counts per axis.
+    // Param blockX/blockY (uint): Input: threads per block per axis. Param dPixels (ulong): Input: device output buffer.
     // Param view (GpuViewParams): Input: view parameters passed by value.
     // Param dLut (ulong): Input: device palette table.
-    internal static unsafe void LaunchRender(IntPtr func, uint grid, uint block,
+    internal static unsafe void LaunchRender(IntPtr func, uint gridX, uint gridY, uint blockX, uint blockY,
         ulong dPixels, in GpuViewParams view, ulong dLut)
     {
         ulong pix = dPixels, lut = dLut;
@@ -264,15 +265,16 @@ internal static class CudaNative
         args[0] = (IntPtr)(&pix);
         args[1] = (IntPtr)(&v);
         args[2] = (IntPtr)(&lut);
-        Check(cuLaunchKernel(func, grid, 1, 1, block, 1, 1, 0, IntPtr.Zero, (IntPtr)args, IntPtr.Zero),
+        Check(cuLaunchKernel(func, gridX, gridY, 1, blockX, blockY, 1, 0, IntPtr.Zero, (IntPtr)args, IntPtr.Zero),
             "cuLaunchKernel(render)");
     }
 
-    // Launches a benchmark kernel: (iters, view).
-    // Param func (IntPtr): Input: kernel handle. Param grid (uint): Input: block count.
-    // Param block (uint): Input: threads per block. Param dIters (ulong): Input: device output buffer.
+    // Launches a benchmark kernel on a 2D grid: (iters, view). Thread (x, y)
+    // maps directly to sample (x, y), so the device needs no index division.
+    // Param func (IntPtr): Input: kernel handle. Param gridX/gridY (uint): Input: block counts per axis.
+    // Param blockX/blockY (uint): Input: threads per block per axis. Param dIters (ulong): Input: device output buffer.
     // Param view (GpuViewParams): Input: view parameters passed by value.
-    internal static unsafe void LaunchBench(IntPtr func, uint grid, uint block,
+    internal static unsafe void LaunchBench(IntPtr func, uint gridX, uint gridY, uint blockX, uint blockY,
         ulong dIters, in GpuViewParams view)
     {
         ulong it = dIters;
@@ -280,7 +282,7 @@ internal static class CudaNative
         IntPtr* args = stackalloc IntPtr[2];
         args[0] = (IntPtr)(&it);
         args[1] = (IntPtr)(&v);
-        Check(cuLaunchKernel(func, grid, 1, 1, block, 1, 1, 0, IntPtr.Zero, (IntPtr)args, IntPtr.Zero),
+        Check(cuLaunchKernel(func, gridX, gridY, 1, blockX, blockY, 1, 0, IntPtr.Zero, (IntPtr)args, IntPtr.Zero),
             "cuLaunchKernel(bench)");
     }
 

@@ -4,6 +4,41 @@ Versioning `X.Y.Z` (if `Z` is 0, short notation `X.Y`). Bump rules in
 `AGENTS.md`. The version is shown in the window title. Entries are grouped
 by minor series below, newest first.
 ## v2.22.x — Native CUDA backend
+- **v2.22.6** — Render kernels on the 2D grid too (same thread-to-pixel
+  mapping as the benchmark kernels; no index division anywhere; the render
+  path shares the tuned 32x8/32x4 layout, dead 1D `GridFor` removed).
+  End-to-end A/B (median of repeats, incl. device-to-host copy) shows CUDA
+  float render at or above DirectX on every scene (5070 Ti: fullset 960x540
+  0.3 vs 0.7 ms, AA4 1.5 vs 1.4, deep 2.0 vs 2.5, Julia 0.3 vs 0.8, deep
+  1080p 6.8 vs 7.8, deep 1080p AA4 97.8 vs 101.1). Regrouping is bit-identical
+  by construction (pure function of x/y; verified: same CPU-diff counts
+  before/after on all scenes). Double render is FP64-hardware-bound on
+  GeForce (deep 960x540: CUDA 79 vs CPU 57 ms) — no kernel change can fix
+  that; left untouched. Float-LUT and fast-math render variants skipped: no
+  measurable headroom left. PTX regenerated with NVRTC 13.3.
+  Files: `Cuda/mandelbrot.cu` + `mandelbrot.ptx`, `CudaNative.cs`,
+  `GpuMandelbrot.cs`, `TODO.md`, `SPECS.md`, `QUESTIONS.md`,
+  `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
+- **v2.22.5** — CUDA benchmark kernels on a 2D grid (thread (x, y) maps
+  directly to sample (x, y), no integer division/modulo per thread; 32-wide
+  blocks keep warps on single rows, fully coalesced). C# side launches 2D
+  (`CudaNative.LaunchBench` takes grid/block per axis) and the init probe
+  sweeps 32x4/32x8/32x16/32x32 (same thread counts as before; fresh processes
+  converge on 32x8 float / 32x4 double). Measured best-of-3, Release:
+  5070 Ti 310.7 (+2-3% vs 301.7) and 4070 SUPER 250.1 (+1.5% vs 247.1);
+  64-bit unchanged within frame-quantization noise (bars kept at 6.7/5.3).
+  Rejected after A/B (same protocol): 4x loop unroll (−3.5%, divergence
+  punishes coarser exit granularity), half-pixel bench sampling (−1.2%),
+  HLSL-style loop form (+0.5%, under threshold), `--use_fast_math` (−0.4%).
+  Evidence the rest of the gap is not our overhead: Nsight Systems shows
+  kernel time == wall time (submit fully hidden by batching), ptxas shows no
+  spills at 14/22 regs, SM clocks identical under both engines (~2.83 GHz).
+  PTX regenerated with NVRTC 13.3 (no MSVC on the build machine, `nvcc`
+  unusable; output byte-identical to the previous nvcc-built PTX for the same
+  source). Bonus: `--diag-gpu` file now includes the tuned block layout.
+  Files: `Cuda/mandelbrot.cu` + `mandelbrot.ptx`, `CudaNative.cs`,
+  `GpuMandelbrot.cs`, `Diagnostics.cs`, `BenchmarkForm.cs`, `TODO.md`,
+  `SPECS.md`, `QUESTIONS.md`, `CHANGELOG.md`, `AppVersion.cs`, `.csproj`.
 - **v2.22.4** — Program icon replaced with `icon4.png`, converted to a
   multiresolution `.ico` 16/32/48/256. Files: `app.ico`, `AppVersion.cs`,
   `.csproj`.

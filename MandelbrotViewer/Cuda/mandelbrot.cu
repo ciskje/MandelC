@@ -67,12 +67,15 @@ __device__ inline int LutColor(const int* __restrict__ lut, double smooth, int m
 
 // Benchmark kernel, single precision: escape-iteration count of one
 // elementary sample, no coloring, no smoothing, no SSAA averaging.
+// 2D grid: thread (x, y) maps directly to sample (x, y), so no integer
+// division/modulo is needed (the rasterizer-equivalent layout; consecutive
+// x threads still write consecutive words, fully coalesced).
 extern "C" __global__ void FloatBenchKernel(int* __restrict__ iters, GpuViewParams p)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= p.W * p.H) return;
-    int x = idx % p.W;
-    int y = idx / p.W;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= p.W || y >= p.H) return;
+    int idx = y * p.W + x;
     float pixel = (float)p.PixelSize;
     float cx = (float)p.CenterX + ((float)x - (float)p.W * 0.5f) * pixel;
     float cy = (float)p.TopY + (float)y * pixel;
@@ -90,13 +93,14 @@ extern "C" __global__ void FloatBenchKernel(int* __restrict__ iters, GpuViewPara
     iters[idx] = iter;
 }
 
-// Benchmark kernel, double precision: same contract in float64.
+// Benchmark kernel, double precision: same contract in float64 (2D grid,
+// see FloatBenchKernel above).
 extern "C" __global__ void DoubleBenchKernel(int* __restrict__ iters, GpuViewParams p)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= p.W * p.H) return;
-    int x = idx % p.W;
-    int y = idx / p.W;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= p.W || y >= p.H) return;
+    int idx = y * p.W + x;
     double cx = p.CenterX + ((double)x - (double)p.W * 0.5) * p.PixelSize;
     double cy = p.TopY + (double)y * p.PixelSize;
 
@@ -117,13 +121,15 @@ extern "C" __global__ void DoubleBenchKernel(int* __restrict__ iters, GpuViewPar
 // pixel. Same math as ComputePixelFloat: cardioid test in double on the
 // host-order coordinates, escape and smooth in float, integer accumulation
 // (FMA contraction may flip rare boundary pixels vs the CPU).
+// 2D grid: thread (x, y) maps directly to output pixel (x, y), no index
+// division (thread/block layout shared with the benchmark kernels).
 // Param idx contract, tile mapping and LUT averaging as in DoubleKernel below.
 extern "C" __global__ void FloatKernel(int* __restrict__ pixels, GpuViewParams p, const int* __restrict__ lut)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= p.W * p.H) return;
-    int x = idx % p.W;
-    int y = idx / p.W;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= p.W || y >= p.H) return;
+    int idx = y * p.W + x;
     int k = p.Supersample;
     // Exact host op order (Mandelbrot.cs RenderTile/ComputePixelFloat).
     double originX = p.CenterX - (double)(p.FullW * k) * 0.5 * p.PixelSize;
@@ -181,12 +187,13 @@ extern "C" __global__ void FloatKernel(int* __restrict__ pixels, GpuViewParams p
 // flip rare boundary pixels vs the CPU).
 // The thread loops over its k x k subsamples on the global k-times grid;
 // VRAM traffic stays O(W x H), the W*k x H*k grid is never materialized.
+// 2D grid like FloatKernel above (no index division).
 extern "C" __global__ void DoubleKernel(int* __restrict__ pixels, GpuViewParams p, const int* __restrict__ lut)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= p.W * p.H) return;
-    int x = idx % p.W;
-    int y = idx / p.W;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= p.W || y >= p.H) return;
+    int idx = y * p.W + x;
     int k = p.Supersample;
     // Exact host op order (Mandelbrot.cs RenderTile/ComputePixelDouble).
     double originX = p.CenterX - (double)(p.FullW * k) * 0.5 * p.PixelSize;

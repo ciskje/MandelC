@@ -84,3 +84,40 @@ zone constants) stays in `TODO.md` with its verdicts in `SPECS.md`.
   32-thread warps. The only parallelism knobs we control are the frame-level
   queue depths (CUDA adaptive batch, DirectX in-flight ring), not the
   intra-frame blocks/warps.
+
+- **Why CUDA benchmarks slower than DirectX despite full optimization control** —
+  answered. The gap is small, not a missing optimization: on the history bars
+  (best of 3, Release) CUDA 32-bit scores 301.7 vs DirectX 322.4 MPixel/s on
+  the 5070 Ti (~7%) and 247.1 vs 262.4 on the 4070 SUPER (~6%);
+  `BenchmarkForm.cs` notes both kernels run the identical incremental-squares
+  loop, so it is a fair engine-to-engine comparison. ILGPU was already ruled
+  out as the cause: v2.22.0 replaced it with native PTX (`Cuda/mandelbrot.cu`
+  via `nvcc`, driven through `CudaNative.cs`) and throughput was a wash
+  (+4% float / −13% double from the `--fmad=false` identity trade, later
+  recovered by re-enabling FMA in v2.22.2). Remaining structural causes, all
+  visible in the sources: (1) per-thread index math — every CUDA bench thread
+  pays an integer `idx % W` / `idx / W` division (`mandelbrot.cu`,
+  `FloatBenchKernel`/`DoubleBenchKernel`), while the HLSL bench shader gets
+  its coordinates free from the rasterizer (`SV_Position` in `BenchPS`,
+  `DxMandelbrot.cs`); (2) submit path — DirectX sets pipeline state once and
+  then issues only `Draw + End(query)` per frame with a deep (up to 256)
+  in-flight ring (`RunBenchmarkFramesOffscreen`), while CUDA pays a
+  managed-to-native `cuLaunchKernel` per launch plus param packing and
+  `Synchronize` per batch (`GpuMandelbrot.cs`, `BenchmarkGpuCore`); (3) the
+  graphics pipeline (fullscreen triangle, quad grouping, ROP render-target
+  write) is the most game-tuned path in the driver, vs a 1D compute dispatch
+  with global-memory writes. Practical consequence: DirectX wins interactive
+  float rendering, but it is float-only (`SPECS.md`), so deep zoom has no
+  DirectX equivalent and needs CUDA double (6.7 MPixel/s on the 5070 Ti).
+  Follow-up (v2.22.5): the 2D-grid bench layout closed part of it
+  (5070 Ti 301.7 → 310.7, 4070 SUPER 247.1 → 250.1); Nsight Systems then
+  showed kernel time == wall time, ptxas no spills, and identical SM clocks
+  under both engines, so the remainder is backend codegen/divergence
+  handling inside NVIDIA's own compilers, not host overhead. Rejected by A/B:
+  4x unroll (−3.5%), half-pixel sampling (−1.2%), HLSL-style loop (+0.5%),
+  `--use_fast_math` (−0.4%).
+  Render follow-up (v2.22.6): end-to-end float rendering needs no catch-up —
+  CUDA is at or above DirectX on every measured scene (fullset, AA4, deep,
+  Julia, 1080p, 1080p AA4); render kernels moved to the same 2D grid,
+  bit-identical. Double render stays FP64-hardware-bound on GeForce
+  (deep 960x540: CUDA ~79 ms vs CPU ~57 ms).

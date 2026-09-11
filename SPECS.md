@@ -54,11 +54,13 @@ High-resolution PNG export uses the selected antialiasing without automatic redu
   time and embedded in the executable; the C# side drives them through a
   minimal `nvcuda.dll` driver-API binding (`CudaNative.cs`). End-user
   machines need only the NVIDIA driver, never the CUDA toolkit.
-- Explicit wave allocation: launches use `grid = ceil(N/block)` with a
-  tuned threads-per-block per precision (default 256 = 8 warps). At
+- Explicit wave allocation: all launches (render and benchmark) use a 2D
+  grid (`grid = ceil(W/bx) x ceil(H/by)`, thread (x, y) maps directly to
+  sample (x, y) with no index division; 32-wide blocks keep warps on single
+  rows) with a tuned threads-per-block per precision (default 32x8 = 8 warps). At
   initialization, after a warmup (steady clocks, compiled kernels), a probe
-  on the real benchmark grid at reduced iterations times 128/256/512/1024
-  interleaved (median of 5 rounds); the winner replaces 256 only with a
+  on the real benchmark grid at reduced iterations times 32x4/32x8/32x16/32x32
+  interleaved (median of 5 rounds); the winner replaces 32x8 only with a
   clear margin, so noise cannot flip the layout between runs. The log window
   reports SM count, compute capability, chosen blocks, and resident
   blocks/SM. PTX is built with FMA

@@ -78,7 +78,7 @@ internal static class Diagnostics
             using var bmp = new Bitmap(320, 240);
             if (ok)
                 GpuMandelbrot.Render(bmp, MandelbrotForm.StartCenterX, MandelbrotForm.StartCenterY, MandelbrotForm.StartScale, 200, Palette.Fire, 1, false, CancellationToken.None);
-            File.WriteAllText(path, $"Devices: {string.Join(", ", devices)}\nReady: {ok}\nDevice: {GpuMandelbrot.DeviceName}\nError: {GpuMandelbrot.LastError}");
+            File.WriteAllText(path, $"Devices: {string.Join(", ", devices)}\nReady: {ok}\nDevice: {GpuMandelbrot.DeviceName}\nDetails: {GpuMandelbrot.DeviceDetails}\nError: {GpuMandelbrot.LastError}");
         }
         catch (Exception ex)
         {
